@@ -1,0 +1,35 @@
+{
+  "name": "biela",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BIELA backend Phase 1 monorepo",
+  "workspaces": [
+    "services/*"
+  ],
+  "scripts": {
+    "dev:users": "npm run start:dev --workspace @biela/ms-users",
+    "dev:autorepuesto": "npm run start:dev --workspace @biela/ms-autorepuesto",
+    "dev:gateway": "npm run start:dev --workspace @biela/api-gateway",
+    "seed:admin": "npm run seed:admin --workspace @biela/ms-users",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspaces --if-present",
+    "format": "prettier --write \"**/*.{ts,js,json,md,yml,yaml}\" --ignore-path .gitignore",
+    "prisma:generate": "npm run prisma:generate --workspace @biela/ms-autorepuesto",
+    "prisma:migrate": "npm run prisma:migrate --workspace @biela/ms-autorepuesto",
+    "prisma:deploy": "npm run prisma:deploy --workspace @biela/ms-autorepuesto"
+  },
+  "devDependencies": {
+    "js-yaml": "^5.2.3",
+    "prettier": "^3.4.2"
+  },
+  "overrides": {
+    "@nestjs/swagger": {
+      "js-yaml": "^5.2.3"
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

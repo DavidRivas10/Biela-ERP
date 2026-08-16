@@ -1,0 +1,2 @@
+-- BIELA Backend Phase 1 baseline.
+-- No business tables are introduced until their approved roadmap phase.

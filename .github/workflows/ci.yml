@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: biela_test
+          POSTGRES_PASSWORD: biela_test
+          POSTGRES_DB: biela_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U biela_test -d biela_test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      MS_USERS_MONGO_URI: mongodb://localhost:27017/biela_test
+      JWT_ACCESS_SECRET: ci_only_secret_with_at_least_32_chars
+      JWT_ACCESS_EXPIRES_IN: 15m
+      DATABASE_URL: postgresql://biela_test:biela_test@localhost:5432/biela_test?schema=public
+      MS_USERS_URL: http://localhost:4001
+      MS_AUTOREPUESTO_URL: http://localhost:4002
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:e2e
+      - run: npm run build
