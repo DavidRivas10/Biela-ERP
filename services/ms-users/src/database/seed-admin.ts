@@ -33,7 +33,7 @@ async function seed(): Promise<void> {
     const role = await roleModel.findOneAndUpdate(
       { name: "administrator" },
       {
-        description: "Phase 1 system administrator",
+        description: "BIELA system administrator",
         permissions: ADMIN_PERMISSIONS,
         active: true,
       },

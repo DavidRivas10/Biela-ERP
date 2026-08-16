@@ -2,7 +2,7 @@
   "name": "biela",
   "version": "0.1.0",
   "private": true,
-  "description": "BIELA backend Phase 1 monorepo",
+  "description": "BIELA backend monorepo with authentication and automotive catalog services",
   "workspaces": [
     "services/*"
   ],

@@ -10,22 +10,36 @@ architecture. Do not redesign it without explicit human approval.
 - `ms-autorepuesto` owns PostgreSQL and its Prisma schema/migrations.
 - `api-gateway` owns no database and communicates with services only through APIs.
 - Services do not read or write another service's database.
-- The future frontend is React + TypeScript; do not implement it in Phase 1.
-- The future AI service is Python/FastAPI; do not implement it in Phase 1.
+- The future frontend is React + TypeScript; it is not implemented yet.
+- The future AI service is Python/FastAPI; it is not implemented yet.
 
 ## Roadmap boundaries
 
-The current phase is Backend Phase 1: environment, authentication, basic users
-and roles, service communication, documentation, and tests. The next phase is
-products, vehicles, and compatibility. Later phases cover inventory, commerce,
-workshop, and intelligence. Never implement a future phase without explicit
-instruction.
+Backend Phases 1 and 2 are implemented. Phase 1 provides environment,
+authentication, users, roles, service communication, documentation, and tests.
+Phase 2 provides Products, Vehicles, and deterministic Product ↔ Vehicle
+Compatibility in `ms-autorepuesto` with additive Prisma migrations. The next
+approved phase is inventory, physical locations, and deterministic search.
+Later phases cover commerce, workshop, and intelligence. Never implement a
+future phase without explicit instruction.
+
+## Phase 2 domain rules
+
+- Products contain catalog data only; never add stock quantities to Product.
+- Product attributes use controlled category-specific definitions and relational
+  values, not arbitrary JSON.
+- Vehicles use Vehicle Brand → Vehicle Model → Vehicle with year and engine.
+- `ProductCompatibility` is the explicit fitment relation and must retain its
+  database-level unique `(productId, vehicleId)` constraint.
+- `ms-autorepuesto` validates bearer tokens through the `ms-users` API and never
+  reads MongoDB directly.
 
 ## Commands
 
 - `npm run dev:users`, `npm run dev:autorepuesto`, `npm run dev:gateway`
 - `npm run seed:admin`
-- `npm run lint`, `npm test`, `npm run build`
+- `npm run lint`, `npm test`, `npm run test:e2e`, `npm run build`
+- `npm run prisma:generate`, `npm run prisma:deploy`
 - `docker compose up -d`, `docker compose down`
 
 ## Engineering expectations

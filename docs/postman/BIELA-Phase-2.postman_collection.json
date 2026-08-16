@@ -1,0 +1,380 @@
+{
+  "info": {
+    "name": "BIELA Backend Phase 2",
+    "description": "Run after Phase 1 setup, migrations, and administrator seed. Set adminEmail/adminPassword locally; no credentials are committed.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "if (!pm.environment.get('suffix')) pm.environment.set('suffix', Date.now().toString());"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Administrator login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Login succeeds', () => pm.response.to.have.status(200));",
+              "pm.environment.set('accessToken', pm.response.json().accessToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Create Product Category",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"braking-{{suffix}}\",\"name\":\"Braking\"}"
+        },
+        "url": "{{baseUrl}}/api/product-categories"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Category created', () => pm.response.to.have.status(201));",
+              "pm.environment.set('productCategoryId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Create Product Brand",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"brembo-{{suffix}}\",\"name\":\"Brembo\"}"
+        },
+        "url": "{{baseUrl}}/api/product-brands"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Product brand created', () => pm.response.to.have.status(201));",
+              "pm.environment.set('productBrandId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Create controlled Product Attribute",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"categoryId\":\"{{productCategoryId}}\",\"code\":\"compound-{{suffix}}\",\"name\":\"Compound\",\"valueType\":\"STRING\",\"required\":true}"
+        },
+        "url": "{{baseUrl}}/api/product-attribute-definitions"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Attribute definition created', () => pm.response.to.have.status(201));",
+              "pm.environment.set('productAttributeDefinitionId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Create Brake Pad Product",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"BP-{{suffix}}\",\"name\":\"Brake Pad\",\"categoryId\":\"{{productCategoryId}}\",\"brandId\":\"{{productBrandId}}\",\"attributes\":[{\"definitionId\":\"{{productAttributeDefinitionId}}\",\"value\":\"ceramic\"}]}"
+        },
+        "url": "{{baseUrl}}/api/products"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Product created', () => pm.response.to.have.status(201));",
+              "pm.environment.set('productId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. List and filter Products",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/products?search=Brake&categoryId={{productCategoryId}}&active=true&page=1&limit=20"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Product appears in paginated results', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.some(x => x.id === pm.environment.get('productId'))).to.eql(true); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Update Product",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"description\":\"Postman Phase 2 verified\"}"
+        },
+        "url": "{{baseUrl}}/api/products/{{productId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Product updated', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Create Vehicle Brand",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"toyota-{{suffix}}\",\"name\":\"Toyota\"}"
+        },
+        "url": "{{baseUrl}}/api/vehicle-brands"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Vehicle brand created', () => pm.response.to.have.status(201));",
+              "pm.environment.set('vehicleBrandId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Create Corolla Vehicle Model",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"brandId\":\"{{vehicleBrandId}}\",\"code\":\"corolla-{{suffix}}\",\"name\":\"Corolla\"}"
+        },
+        "url": "{{baseUrl}}/api/vehicle-models"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Vehicle model created', () => pm.response.to.have.status(201));",
+              "pm.environment.set('vehicleModelId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Create Toyota Corolla 2015 Vehicle",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"modelId\":\"{{vehicleModelId}}\",\"year\":2015,\"engine\":\"1.8L\"}"
+        },
+        "url": "{{baseUrl}}/api/vehicles"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Vehicle created', () => pm.response.to.have.status(201));",
+              "pm.environment.set('vehicleId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. List and filter Vehicles",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/vehicles?brandId={{vehicleBrandId}}&modelId={{vehicleModelId}}&year=2015&engine=1.8&active=true&page=1&limit=20"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Vehicle appears in filtered results', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.some(x => x.id === pm.environment.get('vehicleId'))).to.eql(true); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Create Compatibility",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"productId\":\"{{productId}}\",\"vehicleId\":\"{{vehicleId}}\",\"notes\":\"Direct fit\"}"
+        },
+        "url": "{{baseUrl}}/api/compatibilities"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Compatibility created', () => pm.response.to.have.status(201));",
+              "pm.environment.set('compatibilityId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Product to compatible Vehicles",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/products/{{productId}}/vehicles"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Compatible vehicle is returned', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.some(x => x.id === pm.environment.get('vehicleId'))).to.eql(true); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14. Vehicle to compatible Products",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}/products"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Compatible product is returned', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.some(x => x.id === pm.environment.get('productId'))).to.eql(true); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15. Duplicate Compatibility is rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"productId\":\"{{productId}}\",\"vehicleId\":\"{{vehicleId}}\"}"
+        },
+        "url": "{{baseUrl}}/api/compatibilities"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Duplicate compatibility returns conflict', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

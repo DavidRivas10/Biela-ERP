@@ -30,6 +30,7 @@ jobs:
       DATABASE_URL: postgresql://biela_test:biela_test@localhost:5432/biela_test?schema=public
       MS_USERS_URL: http://localhost:4001
       MS_AUTOREPUESTO_URL: http://localhost:4002
+      UPSTREAM_TIMEOUT_MS: 5000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,6 +39,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run prisma:generate
+      - run: npm run prisma:deploy
       - run: npm run lint
       - run: npm test
       - run: npm run test:e2e

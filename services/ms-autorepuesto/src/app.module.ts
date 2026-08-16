@@ -4,6 +4,10 @@ import { ConfigModule } from "@nestjs/config";
 import { envValidationSchema } from "./config/env.validation";
 import { DatabaseModule } from "./database/database.module";
 import { HealthModule } from "./health/health.module";
+import { ProductsModule } from "./products/products.module";
+import { VehiclesModule } from "./vehicles/vehicles.module";
+import { CompatibilitiesModule } from "./compatibilities/compatibilities.module";
+import { AuthModule } from "./auth/auth.module";
 
 @Module({
   imports: [
@@ -13,7 +17,11 @@ import { HealthModule } from "./health/health.module";
       validationSchema: envValidationSchema,
     }),
     DatabaseModule,
+    AuthModule,
     HealthModule,
+    ProductsModule,
+    VehiclesModule,
+    CompatibilitiesModule,
   ],
 })
 export class AppModule {}

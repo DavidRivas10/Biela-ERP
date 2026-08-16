@@ -1,9 +1,9 @@
 # BIELA Backend
 
 BIELA (Base Integrada Empresarial de Logística Automotriz) is an integrated
-automotive logistics platform. This repository contains the approved Backend
-Phase 1 foundation: environment setup, authentication, users, basic RBAC,
-service communication, documentation, and tests.
+automotive logistics platform. The backend currently implements authentication,
+users, basic RBAC, and the Phase 2 automotive catalog foundation: Products,
+Vehicles, and deterministic Product ↔ Vehicle Compatibility.
 
 ```mermaid
 flowchart TD
@@ -14,44 +14,43 @@ flowchart TD
     Auto --> Postgres[(PostgreSQL :5432)]
 ```
 
-`ms-users` exclusively owns MongoDB user, role, permission, and authentication
-data. `ms-autorepuesto` exclusively owns its PostgreSQL database and Prisma
-migrations. The API Gateway owns no data and has no ORM/database dependency.
+`ms-users` exclusively owns MongoDB authentication and RBAC data.
+`ms-autorepuesto` exclusively owns PostgreSQL catalog data and Prisma
+migrations. The API Gateway owns no database and has no ORM dependency.
 
-## Repository layout
+## Implemented scope
 
-```text
-services/ms-users/          MongoDB authentication and RBAC service
-services/ms-autorepuesto/   PostgreSQL/Prisma operational foundation
-services/api-gateway/       Unified REST entry point
-database/                   Local database operating notes
-docs/postman/               Phase 1 Postman collection and environment
-.github/workflows/          CI verification
-```
+- Phase 1: JWT authentication, users, roles, permissions, service health,
+  Swagger, Postman, and CI.
+- Phase 2 Products: categories, brands/manufacturers, products, active state,
+  filtering, and controlled category-specific technical attributes.
+- Phase 2 Vehicles: relational brands and models plus year, engine, optional
+  generation/trim, active state, and deterministic filters.
+- Phase 2 Compatibility: explicit Product ↔ Vehicle relation, notes, active
+  state, unique pair constraint, and queries in both directions.
 
-## Prerequisites and setup
+No Product contains stock quantity or other inventory data. See
+[the Phase 2 model](docs/phase-2-data-model.md) for the actual ER diagram and
+constraint rationale.
 
-Use Node.js 20 or newer, npm, Docker Engine, and Docker Compose. Then:
+## Setup
+
+Prerequisites are Node.js 20+, npm, Docker Engine, and Docker Compose.
 
 ```bash
 cp .env.example .env
-# Replace every example credential/secret in .env with local values.
+# Replace all example credentials and secrets with local values.
 npm install
 docker compose up -d
-docker compose ps
 npm run prisma:generate
 npm run prisma:deploy
 npm run seed:admin
 ```
 
-The administrator seed reads `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`,
-`SEED_ADMIN_FIRST_NAME`, and `SEED_ADMIN_LAST_NAME`. It creates the Phase 1
-administrator role and is safe to rerun; an existing administrator is activated
-and assigned the current administrator permissions.
+The administrator seed is idempotent and updates the administrator role with
+the current permission set. Never commit `.env`.
 
-## Development and verification
-
-Run the services in separate terminals:
+Start services in separate terminals:
 
 ```bash
 npm run dev:users
@@ -59,60 +58,104 @@ npm run dev:autorepuesto
 npm run dev:gateway
 ```
 
-Repository verification commands are:
+## Public Phase 2 API
+
+All public paths are exposed by the Gateway at `http://localhost:4000` and
+require a bearer token unless noted otherwise.
+
+| Domain           | Routes                                                                                                                            |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Authentication   | `POST /api/auth/login`, `GET /api/auth/me`                                                                                        |
+| Health           | `GET /health`, `GET /api/system/health`                                                                                           |
+| Products         | `POST/GET /api/products`, `GET/PATCH /api/products/:id`, `PATCH /api/products/:id/activate`, `PATCH /api/products/:id/deactivate` |
+| Product catalogs | `POST/GET/PATCH /api/product-categories`, `/api/product-brands`, `/api/product-attribute-definitions`                             |
+| Vehicles         | `POST/GET /api/vehicles`, `GET/PATCH /api/vehicles/:id`, `PATCH /api/vehicles/:id/activate`, `PATCH /api/vehicles/:id/deactivate` |
+| Vehicle catalogs | `POST/GET/PATCH /api/vehicle-brands`, `/api/vehicle-models`                                                                       |
+| Compatibility    | `POST/GET /api/compatibilities`, `GET/PATCH /api/compatibilities/:id`                                                             |
+| Fitment queries  | `GET /api/products/:id/vehicles`, `GET /api/vehicles/:id/products`                                                                |
+
+List endpoints use one contract:
+
+```json
+{
+  "data": [],
+  "meta": { "page": 1, "limit": 20, "total": 0, "pages": 0 }
+}
+```
+
+Products support search, category, brand, and active filters. Vehicles support
+brand, model, year, engine, and active filters. Compatibilities support product,
+vehicle, and active filters.
+
+## Permissions
+
+Phase 2 extends the existing stable string convention:
+
+- `products.read`, `products.create`, `products.update`
+- `vehicles.read`, `vehicles.create`, `vehicles.update`
+- `compatibilities.read`, `compatibilities.manage`
+
+`ms-autorepuesto` delegates bearer-token validation to `ms-users /auth/me` over
+HTTP, then enforces these permissions. It never reads MongoDB.
+
+## Swagger and Postman
+
+| Component       | Swagger                      |
+| --------------- | ---------------------------- |
+| Gateway         | `http://localhost:4000/docs` |
+| ms-users        | `http://localhost:4001/docs` |
+| ms-autorepuesto | `http://localhost:4002/docs` |
+
+Import the Phase 2 collection and environment from `docs/postman`, set only the
+local administrator email/password, and run requests in order. The collection
+creates a Brake Pad, Toyota Corolla 2015 1.8L vehicle, compatibility, both
+directional queries, and verifies duplicate rejection. Phase 1 Postman files
+remain available unchanged.
+
+## Verification and migrations
 
 ```bash
+npm run prisma:generate
+npm run prisma:deploy
+npm run prisma:status --workspace @biela/ms-autorepuesto
 npm run lint
 npm test
 npm run test:e2e
 npm run build
 ```
 
-Prisma is owned by `ms-autorepuesto`. Use `npm run prisma:migrate -- --name
-<name>` to create a future development migration and `npm run prisma:deploy` to
-apply committed migrations. See [database/README.md](database/README.md) before
-any local reset.
+Create future development migrations with `npm run prisma:migrate -- --name
+<name>`. Never reset a shared database. The Phase 2 migrations are additive:
 
-## URLs and ports
+- `20260816170958_phase_2_products`
+- `20260816171416_phase_2_vehicles`
+- `20260816171731_phase_2_compatibility`
 
-| Component               | URL                          |
-| ----------------------- | ---------------------------- |
-| API Gateway             | `http://localhost:4000`      |
-| Gateway Swagger         | `http://localhost:4000/docs` |
-| ms-users Swagger        | `http://localhost:4001/docs` |
-| ms-autorepuesto Swagger | `http://localhost:4002/docs` |
-| MongoDB                 | `localhost:27017`            |
-| PostgreSQL              | `localhost:5432`             |
+## Manual Phase 2 verification
 
-Primary public routes are under `/api` on the Gateway. Swagger's Authorize
-button accepts the JWT returned by `POST /api/auth/login`. Import both JSON files
-from `docs/postman`, set non-committed admin/test passwords in your local Postman
-environment, and run the collection in order.
-
-## Environment contract
-
-`.env.example` documents all required settings. Important groups are MongoDB
-initialization variables, PostgreSQL initialization variables,
-`MS_USERS_MONGO_URI`, JWT secret/expiry, `DATABASE_URL`, service ports, upstream
-service URLs, timeout, CORS origins, and administrator seed values. Services
-validate critical configuration at startup and do not provide an insecure JWT
-fallback. Never commit `.env`.
+1. Start databases and all three services; seed the administrator.
+2. Log in through `POST /api/auth/login` and use the returned bearer token.
+3. Create a Product Category, Product Brand, and optional controlled attribute.
+4. Create a Product.
+5. Create a Vehicle Brand, Vehicle Model, and Vehicle.
+6. Create a Compatibility.
+7. Query `/api/products/{productId}/vehicles` and
+   `/api/vehicles/{vehicleId}/products`.
+8. Submit the same pair again and verify HTTP 409.
 
 ## Troubleshooting
 
-- If a database health check fails, inspect `docker compose ps` and `docker
-compose logs mongodb postgres`; confirm `.env` credentials match volumes that
-  were initialized with those credentials.
-- If a port is occupied, change the relevant port and service URL consistently
-  in `.env`.
-- If Prisma Client is missing after install, run `npm run prisma:generate`.
-- A Gateway 502 means the named upstream is unreachable or timed out; start the
-  corresponding service and check its direct `/health` endpoint.
-- Stop local databases with `docker compose down`. Data remains in named volumes.
+- Check databases with `docker compose ps` and logs with `docker compose logs
+mongodb postgres`.
+- A Gateway 502 means an upstream is unavailable or timed out.
+- A catalog-route 503 from `ms-autorepuesto` can indicate `ms-users` is
+  unavailable for token validation.
+- Run `npm run prisma:generate` if Prisma Client is missing and `npm run
+prisma:deploy` if migration status is behind.
 
 ## Scope boundary
 
-Phase 1 intentionally does not include a frontend, AI service, catalog,
-products, vehicles, compatibility, inventory, locations, purchasing, sales,
-cash register, workshop, OCR, semantic search, YOLO, embeddings, or pgvector.
-The next approved phase is products, vehicles, and compatibility.
+Inventory, physical locations, stock movements, purchasing, sales, cash
+register, workshop, frontend, AI, OCR, YOLO, embeddings, semantic search,
+pgvector, and `ms-intelligence` are intentionally not implemented. The next
+approved work is inventory, physical locations, and deterministic search.

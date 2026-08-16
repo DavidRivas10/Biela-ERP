@@ -6,5 +6,7 @@ export const envValidationSchema = Joi.object({
     .default("development"),
   MS_AUTOREPUESTO_PORT: Joi.number().port().default(4002),
   DATABASE_URL: Joi.string().uri().required(),
+  MS_USERS_URL: Joi.string().uri().required(),
+  UPSTREAM_TIMEOUT_MS: Joi.number().integer().min(100).max(30000).required(),
   CORS_ORIGINS: Joi.string().default("http://localhost:4000"),
 });
