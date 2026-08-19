@@ -33,8 +33,10 @@ export class AutorepuestoAuthGuard implements CanActivate {
           this.config.getOrThrow<number>("UPSTREAM_TIMEOUT_MS"),
         ),
       });
-      if (!response.ok)
+      if (response.status === 401 || response.status === 403)
         throw new UnauthorizedException("Invalid or expired access token");
+      if (!response.ok)
+        throw new Error("Authentication service rejected request");
       const user = (await response.json()) as AuthorizationUser;
       if (!user.active || !Array.isArray(user.roles)) {
         throw new UnauthorizedException("Invalid or expired access token");

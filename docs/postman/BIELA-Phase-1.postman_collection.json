@@ -78,9 +78,9 @@
           "script": {
             "exec": [
               "pm.test('Login succeeds', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
-              "const data = pm.response.json();",
-              "pm.expect(data.accessToken).to.be.a('string');",
-              "pm.environment.set('accessToken', data.accessToken);",
+              "const loginBody = pm.response.json();",
+              "pm.expect(loginBody.accessToken).to.be.a('string');",
+              "pm.environment.set('accessToken', loginBody.accessToken);",
               "pm.environment.set('testUserEmail', `phase1-${Date.now()}@example.invalid`);"
             ]
           }

@@ -15,13 +15,28 @@ architecture. Do not redesign it without explicit human approval.
 
 ## Roadmap boundaries
 
-Backend Phases 1 and 2 are implemented. Phase 1 provides environment,
+Backend Phases 1, 2, and 3 are implemented. Phase 1 provides environment,
 authentication, users, roles, service communication, documentation, and tests.
 Phase 2 provides Products, Vehicles, and deterministic Product ↔ Vehicle
-Compatibility in `ms-autorepuesto` with additive Prisma migrations. The next
-approved phase is inventory, physical locations, and deterministic search.
-Later phases cover commerce, workshop, and intelligence. Never implement a
-future phase without explicit instruction.
+Compatibility in `ms-autorepuesto` with additive Prisma migrations. Phase 3
+provides physical Locations, non-negative Product + Location Inventory,
+traceable stock Movements, atomic Transfers, and deterministic Product search.
+Phase 4 backend integration, hardening, regression testing, and MVP
+stabilization is complete. The frontend and AI service remain unimplemented;
+commerce, purchasing, sales, workshop, and intelligence are deferred. No
+subsequent roadmap block is approved here. Never implement a future phase
+without explicit instruction.
+
+## Migration and credential safety
+
+- Preserve historical migrations. Schema evolution must use new additive
+  migrations; never squash, rewrite applied migrations, or reset a shared
+  database without explicit human approval.
+- PostgreSQL extensions and indexes, including `pg_trgm`, must remain
+  reproducible through migrations rather than undocumented manual setup.
+- Never store administrator credentials or tokens in tracked Postman files.
+  Keep secret environment values empty and inject `SEED_ADMIN_EMAIL` and
+  `SEED_ADMIN_PASSWORD` from the ignored local `.env` when running Newman.
 
 ## Phase 2 domain rules
 
@@ -34,12 +49,26 @@ future phase without explicit instruction.
 - `ms-autorepuesto` validates bearer tokens through the `ms-users` API and never
   reads MongoDB directly.
 
+## Phase 3 domain rules
+
+- Inventory remains separate from Product and is unique per Product + Location.
+- All stock mutations use the Inventory Movement ledger; never add a direct
+  quantity-overwrite API.
+- OUT and TRANSFER use conditional atomic decrements inside serializable Prisma
+  transactions. TRANSFER changes both locations and records its ledger entry in
+  one transaction.
+- ADJUSTMENT means setting a non-negative target balance and requires a reason.
+- Product search is deterministic PostgreSQL search by code, name, and the
+  existing Compatibility relation. Do not introduce semantic or external search.
+
 ## Commands
 
 - `npm run dev:users`, `npm run dev:autorepuesto`, `npm run dev:gateway`
 - `npm run seed:admin`
 - `npm run lint`, `npm test`, `npm run test:e2e`, `npm run build`
-- `npm run prisma:generate`, `npm run prisma:deploy`
+- `npm run prisma:generate`, `npm run prisma:deploy`, `npm run prisma:status
+--workspace @biela/ms-autorepuesto`
+- `npm audit --omit=dev`, `git diff --check`
 - `docker compose up -d`, `docker compose down`
 
 ## Engineering expectations

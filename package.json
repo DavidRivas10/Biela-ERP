@@ -2,7 +2,7 @@
   "name": "biela",
   "version": "0.1.0",
   "private": true,
-  "description": "BIELA backend monorepo with authentication and automotive catalog services",
+  "description": "BIELA backend monorepo with authentication, automotive catalog, inventory, and deterministic search",
   "workspaces": [
     "services/*"
   ],
@@ -27,7 +27,8 @@
   "overrides": {
     "@nestjs/swagger": {
       "js-yaml": "^5.2.3"
-    }
+    },
+    "deepmerge-ts": "8.0.0"
   },
   "engines": {
     "node": ">=20"

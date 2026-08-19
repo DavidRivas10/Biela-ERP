@@ -1,4 +1,8 @@
-import { ExecutionContext, UnauthorizedException } from "@nestjs/common";
+import {
+  ExecutionContext,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AutorepuestoAuthGuard } from "./autorepuesto-auth.guard";
 
@@ -51,5 +55,31 @@ describe("AutorepuestoAuthGuard", () => {
         }),
       }),
     );
+  });
+
+  it("rejects a token that ms-users does not authenticate", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ message: "Invalid access token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const guard = new AutorepuestoAuthGuard(config);
+    await expect(
+      guard.canActivate(contextWithAuthorization("Bearer invalid-token")),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it("reports ms-users failures as service unavailable", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ message: "Database unavailable" }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const guard = new AutorepuestoAuthGuard(config);
+    await expect(
+      guard.canActivate(contextWithAuthorization("Bearer valid-token")),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 });

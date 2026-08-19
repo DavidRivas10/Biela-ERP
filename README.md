@@ -2,8 +2,8 @@
 
 BIELA (Base Integrada Empresarial de Logística Automotriz) is an integrated
 automotive logistics platform. The backend currently implements authentication,
-users, basic RBAC, and the Phase 2 automotive catalog foundation: Products,
-Vehicles, and deterministic Product ↔ Vehicle Compatibility.
+users, RBAC, the automotive catalog, physical locations, safe inventory
+movements, and deterministic Product search.
 
 ```mermaid
 flowchart TD
@@ -15,7 +15,7 @@ flowchart TD
 ```
 
 `ms-users` exclusively owns MongoDB authentication and RBAC data.
-`ms-autorepuesto` exclusively owns PostgreSQL catalog data and Prisma
+`ms-autorepuesto` exclusively owns PostgreSQL catalog and inventory data and Prisma
 migrations. The API Gateway owns no database and has no ORM dependency.
 
 ## Implemented scope
@@ -28,10 +28,20 @@ migrations. The API Gateway owns no database and has no ORM dependency.
   generation/trim, active state, and deterministic filters.
 - Phase 2 Compatibility: explicit Product ↔ Vehicle relation, notes, active
   state, unique pair constraint, and queries in both directions.
+- Phase 3 Locations: unique normalized codes and worker-readable zone, aisle,
+  rack, shelf, and bin information with soft active state.
+- Phase 3 Inventory: unique Product + Location balances, non-negative database
+  constraints, total Product stock, and location/product queries.
+- Phase 3 Movements: traceable INITIAL, IN, OUT, target-quantity ADJUSTMENT, and
+  atomic TRANSFER commands with actor and before/after balances.
+- Phase 3 Search: deterministic Product code/name and existing Vehicle
+  compatibility search, stock/catalog filters, and stable pagination.
 
-No Product contains stock quantity or other inventory data. See
-[the Phase 2 model](docs/phase-2-data-model.md) for the actual ER diagram and
-constraint rationale.
+No Product contains stock quantity or a physical-location string. See
+[the Phase 3 model](docs/phase-3-data-model.md) for the actual ER diagram,
+movement semantics, and concurrency strategy. See
+[the backend MVP guide](docs/backend-mvp.md) for architecture, request flows,
+and the complete demonstration procedure verified during Phase 4 stabilization.
 
 ## Setup
 
@@ -58,7 +68,7 @@ npm run dev:autorepuesto
 npm run dev:gateway
 ```
 
-## Public Phase 2 API
+## Public API
 
 All public paths are exposed by the Gateway at `http://localhost:4000` and
 require a bearer token unless noted otherwise.
@@ -73,6 +83,10 @@ require a bearer token unless noted otherwise.
 | Vehicle catalogs | `POST/GET/PATCH /api/vehicle-brands`, `/api/vehicle-models`                                                                       |
 | Compatibility    | `POST/GET /api/compatibilities`, `GET/PATCH /api/compatibilities/:id`                                                             |
 | Fitment queries  | `GET /api/products/:id/vehicles`, `GET /api/vehicles/:id/products`                                                                |
+| Locations        | `POST/GET /api/locations`, `GET/PATCH /api/locations/:id`, activate/deactivate                                                    |
+| Inventory        | `GET /api/inventory`, `GET /api/inventory/:id`, `GET /api/products/:id/inventory`, `GET /api/locations/:id/inventory`             |
+| Movements        | `POST/GET /api/inventory/movements`                                                                                               |
+| Search           | `GET /api/search/products`                                                                                                        |
 
 List endpoints use one contract:
 
@@ -85,7 +99,18 @@ List endpoints use one contract:
 
 Products support search, category, brand, and active filters. Vehicles support
 brand, model, year, engine, and active filters. Compatibilities support product,
-vehicle, and active filters.
+vehicle, and active filters. Locations support code/text/active filters.
+Inventory supports Product, Location, and `inStock` filters. Movement history
+supports Product, Location, type, date range, and pagination. Search supports
+code/name text, Product category/brand/active/stock filters, and Vehicle ID,
+brand, model, year, engine, generation, and trim criteria.
+
+Stock is never overwritten directly. `INITIAL` creates the first balance, `IN`
+adds units, `OUT` subtracts only sufficient units, `ADJUSTMENT` sets a target
+quantity and requires a reason, and `TRANSFER` moves units between distinct
+locations. Commands use serializable transactions with retry; decreases are
+conditional atomic mutations, and transfers commit balances plus ledger record
+together.
 
 ## Permissions
 
@@ -94,6 +119,9 @@ Phase 2 extends the existing stable string convention:
 - `products.read`, `products.create`, `products.update`
 - `vehicles.read`, `vehicles.create`, `vehicles.update`
 - `compatibilities.read`, `compatibilities.manage`
+- `locations.read`, `locations.create`, `locations.update`
+- `inventory.read`, `inventory.adjust`, `inventory.transfer`
+- `search.read`
 
 `ms-autorepuesto` delegates bearer-token validation to `ms-users /auth/me` over
 HTTP, then enforces these permissions. It never reads MongoDB.
@@ -106,11 +134,25 @@ HTTP, then enforces these permissions. It never reads MongoDB.
 | ms-users        | `http://localhost:4001/docs` |
 | ms-autorepuesto | `http://localhost:4002/docs` |
 
-Import the Phase 2 collection and environment from `docs/postman`, set only the
+Import the Phase 3 collection and environment from `docs/postman`, set only the
 local administrator email/password, and run requests in order. The collection
-creates a Brake Pad, Toyota Corolla 2015 1.8L vehicle, compatibility, both
-directional queries, and verifies duplicate rejection. Phase 1 Postman files
-remain available unchanged.
+creates catalog/fitment fixtures, two Locations, exercises all stock operations
+and failure rollback, and verifies deterministic search. The consolidated
+`BIELA-Backend-MVP` collection demonstrates the complete Gateway flow. Phase 1
+and Phase 2 assets remain available for regression testing.
+
+Committed Postman environments contain no credentials. Inject local seed
+credentials without printing or storing them in the collection:
+
+```bash
+npx dotenv -e .env -- sh -c '
+npx newman run \
+  docs/postman/BIELA-Backend-MVP.postman_collection.json \
+  -e docs/postman/BIELA-Backend-MVP.postman_environment.json \
+  --env-var "adminEmail=$SEED_ADMIN_EMAIL" \
+  --env-var "adminPassword=$SEED_ADMIN_PASSWORD"
+'
+```
 
 ## Verification and migrations
 
@@ -122,6 +164,8 @@ npm run lint
 npm test
 npm run test:e2e
 npm run build
+npm audit --omit=dev
+git diff --check
 ```
 
 Create future development migrations with `npm run prisma:migrate -- --name
@@ -130,6 +174,23 @@ Create future development migrations with `npm run prisma:migrate -- --name
 - `20260816170958_phase_2_products`
 - `20260816171416_phase_2_vehicles`
 - `20260816171731_phase_2_compatibility`
+
+Phase 3 adds only new migrations:
+
+- `20260816182321_phase_3_locations`
+- `20260816182705_phase_3_inventory_movements`
+- `20260816182800_phase_3_inventory_constraints`
+- `20260816183100_phase_3_product_search_indexes`
+
+## Manual Phase 3 verification
+
+1. Log in through the Gateway and select or create an active Product.
+2. Create Location A and Location B.
+3. INITIAL 10 units into A; verify A=10, B=0, total=10.
+4. TRANSFER 3 from A to B; verify A=7, B=3, total=10.
+5. Attempt an excessive OUT and verify rejection with unchanged balances.
+6. Search by exact/partial Product code, Product name, and Vehicle compatibility.
+7. Query Product/Location inventory and Product movement history.
 
 ## Manual Phase 2 verification
 
@@ -150,12 +211,16 @@ mongodb postgres`.
 - A Gateway 502 means an upstream is unavailable or timed out.
 - A catalog-route 503 from `ms-autorepuesto` can indicate `ms-users` is
   unavailable for token validation.
+- `EADDRINUSE` means another process is already bound to the configured port.
+  Stop the duplicate service instance or correct the local port configuration;
+  this alone is an environment/process conflict, not an application defect.
 - Run `npm run prisma:generate` if Prisma Client is missing and `npm run
 prisma:deploy` if migration status is behind.
 
 ## Scope boundary
 
-Inventory, physical locations, stock movements, purchasing, sales, cash
-register, workshop, frontend, AI, OCR, YOLO, embeddings, semantic search,
-pgvector, and `ms-intelligence` are intentionally not implemented. The next
-approved work is inventory, physical locations, and deterministic search.
+Purchasing, suppliers, sales, invoices, cash register, accounting, workshop,
+advanced reporting, frontend, AI, OCR, YOLO, embeddings, semantic search,
+pgvector, external search engines, and multi-site enterprise workflows remain
+intentionally unimplemented. No later roadmap block is approved in the current
+repository documentation.
