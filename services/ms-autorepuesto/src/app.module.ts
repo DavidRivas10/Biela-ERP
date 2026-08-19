@@ -11,6 +11,8 @@ import { AuthModule } from "./auth/auth.module";
 import { LocationsModule } from "./locations/locations.module";
 import { InventoryModule } from "./inventory/inventory.module";
 import { SearchModule } from "./search/search.module";
+import { SuppliersModule } from "./suppliers/suppliers.module";
+import { PurchasingModule } from "./purchasing/purchasing.module";
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { SearchModule } from "./search/search.module";
     LocationsModule,
     InventoryModule,
     SearchModule,
+    SuppliersModule,
+    PurchasingModule,
   ],
 })
 export class AppModule {}

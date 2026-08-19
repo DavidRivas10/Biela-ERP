@@ -21,6 +21,14 @@ export const PERMISSIONS = {
   INVENTORY_ADJUST: "inventory.adjust",
   INVENTORY_TRANSFER: "inventory.transfer",
   SEARCH_READ: "search.read",
+  SUPPLIERS_READ: "suppliers.read",
+  SUPPLIERS_CREATE: "suppliers.create",
+  SUPPLIERS_UPDATE: "suppliers.update",
+  PURCHASES_READ: "purchases.read",
+  PURCHASES_CREATE: "purchases.create",
+  PURCHASES_UPDATE: "purchases.update",
+  PURCHASES_RECEIVE: "purchases.receive",
+  PURCHASES_RETURN: "purchases.return",
 } as const;
 
 export const ADMIN_PERMISSIONS = Object.values(PERMISSIONS);

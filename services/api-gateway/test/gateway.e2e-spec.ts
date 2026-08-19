@@ -9,6 +9,8 @@ import { CompatibilitiesController } from "../src/catalog/compatibilities.contro
 import { LocationsController } from "../src/operations/locations.controller";
 import { InventoryController } from "../src/operations/inventory.controller";
 import { SearchController } from "../src/operations/search.controller";
+import { PurchasesController } from "../src/purchasing/purchases.controller";
+import { SuppliersController } from "../src/purchasing/suppliers.controller";
 import { UpstreamService } from "../src/upstream/upstream.service";
 
 describe("API Gateway HTTP", () => {
@@ -26,6 +28,8 @@ describe("API Gateway HTTP", () => {
         LocationsController,
         InventoryController,
         SearchController,
+        SuppliersController,
+        PurchasesController,
       ],
       providers: [{ provide: UpstreamService, useValue: upstream }],
     }).compile();
@@ -142,6 +146,84 @@ describe("API Gateway HTTP", () => {
         year: "2015",
         inStock: "true",
       }),
+    });
+  });
+
+  it("forwards Supplier bodies and bearer authorization", async () => {
+    upstream.request.mockResolvedValue({ id: "supplier-id", code: "SUP-001" });
+    const body = { code: "SUP-001", businessName: "Parts Supplier" };
+    await request(app.getHttpServer())
+      .post("/api/suppliers")
+      .set("Authorization", "Bearer purchasing-token")
+      .send(body)
+      .expect(201);
+    expect(upstream.request).toHaveBeenCalledWith("autorepuesto", {
+      method: "POST",
+      path: "suppliers",
+      authorization: "Bearer purchasing-token",
+      body,
+    });
+  });
+
+  it("forwards Purchase bodies and list filters without commercial logic", async () => {
+    upstream.request.mockResolvedValue({ id: "purchase-id", status: "DRAFT" });
+    const body = {
+      supplierId: "supplier-id",
+      documentDate: "2026-08-19",
+      items: [
+        { productId: "product-id", orderedQuantity: 10, unitCost: "1.25" },
+      ],
+    };
+    await request(app.getHttpServer())
+      .post("/api/purchases")
+      .set("Authorization", "Bearer purchasing-token")
+      .send(body)
+      .expect(201);
+    expect(upstream.request).toHaveBeenCalledWith("autorepuesto", {
+      method: "POST",
+      path: "purchases",
+      authorization: "Bearer purchasing-token",
+      body,
+    });
+
+    upstream.request.mockResolvedValue({ data: [], meta: { page: 1 } });
+    await request(app.getHttpServer())
+      .get("/api/purchases?supplierId=supplier-id&status=CONFIRMED&page=1")
+      .set("Authorization", "Bearer purchasing-token")
+      .expect(200);
+    expect(upstream.request).toHaveBeenLastCalledWith("autorepuesto", {
+      path: "purchases",
+      authorization: "Bearer purchasing-token",
+      query: expect.objectContaining({
+        supplierId: "supplier-id",
+        status: "CONFIRMED",
+        page: "1",
+      }),
+    });
+  });
+
+  it("forwards Receipt and Return posting as thin commands", async () => {
+    upstream.request.mockResolvedValue({ status: "POSTED" });
+    await request(app.getHttpServer())
+      .post("/api/purchase-receipts/receipt-id/post")
+      .set("Authorization", "Bearer purchasing-token")
+      .expect(201);
+    expect(upstream.request).toHaveBeenCalledWith("autorepuesto", {
+      method: "POST",
+      path: "purchase-receipts/receipt-id/post",
+      authorization: "Bearer purchasing-token",
+      body: undefined,
+    });
+
+    await request(app.getHttpServer())
+      .post("/api/purchase-returns/return-id/post")
+      .set("Authorization", "Bearer purchasing-token")
+      .expect(201);
+    expect(upstream.request).toHaveBeenLastCalledWith("autorepuesto", {
+      method: "POST",
+      path: "purchase-returns/return-id/post",
+      authorization: "Bearer purchasing-token",
+      body: undefined,
     });
   });
 });

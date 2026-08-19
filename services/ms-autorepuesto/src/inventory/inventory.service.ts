@@ -4,7 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { InventoryMovementType, Prisma } from "@prisma/client";
+import {
+  InventoryMovementReferenceType,
+  InventoryMovementType,
+  Prisma,
+} from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { throwMappedPrismaError } from "../database/prisma-error.util";
 import { CreateInventoryMovementDto } from "./dto/inventory-movement.dto";
@@ -21,6 +25,12 @@ const movementInclude = {
   sourceLocation: true,
   destinationLocation: true,
 } satisfies Prisma.InventoryMovementInclude;
+
+export interface InventoryMovementReference {
+  type: InventoryMovementReferenceType;
+  documentId: string;
+  itemId: string;
+}
 
 @Injectable()
 export class InventoryService {
@@ -80,10 +90,9 @@ export class InventoryService {
   }
 
   async createMovement(dto: CreateInventoryMovementDto, actorId: string) {
-    this.validateMovementShape(dto);
     try {
-      return await this.runSerializable((transaction) =>
-        this.applyMovement(transaction, dto, actorId),
+      return await this.prisma.runSerializable((transaction) =>
+        this.createMovementInTransaction(transaction, dto, actorId),
       );
     } catch (error: unknown) {
       throwMappedPrismaError(
@@ -93,6 +102,16 @@ export class InventoryService {
           : "Inventory state conflicts with another operation",
       );
     }
+  }
+
+  createMovementInTransaction(
+    transaction: Prisma.TransactionClient,
+    dto: CreateInventoryMovementDto,
+    actorId: string,
+    reference?: InventoryMovementReference,
+  ) {
+    this.validateMovementShape(dto);
+    return this.applyMovement(transaction, dto, actorId, reference);
   }
 
   async findMovements(query: ListInventoryMovementsQueryDto) {
@@ -128,6 +147,7 @@ export class InventoryService {
     transaction: Prisma.TransactionClient,
     dto: CreateInventoryMovementDto,
     actorId: string,
+    reference?: InventoryMovementReference,
   ) {
     await this.requireProduct(transaction, dto.productId, true);
     if (dto.sourceLocationId)
@@ -137,15 +157,15 @@ export class InventoryService {
 
     switch (dto.type) {
       case InventoryMovementType.INITIAL:
-        return this.applyInitial(transaction, dto, actorId);
+        return this.applyInitial(transaction, dto, actorId, reference);
       case InventoryMovementType.IN:
-        return this.applyIn(transaction, dto, actorId);
+        return this.applyIn(transaction, dto, actorId, reference);
       case InventoryMovementType.OUT:
-        return this.applyOut(transaction, dto, actorId);
+        return this.applyOut(transaction, dto, actorId, reference);
       case InventoryMovementType.ADJUSTMENT:
-        return this.applyAdjustment(transaction, dto, actorId);
+        return this.applyAdjustment(transaction, dto, actorId, reference);
       case InventoryMovementType.TRANSFER:
-        return this.applyTransfer(transaction, dto, actorId);
+        return this.applyTransfer(transaction, dto, actorId, reference);
     }
   }
 
@@ -153,6 +173,7 @@ export class InventoryService {
     transaction: Prisma.TransactionClient,
     dto: CreateInventoryMovementDto,
     actorId: string,
+    reference?: InventoryMovementReference,
   ) {
     await transaction.inventory.create({
       data: {
@@ -161,16 +182,23 @@ export class InventoryService {
         quantity: dto.quantity,
       },
     });
-    return this.recordMovement(transaction, dto, actorId, {
-      destinationQuantityBefore: 0,
-      destinationQuantityAfter: dto.quantity,
-    });
+    return this.recordMovement(
+      transaction,
+      dto,
+      actorId,
+      {
+        destinationQuantityBefore: 0,
+        destinationQuantityAfter: dto.quantity,
+      },
+      reference,
+    );
   }
 
   private async applyIn(
     transaction: Prisma.TransactionClient,
     dto: CreateInventoryMovementDto,
     actorId: string,
+    reference?: InventoryMovementReference,
   ) {
     const before = await this.quantityAt(
       transaction,
@@ -191,16 +219,23 @@ export class InventoryService {
       },
       update: { quantity: { increment: dto.quantity } },
     });
-    return this.recordMovement(transaction, dto, actorId, {
-      destinationQuantityBefore: before,
-      destinationQuantityAfter: before + dto.quantity,
-    });
+    return this.recordMovement(
+      transaction,
+      dto,
+      actorId,
+      {
+        destinationQuantityBefore: before,
+        destinationQuantityAfter: before + dto.quantity,
+      },
+      reference,
+    );
   }
 
   private async applyOut(
     transaction: Prisma.TransactionClient,
     dto: CreateInventoryMovementDto,
     actorId: string,
+    reference?: InventoryMovementReference,
   ) {
     const inventory = await transaction.inventory.findUnique({
       where: {
@@ -216,16 +251,23 @@ export class InventoryService {
       data: { quantity: { decrement: dto.quantity } },
     });
     if (result.count !== 1) throw new ConflictException("Insufficient stock");
-    return this.recordMovement(transaction, dto, actorId, {
-      sourceQuantityBefore: inventory.quantity,
-      sourceQuantityAfter: inventory.quantity - dto.quantity,
-    });
+    return this.recordMovement(
+      transaction,
+      dto,
+      actorId,
+      {
+        sourceQuantityBefore: inventory.quantity,
+        sourceQuantityAfter: inventory.quantity - dto.quantity,
+      },
+      reference,
+    );
   }
 
   private async applyAdjustment(
     transaction: Prisma.TransactionClient,
     dto: CreateInventoryMovementDto,
     actorId: string,
+    reference?: InventoryMovementReference,
   ) {
     const inventory = await transaction.inventory.findUnique({
       where: {
@@ -243,16 +285,23 @@ export class InventoryService {
       where: { id: inventory.id },
       data: { quantity: dto.quantity },
     });
-    return this.recordMovement(transaction, dto, actorId, {
-      destinationQuantityBefore: inventory.quantity,
-      destinationQuantityAfter: dto.quantity,
-    });
+    return this.recordMovement(
+      transaction,
+      dto,
+      actorId,
+      {
+        destinationQuantityBefore: inventory.quantity,
+        destinationQuantityAfter: dto.quantity,
+      },
+      reference,
+    );
   }
 
   private async applyTransfer(
     transaction: Prisma.TransactionClient,
     dto: CreateInventoryMovementDto,
     actorId: string,
+    reference?: InventoryMovementReference,
   ) {
     const source = await transaction.inventory.findUnique({
       where: {
@@ -288,12 +337,18 @@ export class InventoryService {
       },
       update: { quantity: { increment: dto.quantity } },
     });
-    return this.recordMovement(transaction, dto, actorId, {
-      sourceQuantityBefore: source.quantity,
-      sourceQuantityAfter: source.quantity - dto.quantity,
-      destinationQuantityBefore: destinationBefore,
-      destinationQuantityAfter: destinationBefore + dto.quantity,
-    });
+    return this.recordMovement(
+      transaction,
+      dto,
+      actorId,
+      {
+        sourceQuantityBefore: source.quantity,
+        sourceQuantityAfter: source.quantity - dto.quantity,
+        destinationQuantityBefore: destinationBefore,
+        destinationQuantityAfter: destinationBefore + dto.quantity,
+      },
+      reference,
+    );
   }
 
   private recordMovement(
@@ -306,6 +361,7 @@ export class InventoryService {
       destinationQuantityBefore?: number;
       destinationQuantityAfter?: number;
     },
+    reference?: InventoryMovementReference,
   ) {
     return transaction.inventoryMovement.create({
       data: {
@@ -316,6 +372,9 @@ export class InventoryService {
         quantity: dto.quantity,
         reason: dto.reason?.trim(),
         actorId,
+        referenceType: reference?.type,
+        referenceId: reference?.documentId,
+        referenceItemId: reference?.itemId,
         ...balances,
       },
       include: movementInclude,
@@ -390,28 +449,6 @@ export class InventoryService {
     if (!location)
       throw new NotFoundException("Location not found or inactive");
     return location;
-  }
-
-  private async runSerializable<T>(
-    operation: (transaction: Prisma.TransactionClient) => Promise<T>,
-  ): Promise<T> {
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      try {
-        return await this.prisma.$transaction(operation, {
-          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        });
-      } catch (error: unknown) {
-        const retryable =
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2034";
-        if (!retryable) throw error;
-        if (attempt === 3)
-          throw new ConflictException(
-            "Inventory changed concurrently; retry the operation",
-          );
-      }
-    }
-    throw new ConflictException("Inventory operation could not be serialized");
   }
 
   private meta(page: number, limit: number, total: number) {

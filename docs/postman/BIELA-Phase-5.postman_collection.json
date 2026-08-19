@@ -1,0 +1,755 @@
+{
+  "info": {
+    "name": "BIELA Backend Phase 5",
+    "description": "Gateway-only Supplier, Purchase, receiving, return, Inventory traceability, and RBAC flow. Inject administrator credentials from the ignored local .env.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 System Health and Run Data",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;",
+              "pm.environment.set('runSuffix', suffix);",
+              "pm.environment.set('restrictedEmail', `phase5-${suffix}@example.invalid`);",
+              "pm.environment.set('restrictedPassword', `Phase5-${suffix}-Aa1!`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('system is healthy', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().status).to.eql('ok'); });"
+            ]
+          }
+        }
+      ],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/system/health" }
+    },
+    {
+      "name": "02 Administrator Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('login succeeds safely', () => { pm.response.to.have.status(200); const body = pm.response.json(); pm.expect(body.accessToken).to.be.a('string'); pm.expect(body).not.to.have.property('passwordHash'); pm.environment.set('accessToken', body.accessToken); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{adminEmail}}\",\"password\":\"{{adminPassword}}\"}"
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "03 Create Supplier",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Supplier is created and normalized', () => { pm.response.to.have.status(201); const body = pm.response.json(); pm.expect(body.code).to.eql(`SUP-${pm.environment.get('runSuffix')}`.toUpperCase()); pm.environment.set('supplierId', body.id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"sup-{{runSuffix}}\",\"businessName\":\"Phase 5 Supplier {{runSuffix}}\",\"email\":\"purchasing@example.invalid\"}"
+        },
+        "url": "{{baseUrl}}/api/suppliers"
+      }
+    },
+    {
+      "name": "04 Create Product Category",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('category created', () => { pm.response.to.have.status(201); pm.environment.set('categoryId', pm.response.json().id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P5-CAT-{{runSuffix}}\",\"name\":\"Phase 5 Category {{runSuffix}}\"}"
+        },
+        "url": "{{baseUrl}}/api/product-categories"
+      }
+    },
+    {
+      "name": "05 Create Product Brand",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('brand created', () => { pm.response.to.have.status(201); pm.environment.set('brandId', pm.response.json().id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P5-BRAND-{{runSuffix}}\",\"name\":\"Phase 5 Brand {{runSuffix}}\"}"
+        },
+        "url": "{{baseUrl}}/api/product-brands"
+      }
+    },
+    {
+      "name": "06 Create Product",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Product created', () => { pm.response.to.have.status(201); pm.environment.set('productId', pm.response.json().id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P5-PROD-{{runSuffix}}\",\"name\":\"Phase 5 Purchased Part\",\"categoryId\":\"{{categoryId}}\",\"brandId\":\"{{brandId}}\"}"
+        },
+        "url": "{{baseUrl}}/api/products"
+      }
+    },
+    {
+      "name": "07 Create Receiving Location",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Location created', () => { pm.response.to.have.status(201); pm.environment.set('locationId', pm.response.json().id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P5-LOC-{{runSuffix}}\",\"name\":\"Phase 5 Receiving\"}"
+        },
+        "url": "{{baseUrl}}/api/locations"
+      }
+    },
+    {
+      "name": "08 Record Initial Stock",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('initial stock recorded', () => { pm.response.to.have.status(200); const total = pm.response.json().totalQuantity; pm.environment.set('initialStock', String(total)); pm.expect(total).to.eql(0); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "09 Create Purchase for 10",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Purchase totals are exact', () => { pm.response.to.have.status(201); const body = pm.response.json(); pm.expect(body.status).to.eql('DRAFT'); pm.expect(body.subtotal).to.eql('123.46'); pm.expect(body.discountTotal).to.eql('1.00'); pm.expect(body.taxTotal).to.eql('2.00'); pm.expect(body.total).to.eql('124.46'); pm.environment.set('purchaseId', body.id); pm.environment.set('purchaseItemId', body.items[0].id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"supplierId\":\"{{supplierId}}\",\"supplierDocumentNumber\":\"INV-{{runSuffix}}\",\"documentDate\":\"2026-08-19\",\"items\":[{\"productId\":\"{{productId}}\",\"orderedQuantity\":10,\"unitCost\":\"12.3456\",\"discountAmount\":\"1.00\",\"taxAmount\":\"2.00\"}]}"
+        },
+        "url": "{{baseUrl}}/api/purchases"
+      }
+    },
+    {
+      "name": "10 Confirm Purchase",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Purchase confirmed without receiving', () => { pm.response.to.have.status(201); pm.expect(pm.response.json().status).to.eql('CONFIRMED'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}/confirm"
+      }
+    },
+    {
+      "name": "11 Confirmation Leaves Stock Unchanged",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('confirmation did not change stock', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(Number(pm.environment.get('initialStock'))); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "12 Create Receipt for 6",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('first Receipt draft created', () => { pm.response.to.have.status(201); pm.expect(pm.response.json().status).to.eql('DRAFT'); pm.environment.set('receipt1Id', pm.response.json().id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"destinationLocationId\":\"{{locationId}}\",\"items\":[{\"purchaseItemId\":\"{{purchaseItemId}}\",\"quantityReceived\":6}]}"
+        },
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}/receipts"
+      }
+    },
+    {
+      "name": "13 Post Receipt for 6",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('first Receipt posted', () => { pm.response.to.have.status(201); pm.expect(pm.response.json().status).to.eql('POSTED'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/purchase-receipts/{{receipt1Id}}/post"
+      }
+    },
+    {
+      "name": "14 Verify Stock Increased by 6",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('stock increased exactly by 6', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(Number(pm.environment.get('initialStock')) + 6); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "15 Verify Partially Received",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Purchase is partially received', () => { pm.response.to.have.status(200); const body = pm.response.json(); pm.expect(body.status).to.eql('PARTIALLY_RECEIVED'); pm.expect(body.items[0].receivedQuantity).to.eql(6); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}"
+      }
+    },
+    {
+      "name": "16 Create Receipt for Remaining 4",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('second Receipt draft created', () => { pm.response.to.have.status(201); pm.environment.set('receipt2Id', pm.response.json().id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"destinationLocationId\":\"{{locationId}}\",\"items\":[{\"purchaseItemId\":\"{{purchaseItemId}}\",\"quantityReceived\":4}]}"
+        },
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}/receipts"
+      }
+    },
+    {
+      "name": "17 Post Receipt for Remaining 4",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('second Receipt posted', () => { pm.response.to.have.status(201); pm.expect(pm.response.json().status).to.eql('POSTED'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/purchase-receipts/{{receipt2Id}}/post"
+      }
+    },
+    {
+      "name": "18 Verify Cumulative Increase 10",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('cumulative stock increase is 10', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(Number(pm.environment.get('initialStock')) + 10); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "19 Verify Purchase Received",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Purchase is fully received', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().status).to.eql('RECEIVED'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}"
+      }
+    },
+    {
+      "name": "20 Reject Over Receipt",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('over-receipt is rejected', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"destinationLocationId\":\"{{locationId}}\",\"items\":[{\"purchaseItemId\":\"{{purchaseItemId}}\",\"quantityReceived\":1}]}"
+        },
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}/receipts"
+      }
+    },
+    {
+      "name": "21 Verify Rejected Receipt Changed Nothing",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('stock remains plus 10', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(Number(pm.environment.get('initialStock')) + 10); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "22 Create Purchase Return for 3",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Return draft created', () => { pm.response.to.have.status(201); pm.environment.set('returnId', pm.response.json().id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reason\":\"Damaged goods\",\"items\":[{\"purchaseItemId\":\"{{purchaseItemId}}\",\"sourceLocationId\":\"{{locationId}}\",\"quantityReturned\":3}]}"
+        },
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}/returns"
+      }
+    },
+    {
+      "name": "23 Post Purchase Return",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Return posted', () => { pm.response.to.have.status(201); pm.expect(pm.response.json().status).to.eql('POSTED'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/purchase-returns/{{returnId}}/post"
+      }
+    },
+    {
+      "name": "24 Verify Stock Decreased by 3",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('stock is net plus 7', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(Number(pm.environment.get('initialStock')) + 7); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "25 Verify Receipt IN Traceability",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Receipt exposes traceable IN', () => { pm.response.to.have.status(200); const movement = pm.response.json().inventoryMovements[0]; pm.expect(movement.type).to.eql('IN'); pm.expect(movement.referenceType).to.eql('PURCHASE_RECEIPT'); pm.expect(movement.referenceId).to.eql(pm.environment.get('receipt1Id')); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/purchase-receipts/{{receipt1Id}}"
+      }
+    },
+    {
+      "name": "26 Verify Return OUT Traceability",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Return exposes traceable OUT', () => { pm.response.to.have.status(200); const movement = pm.response.json().inventoryMovements[0]; pm.expect(movement.type).to.eql('OUT'); pm.expect(movement.referenceType).to.eql('PURCHASE_RETURN'); pm.expect(movement.referenceId).to.eql(pm.environment.get('returnId')); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/purchase-returns/{{returnId}}"
+      }
+    },
+    {
+      "name": "27 Reject Excessive Return",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('excessive Return is rejected', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reason\":\"Too many units\",\"items\":[{\"purchaseItemId\":\"{{purchaseItemId}}\",\"sourceLocationId\":\"{{locationId}}\",\"quantityReturned\":8}]}"
+        },
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}/returns"
+      }
+    },
+    {
+      "name": "28 Verify Rejected Return Changed Nothing",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('stock remains net plus 7', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(Number(pm.environment.get('initialStock')) + 7); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "29 Query Supplier Purchase History",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Supplier history contains Purchase', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.some(row => row.id === pm.environment.get('purchaseId'))).to.be.true; });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/purchases?supplierId={{supplierId}}&page=1&limit=20"
+      }
+    },
+    {
+      "name": "30 Verify Frontend Ready Purchase Detail",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('detail derives commercial quantities', () => { pm.response.to.have.status(200); const item = pm.response.json().items[0]; pm.expect(item).to.include({orderedQuantity:10, receivedQuantity:10, returnedQuantity:3, remainingReceivableQuantity:0}); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}"
+      }
+    },
+    {
+      "name": "31 Unauthenticated Supplier Rejected",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('unauthenticated request is rejected', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/suppliers" }
+    },
+    {
+      "name": "32 Create Restricted User",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('restricted user created safely', () => { pm.response.to.have.status(201); pm.expect(pm.response.json()).not.to.have.property('passwordHash'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{restrictedEmail}}\",\"password\":\"{{restrictedPassword}}\",\"firstName\":\"Phase\",\"lastName\":\"Five\"}"
+        },
+        "url": "{{baseUrl}}/api/users"
+      }
+    },
+    {
+      "name": "33 Restricted User Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('restricted login succeeds', () => { pm.response.to.have.status(200); pm.environment.set('restrictedAccessToken', pm.response.json().accessToken); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{restrictedEmail}}\",\"password\":\"{{restrictedPassword}}\"}"
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "34 Restricted User Forbidden",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('authenticated user without permission is forbidden', () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{restrictedAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/suppliers"
+      }
+    }
+  ]
+}

@@ -21,6 +21,25 @@ enum InventoryMovementType {
   TRANSFER
 }
 
+enum InventoryMovementReferenceType {
+  PURCHASE_RECEIPT
+  PURCHASE_RETURN
+}
+
+enum PurchaseStatus {
+  DRAFT
+  CONFIRMED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum PurchasingDocumentStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
 model ProductCategory {
   id                   String                       @id @default(uuid()) @db.Uuid
   code                 String                       @unique @db.VarChar(60)
@@ -63,6 +82,7 @@ model Product {
   compatibilities    ProductCompatibility[]
   inventories        Inventory[]
   inventoryMovements InventoryMovement[]
+  purchaseItems      PurchaseItem[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -162,21 +182,23 @@ model ProductCompatibility {
 }
 
 model Location {
-  id                String              @id @default(uuid()) @db.Uuid
-  code              String              @unique @db.VarChar(60)
-  name              String              @db.VarChar(120)
-  description       String?             @db.VarChar(500)
-  zone              String?             @db.VarChar(80)
-  aisle             String?             @db.VarChar(40)
-  rack              String?             @db.VarChar(40)
-  shelf             String?             @db.VarChar(40)
-  bin               String?             @db.VarChar(40)
-  active            Boolean             @default(true)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  inventories       Inventory[]
-  outgoingMovements InventoryMovement[] @relation("MovementSourceLocation")
-  incomingMovements InventoryMovement[] @relation("MovementDestinationLocation")
+  id                  String               @id @default(uuid()) @db.Uuid
+  code                String               @unique @db.VarChar(60)
+  name                String               @db.VarChar(120)
+  description         String?              @db.VarChar(500)
+  zone                String?              @db.VarChar(80)
+  aisle               String?              @db.VarChar(40)
+  rack                String?              @db.VarChar(40)
+  shelf               String?              @db.VarChar(40)
+  bin                 String?              @db.VarChar(40)
+  active              Boolean              @default(true)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  inventories         Inventory[]
+  outgoingMovements   InventoryMovement[]  @relation("MovementSourceLocation")
+  incomingMovements   InventoryMovement[]  @relation("MovementDestinationLocation")
+  purchaseReceipts    PurchaseReceipt[]
+  purchaseReturnItems PurchaseReturnItem[]
 
   @@index([active])
 }
@@ -196,28 +218,171 @@ model Inventory {
 }
 
 model InventoryMovement {
-  id                        String                @id @default(uuid()) @db.Uuid
-  productId                 String                @db.Uuid
-  sourceLocationId          String?               @db.Uuid
-  destinationLocationId     String?               @db.Uuid
+  id                        String                          @id @default(uuid()) @db.Uuid
+  productId                 String                          @db.Uuid
+  sourceLocationId          String?                         @db.Uuid
+  destinationLocationId     String?                         @db.Uuid
   type                      InventoryMovementType
   quantity                  Int
-  reason                    String?               @db.VarChar(500)
-  actorId                   String                @db.VarChar(120)
+  reason                    String?                         @db.VarChar(500)
+  actorId                   String                          @db.VarChar(120)
   sourceQuantityBefore      Int?
   sourceQuantityAfter       Int?
   destinationQuantityBefore Int?
   destinationQuantityAfter  Int?
-  createdAt                 DateTime              @default(now())
-  product                   Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
-  sourceLocation            Location?             @relation("MovementSourceLocation", fields: [sourceLocationId], references: [id], onDelete: Restrict)
-  destinationLocation       Location?             @relation("MovementDestinationLocation", fields: [destinationLocationId], references: [id], onDelete: Restrict)
+  referenceType             InventoryMovementReferenceType?
+  referenceId               String?                         @db.Uuid
+  referenceItemId           String?                         @db.Uuid
+  createdAt                 DateTime                        @default(now())
+  product                   Product                         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sourceLocation            Location?                       @relation("MovementSourceLocation", fields: [sourceLocationId], references: [id], onDelete: Restrict)
+  destinationLocation       Location?                       @relation("MovementDestinationLocation", fields: [destinationLocationId], references: [id], onDelete: Restrict)
 
+  @@unique([referenceType, referenceItemId])
   @@index([productId, createdAt])
   @@index([sourceLocationId, createdAt])
   @@index([destinationLocationId, createdAt])
   @@index([type, createdAt])
   @@index([createdAt])
+  @@index([referenceType, referenceId])
 }
 
-// Sales, workshop, and intelligence data remain out of scope.
+model Supplier {
+  id           String     @id @default(uuid()) @db.Uuid
+  code         String     @unique @db.VarChar(60)
+  businessName String     @db.VarChar(160)
+  taxId        String?    @db.VarChar(40)
+  contactName  String?    @db.VarChar(120)
+  phone        String?    @db.VarChar(40)
+  email        String?    @db.VarChar(160)
+  address      String?    @db.VarChar(500)
+  notes        String?    @db.VarChar(1000)
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  purchases    Purchase[]
+
+  @@index([businessName])
+  @@index([active])
+}
+
+model Purchase {
+  id                     String            @id @default(uuid()) @db.Uuid
+  number                 Int               @unique @default(autoincrement())
+  supplierId             String            @db.Uuid
+  supplierDocumentNumber String?           @db.VarChar(80)
+  documentDate           DateTime          @db.Date
+  status                 PurchaseStatus    @default(DRAFT)
+  notes                  String?           @db.VarChar(1000)
+  subtotal               Decimal           @default(0) @db.Decimal(18, 2)
+  discountTotal          Decimal           @default(0) @db.Decimal(18, 2)
+  taxTotal               Decimal           @default(0) @db.Decimal(18, 2)
+  total                  Decimal           @default(0) @db.Decimal(18, 2)
+  createdByActorId       String            @db.VarChar(120)
+  confirmedByActorId     String?           @db.VarChar(120)
+  confirmedAt            DateTime?
+  cancelledByActorId     String?           @db.VarChar(120)
+  cancelledAt            DateTime?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  supplier               Supplier          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  items                  PurchaseItem[]
+  receipts               PurchaseReceipt[]
+  returns                PurchaseReturn[]
+
+  @@index([supplierId, documentDate])
+  @@index([status, documentDate])
+  @@index([supplierDocumentNumber])
+}
+
+model PurchaseItem {
+  id              String                @id @default(uuid()) @db.Uuid
+  purchaseId      String                @db.Uuid
+  productId       String                @db.Uuid
+  orderedQuantity Int
+  unitCost        Decimal               @db.Decimal(18, 4)
+  discountAmount  Decimal               @default(0) @db.Decimal(18, 2)
+  taxAmount       Decimal               @default(0) @db.Decimal(18, 2)
+  lineSubtotal    Decimal               @db.Decimal(18, 2)
+  lineTotal       Decimal               @db.Decimal(18, 2)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  purchase        Purchase              @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product         Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  receiptItems    PurchaseReceiptItem[]
+  returnItems     PurchaseReturnItem[]
+
+  @@unique([purchaseId, productId])
+  @@index([productId])
+}
+
+model PurchaseReceipt {
+  id                    String                   @id @default(uuid()) @db.Uuid
+  number                Int                      @unique @default(autoincrement())
+  purchaseId            String                   @db.Uuid
+  destinationLocationId String                   @db.Uuid
+  status                PurchasingDocumentStatus @default(DRAFT)
+  receivedAt            DateTime?
+  postedAt              DateTime?
+  createdByActorId      String                   @db.VarChar(120)
+  postedByActorId       String?                  @db.VarChar(120)
+  notes                 String?                  @db.VarChar(1000)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  purchase              Purchase                 @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  destinationLocation   Location                 @relation(fields: [destinationLocationId], references: [id], onDelete: Restrict)
+  items                 PurchaseReceiptItem[]
+
+  @@index([purchaseId, createdAt])
+  @@index([destinationLocationId])
+  @@index([status])
+}
+
+model PurchaseReceiptItem {
+  id               String          @id @default(uuid()) @db.Uuid
+  receiptId        String          @db.Uuid
+  purchaseItemId   String          @db.Uuid
+  quantityReceived Int
+  createdAt        DateTime        @default(now())
+  receipt          PurchaseReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  purchaseItem     PurchaseItem    @relation(fields: [purchaseItemId], references: [id], onDelete: Restrict)
+
+  @@unique([receiptId, purchaseItemId])
+  @@index([purchaseItemId])
+}
+
+model PurchaseReturn {
+  id               String                   @id @default(uuid()) @db.Uuid
+  number           Int                      @unique @default(autoincrement())
+  purchaseId       String                   @db.Uuid
+  status           PurchasingDocumentStatus @default(DRAFT)
+  reason           String                   @db.VarChar(500)
+  postedAt         DateTime?
+  createdByActorId String                   @db.VarChar(120)
+  postedByActorId  String?                  @db.VarChar(120)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  purchase         Purchase                 @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  items            PurchaseReturnItem[]
+
+  @@index([purchaseId, createdAt])
+  @@index([status])
+}
+
+model PurchaseReturnItem {
+  id               String         @id @default(uuid()) @db.Uuid
+  purchaseReturnId String         @db.Uuid
+  purchaseItemId   String         @db.Uuid
+  sourceLocationId String         @db.Uuid
+  quantityReturned Int
+  createdAt        DateTime       @default(now())
+  purchaseReturn   PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+  purchaseItem     PurchaseItem   @relation(fields: [purchaseItemId], references: [id], onDelete: Restrict)
+  sourceLocation   Location       @relation(fields: [sourceLocationId], references: [id], onDelete: Restrict)
+
+  @@unique([purchaseReturnId, purchaseItemId, sourceLocationId])
+  @@index([purchaseItemId])
+  @@index([sourceLocationId])
+}
+
+// Customers, sales, cash, workshop, and intelligence data remain out of scope.

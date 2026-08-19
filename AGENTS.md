@@ -22,8 +22,10 @@ Compatibility in `ms-autorepuesto` with additive Prisma migrations. Phase 3
 provides physical Locations, non-negative Product + Location Inventory,
 traceable stock Movements, atomic Transfers, and deterministic Product search.
 Phase 4 backend integration, hardening, regression testing, and MVP
-stabilization is complete. The frontend and AI service remain unimplemented;
-commerce, purchasing, sales, workshop, and intelligence are deferred. No
+stabilization is complete. Phase 5 implements Suppliers, Purchases, partial
+receiving, Purchase Returns, and traceable Inventory integration in
+`ms-autorepuesto`. Customers and Sales are deferred to Phase 6; Cash is deferred
+to Phase 7. The frontend, workshop, accounting, and AI remain unimplemented. No
 subsequent roadmap block is approved here. Never implement a future phase
 without explicit instruction.
 
@@ -60,6 +62,23 @@ without explicit instruction.
 - ADJUSTMENT means setting a non-negative target balance and requires a reason.
 - Product search is deterministic PostgreSQL search by code, name, and the
   existing Compatibility relation. Do not introduce semantic or external search.
+
+## Phase 5 purchasing rules
+
+- Inventory remains the only stock source of truth. A posted Purchase Receipt
+  reuses Inventory `IN`; a posted Purchase Return reuses Inventory `OUT`.
+- Purchase, Receipt, and Return posting share one serializable PostgreSQL
+  transaction with their Inventory movements. Never mutate balances directly
+  from purchasing services.
+- PostgreSQL sequences generate concurrency-safe Purchase, Receipt, and Return
+  numbers. Money uses Prisma Decimal/PostgreSQL NUMERIC, never JavaScript
+  floating-point arithmetic.
+- Confirmation does not affect stock. Posted Receipts and Returns are immutable;
+  over-receipt, over-return, duplicate posting, and negative stock must fail
+  without partial effects.
+- `InventoryMovement` commercial references remain controlled and trace the
+  originating document and line. Do not add Sales reference types before their
+  separately approved phase.
 
 ## Commands
 

@@ -9,6 +9,7 @@ import { UpstreamModule } from "./upstream/upstream.module";
 import { UsersModule } from "./users/users.module";
 import { CatalogModule } from "./catalog/catalog.module";
 import { OperationsModule } from "./operations/operations.module";
+import { PurchasingModule } from "./purchasing/purchasing.module";
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { OperationsModule } from "./operations/operations.module";
     HealthModule,
     CatalogModule,
     OperationsModule,
+    PurchasingModule,
   ],
 })
 export class AppModule {}

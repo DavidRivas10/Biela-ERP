@@ -3,7 +3,8 @@
 BIELA (Base Integrada Empresarial de Logística Automotriz) is an integrated
 automotive logistics platform. The backend currently implements authentication,
 users, RBAC, the automotive catalog, physical locations, safe inventory
-movements, and deterministic Product search.
+movements, deterministic Product search, Suppliers, and the purchasing lifecycle
+through receiving and Purchase Returns.
 
 ```mermaid
 flowchart TD
@@ -36,12 +37,17 @@ migrations. The API Gateway owns no database and has no ORM dependency.
   atomic TRANSFER commands with actor and before/after balances.
 - Phase 3 Search: deterministic Product code/name and existing Vehicle
   compatibility search, stock/catalog filters, and stable pagination.
+- Phase 5 Purchasing: Suppliers, exact-decimal Purchases and PurchaseItems,
+  controlled confirmation/cancellation, partial receiving, Purchase Returns,
+  database-sequenced business numbers, and commercial-to-Inventory traceability.
 
 No Product contains stock quantity or a physical-location string. See
 [the Phase 3 model](docs/phase-3-data-model.md) for the actual ER diagram,
 movement semantics, and concurrency strategy. See
 [the backend MVP guide](docs/backend-mvp.md) for architecture, request flows,
-and the complete demonstration procedure verified during Phase 4 stabilization.
+and the complete Phase 1–4 demonstration procedure. See
+[the Phase 5 purchasing model](docs/phase-5-purchasing-model.md) for commercial
+lifecycle, transaction, money, and concurrency rules.
 
 ## Setup
 
@@ -87,6 +93,10 @@ require a bearer token unless noted otherwise.
 | Inventory        | `GET /api/inventory`, `GET /api/inventory/:id`, `GET /api/products/:id/inventory`, `GET /api/locations/:id/inventory`             |
 | Movements        | `POST/GET /api/inventory/movements`                                                                                               |
 | Search           | `GET /api/search/products`                                                                                                        |
+| Suppliers        | `POST/GET /api/suppliers`, `GET/PATCH /api/suppliers/:id`, activate/deactivate                                                    |
+| Purchases        | `POST/GET /api/purchases`, `GET/PATCH /api/purchases/:id`, `POST /api/purchases/:id/confirm`, `POST /api/purchases/:id/cancel`    |
+| Receiving        | `POST/GET /api/purchases/:id/receipts`, `GET /api/purchase-receipts/:id`, `POST /api/purchase-receipts/:id/post`                  |
+| Purchase returns | `POST/GET /api/purchases/:id/returns`, `GET /api/purchase-returns/:id`, `POST /api/purchase-returns/:id/post`                     |
 
 List endpoints use one contract:
 
@@ -126,6 +136,12 @@ Phase 2 extends the existing stable string convention:
 `ms-autorepuesto` delegates bearer-token validation to `ms-users /auth/me` over
 HTTP, then enforces these permissions. It never reads MongoDB.
 
+Phase 5 adds:
+
+- `suppliers.read`, `suppliers.create`, `suppliers.update`
+- `purchases.read`, `purchases.create`, `purchases.update`
+- `purchases.receive`, `purchases.return`
+
 ## Swagger and Postman
 
 | Component       | Swagger                      |
@@ -139,7 +155,9 @@ local administrator email/password, and run requests in order. The collection
 creates catalog/fitment fixtures, two Locations, exercises all stock operations
 and failure rollback, and verifies deterministic search. The consolidated
 `BIELA-Backend-MVP` collection demonstrates the complete Gateway flow. Phase 1
-and Phase 2 assets remain available for regression testing.
+and Phase 2 assets remain available for regression testing. The Phase 5
+collection demonstrates Supplier → Purchase → Receipt → Inventory IN → Purchase
+Return → Inventory OUT with rollback and RBAC checks.
 
 Committed Postman environments contain no credentials. Inject local seed
 credentials without printing or storing them in the collection:
@@ -147,8 +165,8 @@ credentials without printing or storing them in the collection:
 ```bash
 npx dotenv -e .env -- sh -c '
 npx newman run \
-  docs/postman/BIELA-Backend-MVP.postman_collection.json \
-  -e docs/postman/BIELA-Backend-MVP.postman_environment.json \
+  docs/postman/BIELA-Phase-5.postman_collection.json \
+  -e docs/postman/BIELA-Phase-5.postman_environment.json \
   --env-var "adminEmail=$SEED_ADMIN_EMAIL" \
   --env-var "adminPassword=$SEED_ADMIN_PASSWORD"
 '
@@ -181,6 +199,27 @@ Phase 3 adds only new migrations:
 - `20260816182705_phase_3_inventory_movements`
 - `20260816182800_phase_3_inventory_constraints`
 - `20260816183100_phase_3_product_search_indexes`
+
+Phase 5 adds one migration:
+
+- `20260819110000_phase_5_purchasing`
+
+Purchase, Receipt, and Return numbers use PostgreSQL-backed `SERIAL` sequences.
+Monetary values use Prisma Decimal/PostgreSQL `NUMERIC`; line subtotal is
+quantity × unit cost rounded half-up to two decimals, then discount and tax are
+applied as explicit amounts. Client-submitted totals are not accepted.
+
+## Manual Phase 5 verification
+
+1. Create an active Supplier, Product, and Location through the Gateway.
+2. Create a 10-unit Purchase and verify its exact-decimal totals.
+3. Confirm it and verify Inventory is unchanged.
+4. Post Receipts for 6 and 4; verify PARTIALLY_RECEIVED then RECEIVED and a net
+   Inventory increase of 10.
+5. Attempt over-receiving and verify HTTP 409 with no stock change.
+6. Post a 3-unit Purchase Return; verify a net Inventory decrease of 3.
+7. Inspect Receipt `IN` and Return `OUT` movement references and Purchase detail.
+8. Run the Phase 5 Newman collection using the safe credential command above.
 
 ## Manual Phase 3 verification
 
@@ -219,8 +258,9 @@ prisma:deploy` if migration status is behind.
 
 ## Scope boundary
 
-Purchasing, suppliers, sales, invoices, cash register, accounting, workshop,
-advanced reporting, frontend, AI, OCR, YOLO, embeddings, semantic search,
-pgvector, external search engines, and multi-site enterprise workflows remain
-intentionally unimplemented. No later roadmap block is approved in the current
-repository documentation.
+Customers and Sales are intentionally deferred to Phase 6. Cash is intentionally
+deferred to Phase 7. Customer invoicing, payments, accounts payable/receivable,
+accounting, workshop, advanced reporting, frontend, AI, OCR, embeddings,
+semantic search, external search engines, and multisite workflows remain
+intentionally unimplemented. Do not begin a later phase without separate
+approval.
