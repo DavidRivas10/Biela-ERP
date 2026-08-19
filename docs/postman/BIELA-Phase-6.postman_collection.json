@@ -1,0 +1,723 @@
+{
+  "info": {
+    "name": "BIELA Backend Phase 6",
+    "description": "Gateway-only Customer, Sale, Return, Inventory traceability, rollback, walk-in, and RBAC flow. Inject administrator credentials from the ignored local .env.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "01 System Health and Run Data",
+      "auth": { "type": "noauth" },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;",
+              "pm.environment.set('runSuffix', suffix);",
+              "pm.environment.set('restrictedEmail', `phase6-${suffix}@example.invalid`);",
+              "pm.environment.set('restrictedPassword', `Phase6-${suffix}-Aa1!`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('system is healthy', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().status).to.eql('ok'); });"
+            ]
+          }
+        }
+      ],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/system/health" }
+    },
+    {
+      "name": "02 Administrator Login",
+      "auth": { "type": "noauth" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('login succeeds safely', () => { pm.response.to.have.status(200); const body = pm.response.json(); pm.expect(body.accessToken).to.be.a('string'); pm.expect(body).not.to.have.property('passwordHash'); pm.environment.set('accessToken', body.accessToken); pm.environment.set('adminAccessToken', body.accessToken); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{adminEmail}}\",\"password\":\"{{adminPassword}}\"}"
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "03 Create Customer",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Customer is normalized', () => { pm.response.to.have.status(201); const body = pm.response.json(); pm.expect(body.code).to.eql(`CUS-${pm.environment.get('runSuffix')}`.toUpperCase()); pm.environment.set('customerId', body.id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"cus-{{runSuffix}}\",\"name\":\"Phase 6 Customer\",\"businessName\":\"Phase 6 Trading\",\"taxId\":\"0801-{{runSuffix}}\"}"
+        },
+        "url": "{{baseUrl}}/api/customers"
+      }
+    },
+    {
+      "name": "04 Verify Customer Detail",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Customer detail is readable', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().id).to.eql(pm.environment.get('customerId')); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/customers/{{customerId}}"
+      }
+    },
+    {
+      "name": "05 Verify Customer Listing",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Customer list contains fixture', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.some(row => row.id === pm.environment.get('customerId'))).to.be.true; });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/customers?search=Phase%206%20Trading&active=true&page=1&limit=20"
+      }
+    },
+    {
+      "name": "06 Create Product Category",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('category created', () => { pm.response.to.have.status(201); pm.environment.set('categoryId', pm.response.json().id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P6-CAT-{{runSuffix}}\",\"name\":\"Phase 6 Category\"}"
+        },
+        "url": "{{baseUrl}}/api/product-categories"
+      }
+    },
+    {
+      "name": "07 Create Product Brand",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('brand created', () => { pm.response.to.have.status(201); pm.environment.set('brandId', pm.response.json().id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P6-BRAND-{{runSuffix}}\",\"name\":\"Phase 6 Brand\"}"
+        },
+        "url": "{{baseUrl}}/api/product-brands"
+      }
+    },
+    {
+      "name": "08 Create Product with Selling Price",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Product price is exact', () => { pm.response.to.have.status(201); const body = pm.response.json(); pm.expect(String(body.defaultSalePrice)).to.eql('12.3456'); pm.environment.set('productId', body.id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P6-PROD-{{runSuffix}}\",\"name\":\"Phase 6 Sales Part\",\"categoryId\":\"{{categoryId}}\",\"brandId\":\"{{brandId}}\",\"defaultSalePrice\":\"12.3456\"}"
+        },
+        "url": "{{baseUrl}}/api/products"
+      }
+    },
+    {
+      "name": "09 Create Active Location",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Location created', () => { pm.response.to.have.status(201); pm.environment.set('locationId', pm.response.json().id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P6-LOC-{{runSuffix}}\",\"name\":\"Phase 6 Sales Location\"}"
+        },
+        "url": "{{baseUrl}}/api/locations"
+      }
+    },
+    {
+      "name": "10 Establish Known Inventory",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('INITIAL 10 succeeds', () => pm.response.to.have.status(201));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"type\":\"INITIAL\",\"productId\":\"{{productId}}\",\"destinationLocationId\":\"{{locationId}}\",\"quantity\":10,\"reason\":\"Phase 6 deterministic stock\"}"
+        },
+        "url": "{{baseUrl}}/api/inventory/movements"
+      }
+    },
+    {
+      "name": "11 Read Starting Inventory",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('starting stock is 10', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(10); pm.environment.set('startingStock', '10'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "12 Create DRAFT Sale for 4",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('DRAFT exact totals', () => { pm.response.to.have.status(201); const body = pm.response.json(); pm.expect(body.status).to.eql('DRAFT'); pm.expect(body.subtotal).to.eql('49.38'); pm.expect(body.total).to.eql('50.38'); pm.environment.set('saleId', body.id); pm.environment.set('saleItemId', body.items[0].id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"customerId\":\"{{customerId}}\",\"documentDate\":\"2026-08-19\",\"items\":[{\"productId\":\"{{productId}}\",\"sourceLocationId\":\"{{locationId}}\",\"quantity\":4,\"discountAmount\":\"1.00\",\"taxAmount\":\"2.00\"}]}"
+        },
+        "url": "{{baseUrl}}/api/sales"
+      }
+    },
+    {
+      "name": "13 Verify DRAFT Stock Unchanged",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('DRAFT has no Inventory effect', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(10); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "14 Verify DRAFT Detail",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('price snapshot and Customer are present', () => { pm.response.to.have.status(200); const body = pm.response.json(); pm.expect(body.customer.id).to.eql(pm.environment.get('customerId')); pm.expect(body.items[0].unitPrice).to.eql('12.3456'); });"
+            ]
+          }
+        }
+      ],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/sales/{{saleId}}" }
+    },
+    {
+      "name": "15 POST Sale",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Sale posts', () => { pm.response.to.have.status(201); pm.expect(pm.response.json().status).to.eql('POSTED'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/sales/{{saleId}}/post"
+      }
+    },
+    {
+      "name": "16 Verify Stock Decreased by 4",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('stock is 6', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(6); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "17 Verify Sale OUT Reference",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('OUT traces SaleItem', () => { pm.response.to.have.status(200); const movement = pm.response.json().inventoryMovements[0]; pm.expect(movement).to.include({type:'OUT', referenceType:'SALE', referenceId:pm.environment.get('saleId'), referenceItemId:pm.environment.get('saleItemId')}); });"
+            ]
+          }
+        }
+      ],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/sales/{{saleId}}" }
+    },
+    {
+      "name": "18 Reject Duplicate Sale POST",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('duplicate POST conflicts', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/sales/{{saleId}}/post"
+      }
+    },
+    {
+      "name": "19 Verify Duplicate Did Not Decrement",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('stock remains 6', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(6); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "20 Create Excessive Sale",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('excessive Sale remains DRAFT', () => { pm.response.to.have.status(201); pm.expect(pm.response.json().status).to.eql('DRAFT'); pm.environment.set('excessSaleId', pm.response.json().id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"customerId\":\"{{customerId}}\",\"documentDate\":\"2026-08-19\",\"items\":[{\"productId\":\"{{productId}}\",\"sourceLocationId\":\"{{locationId}}\",\"quantity\":7}]}"
+        },
+        "url": "{{baseUrl}}/api/sales"
+      }
+    },
+    {
+      "name": "21 Reject Excessive Sale POST",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('insufficient stock conflicts', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/sales/{{excessSaleId}}/post"
+      }
+    },
+    {
+      "name": "22 Verify Excessive Sale Rollback",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('stock remains 6 after rollback', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(6); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "23 Create DRAFT Sale Return for 2",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Return DRAFT created', () => { pm.response.to.have.status(201); const body = pm.response.json(); pm.expect(body.status).to.eql('DRAFT'); pm.environment.set('saleReturnId', body.id); pm.environment.set('saleReturnItemId', body.items[0].id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reason\":\"Phase 6 partial return\",\"items\":[{\"saleItemId\":\"{{saleItemId}}\",\"destinationLocationId\":\"{{locationId}}\",\"quantityReturned\":2}]}"
+        },
+        "url": "{{baseUrl}}/api/sales/{{saleId}}/returns"
+      }
+    },
+    {
+      "name": "24 Verify DRAFT Return Stock Unchanged",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('DRAFT Return has no effect', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(6); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "25 POST Sale Return",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Return posts', () => { pm.response.to.have.status(201); pm.expect(pm.response.json().status).to.eql('POSTED'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/sale-returns/{{saleReturnId}}/post"
+      }
+    },
+    {
+      "name": "26 Verify Inventory Increased by 2",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('stock is restored to 8', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(8); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "27 Verify Return IN Reference",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('IN traces SaleReturnItem', () => { pm.response.to.have.status(200); const movement = pm.response.json().inventoryMovements[0]; pm.expect(movement).to.include({type:'IN', referenceType:'SALE_RETURN', referenceId:pm.environment.get('saleReturnId'), referenceItemId:pm.environment.get('saleReturnItemId')}); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/sale-returns/{{saleReturnId}}"
+      }
+    },
+    {
+      "name": "28 Verify Returned and Net Quantity",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Sale detail derives 2 returned and 2 net', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().items[0]).to.include({returnedQuantity:2, netQuantity:2}); });"
+            ]
+          }
+        }
+      ],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/sales/{{saleId}}" }
+    },
+    {
+      "name": "29 Reject Excessive Return",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('over-return conflicts', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reason\":\"Excessive return\",\"items\":[{\"saleItemId\":\"{{saleItemId}}\",\"destinationLocationId\":\"{{locationId}}\",\"quantityReturned\":3}]}"
+        },
+        "url": "{{baseUrl}}/api/sales/{{saleId}}/returns"
+      }
+    },
+    {
+      "name": "30 Verify Over-return Did Not Change Stock",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('stock remains 8', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().totalQuantity).to.eql(8); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "31 Query Sales by Customer",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Customer history contains Sale', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.some(row => row.id === pm.environment.get('saleId'))).to.be.true; });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/sales?customerId={{customerId}}&page=1&limit=20"
+      }
+    },
+    {
+      "name": "32 Create Walk-in Sale",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('walk-in Sale has no Customer', () => { pm.response.to.have.status(201); const body = pm.response.json(); pm.expect(body.customerId).to.eql(null); pm.expect(body.walkIn).to.be.true; pm.environment.set('walkInSaleId', body.id); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"documentDate\":\"2026-08-19\",\"items\":[{\"productId\":\"{{productId}}\",\"sourceLocationId\":\"{{locationId}}\",\"quantity\":1}]}"
+        },
+        "url": "{{baseUrl}}/api/sales"
+      }
+    },
+    {
+      "name": "33 POST Walk-in Sale",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('walk-in Sale posts', () => { pm.response.to.have.status(201); pm.expect(pm.response.json().status).to.eql('POSTED'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/sales/{{walkInSaleId}}/post"
+      }
+    },
+    {
+      "name": "34 Unauthenticated Customer Rejected",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": ["pm.environment.set('accessToken', '');"]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('accessToken', pm.environment.get('adminAccessToken'));",
+              "pm.test('unauthenticated request is rejected', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/customers" }
+    },
+    {
+      "name": "35 Create Restricted User",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('restricted user created safely', () => { pm.response.to.have.status(201); pm.expect(pm.response.json()).not.to.have.property('passwordHash'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{restrictedEmail}}\",\"password\":\"{{restrictedPassword}}\",\"firstName\":\"Phase\",\"lastName\":\"Six\"}"
+        },
+        "url": "{{baseUrl}}/api/users"
+      }
+    },
+    {
+      "name": "36 Restricted User Login",
+      "auth": { "type": "noauth" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('restricted login succeeds', () => { pm.response.to.have.status(200); pm.environment.set('restrictedAccessToken', pm.response.json().accessToken); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{restrictedEmail}}\",\"password\":\"{{restrictedPassword}}\"}"
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "37 Restricted User Forbidden",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.environment.set('accessToken', pm.environment.get('restrictedAccessToken'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('authenticated user without permission is forbidden', () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/customers" }
+    }
+  ]
+}

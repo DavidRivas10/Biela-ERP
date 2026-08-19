@@ -24,8 +24,9 @@ traceable stock Movements, atomic Transfers, and deterministic Product search.
 Phase 4 backend integration, hardening, regression testing, and MVP
 stabilization is complete. Phase 5 implements Suppliers, Purchases, partial
 receiving, Purchase Returns, and traceable Inventory integration in
-`ms-autorepuesto`. Customers and Sales are deferred to Phase 6; Cash is deferred
-to Phase 7. The frontend, workshop, accounting, and AI remain unimplemented. No
+`ms-autorepuesto`. Phase 6 implements Customers, walk-in Sales, Sales Returns,
+exact Sales money, and traceable Inventory integration. Cash and Payments are
+deferred to Phase 7. The frontend, workshop, accounting, and AI remain unimplemented. No
 subsequent roadmap block is approved here. Never implement a future phase
 without explicit instruction.
 
@@ -79,6 +80,20 @@ without explicit instruction.
 - `InventoryMovement` commercial references remain controlled and trace the
   originating document and line. Do not add Sales reference types before their
   separately approved phase.
+
+## Phase 6 sales rules
+
+- A Sale may reference an active Customer or remain walk-in with no Customer.
+  Deactivation never invalidates historical documents.
+- `Product.defaultSalePrice` is only a current suggestion; immutable historical
+  truth is `SaleItem.unitPrice`. Sales money uses Prisma Decimal/NUMERIC.
+- A DRAFT Sale has no stock effect. POST atomically calls the existing Inventory
+  `OUT` engine for every line; Sales services never update balances directly.
+- A posted Sale Return calls the existing Inventory `IN` engine. Eligibility is
+  sold quantity minus prior POSTED returns and is protected by Sale row locking.
+- Sale and Return numbers use PostgreSQL sequences. Posted documents are
+  immutable, commercial line effects are unique, and Cash/Payment concepts do
+  not belong to Phase 6.
 
 ## Commands
 

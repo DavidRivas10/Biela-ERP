@@ -24,6 +24,8 @@ enum InventoryMovementType {
 enum InventoryMovementReferenceType {
   PURCHASE_RECEIPT
   PURCHASE_RETURN
+  SALE
+  SALE_RETURN
 }
 
 enum PurchaseStatus {
@@ -35,6 +37,12 @@ enum PurchaseStatus {
 }
 
 enum PurchasingDocumentStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum SaleStatus {
   DRAFT
   POSTED
   CANCELLED
@@ -74,6 +82,7 @@ model Product {
   categoryId         String                  @db.Uuid
   brandId            String                  @db.Uuid
   active             Boolean                 @default(true)
+  defaultSalePrice   Decimal?                @db.Decimal(18, 4)
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
   category           ProductCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
@@ -83,6 +92,7 @@ model Product {
   inventories        Inventory[]
   inventoryMovements InventoryMovement[]
   purchaseItems      PurchaseItem[]
+  saleItems          SaleItem[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -199,6 +209,8 @@ model Location {
   incomingMovements   InventoryMovement[]  @relation("MovementDestinationLocation")
   purchaseReceipts    PurchaseReceipt[]
   purchaseReturnItems PurchaseReturnItem[]
+  saleItems           SaleItem[]
+  saleReturnItems     SaleReturnItem[]
 
   @@index([active])
 }
@@ -385,4 +397,112 @@ model PurchaseReturnItem {
   @@index([sourceLocationId])
 }
 
-// Customers, sales, cash, workshop, and intelligence data remain out of scope.
+model Customer {
+  id           String   @id @default(uuid()) @db.Uuid
+  code         String   @unique @db.VarChar(60)
+  name         String   @db.VarChar(160)
+  businessName String?  @db.VarChar(160)
+  taxId        String?  @db.VarChar(40)
+  contactName  String?  @db.VarChar(120)
+  phone        String?  @db.VarChar(40)
+  email        String?  @db.VarChar(160)
+  address      String?  @db.VarChar(500)
+  notes        String?  @db.VarChar(1000)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  sales        Sale[]
+
+  @@index([name])
+  @@index([businessName])
+  @@index([taxId])
+  @@index([active])
+}
+
+model Sale {
+  id                 String       @id @default(uuid()) @db.Uuid
+  number             Int          @unique @default(autoincrement())
+  customerId         String?      @db.Uuid
+  documentDate       DateTime     @db.Date
+  status             SaleStatus   @default(DRAFT)
+  notes              String?      @db.VarChar(1000)
+  subtotal           Decimal      @default(0) @db.Decimal(18, 2)
+  discountTotal      Decimal      @default(0) @db.Decimal(18, 2)
+  taxTotal           Decimal      @default(0) @db.Decimal(18, 2)
+  total              Decimal      @default(0) @db.Decimal(18, 2)
+  createdByActorId   String       @db.VarChar(120)
+  postedByActorId    String?      @db.VarChar(120)
+  postedAt           DateTime?
+  cancelledByActorId String?      @db.VarChar(120)
+  cancelledAt        DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  customer           Customer?    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  items              SaleItem[]
+  returns            SaleReturn[]
+
+  @@index([customerId, documentDate])
+  @@index([status, documentDate])
+  @@index([documentDate])
+}
+
+model SaleItem {
+  id               String           @id @default(uuid()) @db.Uuid
+  saleId           String           @db.Uuid
+  productId        String           @db.Uuid
+  sourceLocationId String           @db.Uuid
+  quantity         Int
+  unitPrice        Decimal          @db.Decimal(18, 4)
+  discountAmount   Decimal          @default(0) @db.Decimal(18, 2)
+  taxAmount        Decimal          @default(0) @db.Decimal(18, 2)
+  lineSubtotal     Decimal          @db.Decimal(18, 2)
+  lineTotal        Decimal          @db.Decimal(18, 2)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  sale             Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product          Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sourceLocation   Location         @relation(fields: [sourceLocationId], references: [id], onDelete: Restrict)
+  returnItems      SaleReturnItem[]
+
+  @@unique([saleId, productId, sourceLocationId])
+  @@index([productId])
+  @@index([sourceLocationId])
+}
+
+model SaleReturn {
+  id                 String           @id @default(uuid()) @db.Uuid
+  number             Int              @unique @default(autoincrement())
+  saleId             String           @db.Uuid
+  status             SaleStatus       @default(DRAFT)
+  reason             String           @db.VarChar(500)
+  createdByActorId   String           @db.VarChar(120)
+  postedByActorId    String?          @db.VarChar(120)
+  postedAt           DateTime?
+  cancelledByActorId String?          @db.VarChar(120)
+  cancelledAt        DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  sale               Sale             @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  items              SaleReturnItem[]
+
+  @@index([saleId, createdAt])
+  @@index([status, createdAt])
+}
+
+model SaleReturnItem {
+  id                    String     @id @default(uuid()) @db.Uuid
+  saleReturnId          String     @db.Uuid
+  saleItemId            String     @db.Uuid
+  destinationLocationId String     @db.Uuid
+  quantityReturned      Int
+  createdAt             DateTime   @default(now())
+  saleReturn            SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  saleItem              SaleItem   @relation(fields: [saleItemId], references: [id], onDelete: Restrict)
+  destinationLocation   Location   @relation(fields: [destinationLocationId], references: [id], onDelete: Restrict)
+
+  @@unique([saleReturnId, saleItemId, destinationLocationId])
+  @@index([saleItemId])
+  @@index([destinationLocationId])
+}
+
+// Cash, payments, workshop, and intelligence data remain out of scope.

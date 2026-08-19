@@ -22,4 +22,12 @@ export const BUSINESS_PERMISSIONS = {
   PURCHASES_UPDATE: "purchases.update",
   PURCHASES_RECEIVE: "purchases.receive",
   PURCHASES_RETURN: "purchases.return",
+  CUSTOMERS_READ: "customers.read",
+  CUSTOMERS_CREATE: "customers.create",
+  CUSTOMERS_UPDATE: "customers.update",
+  SALES_READ: "sales.read",
+  SALES_CREATE: "sales.create",
+  SALES_UPDATE: "sales.update",
+  SALES_POST: "sales.post",
+  SALES_RETURN: "sales.return",
 } as const;

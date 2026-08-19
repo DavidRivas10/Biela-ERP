@@ -28,9 +28,9 @@ async function bootstrap(): Promise<void> {
   const swaggerConfig = new DocumentBuilder()
     .setTitle("BIELA ms-autorepuesto")
     .setDescription(
-      "BIELA operational service: catalog, locations, inventory, movements, and deterministic search",
+      "BIELA operational service: catalog, inventory, purchasing, Customers, Sales, and Returns",
     )
-    .setVersion("3.0")
+    .setVersion("6.0")
     .addBearerAuth()
     .build();
   SwaggerModule.setup(

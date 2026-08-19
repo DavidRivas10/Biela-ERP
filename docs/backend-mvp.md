@@ -1,7 +1,7 @@
 # BIELA Backend MVP
 
-This document describes the implemented and verified backend scope after Phase
-4 stabilization. It does not describe deployed infrastructure or approve a new
+This document describes the implemented backend scope through Phase 6. It does
+not describe deployed infrastructure or approve a new
 product phase.
 
 ## Architecture and ownership
@@ -11,7 +11,7 @@ flowchart LR
     Client[Future client] -->|HTTP /api| Gateway[API Gateway :4000]
 
     Gateway -->|Authentication, users, roles| Users[ms-users :4001]
-    Gateway -->|Catalog, fitment, stock, search| Auto
+    Gateway -->|Catalog, stock, purchasing, sales| Auto
 
     subgraph Identity[Identity service boundary]
         Users --> Mongo[(MongoDB :27017)]
@@ -25,6 +25,8 @@ flowchart LR
         Locations[Physical Locations]
         Inventory[Inventory balances and Movements]
         Search[Deterministic Product search]
+        Purchasing[Suppliers and Purchasing]
+        Sales[Customers, Sales, Returns]
 
         Auto --> Catalog
         Auto --> Vehicles
@@ -35,6 +37,8 @@ flowchart LR
         Catalog --> Search
         Fitment --> Search
         Inventory --> Search
+        Purchasing --> Inventory
+        Sales --> Inventory
     end
 
     Auto --> Postgres[(PostgreSQL :5432)]
@@ -61,8 +65,13 @@ business rules. Inter-service communication uses HTTP APIs.
 - Search: deterministic Product code/name search, catalog filters, explicit
   Vehicle compatibility filters, active state, stock availability, ranking, and
   stable pagination.
+- Purchasing: Suppliers, exact-money Purchases, partial Receipts, Purchase
+  Returns, and controlled Inventory references.
+- Sales: Customers and walk-in Sales, exact historical price snapshots, atomic
+  Inventory OUT posting, partial Returns through Inventory IN, and concurrency
+  protection against overselling and over-return.
 
-Frontend, purchasing, sales, invoicing, workshop, accounting, multisite,
+Frontend, Cash/Payments, fiscal invoicing, workshop, accounting, multisite,
 notifications, AI, semantic search, and external search systems are not part of
 this MVP.
 

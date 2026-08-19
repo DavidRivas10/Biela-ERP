@@ -4,6 +4,7 @@ import {
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsDecimal,
   IsOptional,
   IsString,
   IsUUID,
@@ -47,6 +48,16 @@ export class CreateProductDto {
   @IsString()
   @MaxLength(1000)
   description?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    example: "125.5000",
+    description: "Current suggested price; SaleItem stores its own snapshot",
+  })
+  @IsOptional()
+  @IsDecimal({ decimal_digits: "0,4", force_decimal: false })
+  @Matches(/^\d+(?:\.\d{1,4})?$/)
+  defaultSalePrice?: string;
 
   @ApiProperty({ format: "uuid" })
   @IsUUID()

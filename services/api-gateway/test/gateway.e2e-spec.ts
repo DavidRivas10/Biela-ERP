@@ -12,6 +12,8 @@ import { SearchController } from "../src/operations/search.controller";
 import { PurchasesController } from "../src/purchasing/purchases.controller";
 import { SuppliersController } from "../src/purchasing/suppliers.controller";
 import { UpstreamService } from "../src/upstream/upstream.service";
+import { CustomersController } from "../src/sales/customers.controller";
+import { SalesController } from "../src/sales/sales.controller";
 
 describe("API Gateway HTTP", () => {
   let app: INestApplication;
@@ -30,6 +32,8 @@ describe("API Gateway HTTP", () => {
         SearchController,
         SuppliersController,
         PurchasesController,
+        CustomersController,
+        SalesController,
       ],
       providers: [{ provide: UpstreamService, useValue: upstream }],
     }).compile();
@@ -224,6 +228,92 @@ describe("API Gateway HTTP", () => {
       path: "purchase-returns/return-id/post",
       authorization: "Bearer purchasing-token",
       body: undefined,
+    });
+  });
+
+  it("forwards Customer bodies and deterministic filters", async () => {
+    upstream.request.mockResolvedValue({ id: "customer-id", code: "CUS-001" });
+    const body = { code: "CUS-001", name: "Customer One" };
+    await request(app.getHttpServer())
+      .post("/api/customers")
+      .set("Authorization", "Bearer sales-token")
+      .send(body)
+      .expect(201);
+    expect(upstream.request).toHaveBeenCalledWith("autorepuesto", {
+      method: "POST",
+      path: "customers",
+      authorization: "Bearer sales-token",
+      body,
+    });
+    upstream.request.mockResolvedValue({ data: [], meta: { page: 1 } });
+    await request(app.getHttpServer())
+      .get("/api/customers?search=Customer&active=true&page=1")
+      .set("Authorization", "Bearer sales-token")
+      .expect(200);
+    expect(upstream.request).toHaveBeenLastCalledWith("autorepuesto", {
+      path: "customers",
+      authorization: "Bearer sales-token",
+      query: expect.objectContaining({
+        search: "Customer",
+        active: "true",
+        page: "1",
+      }),
+    });
+  });
+
+  it("forwards Sale lifecycle and Return commands without business logic", async () => {
+    const body = {
+      documentDate: "2026-08-19",
+      items: [
+        {
+          productId: "product-id",
+          sourceLocationId: "location-id",
+          quantity: 4,
+        },
+      ],
+    };
+    upstream.request.mockResolvedValue({ id: "sale-id", status: "DRAFT" });
+    await request(app.getHttpServer())
+      .post("/api/sales")
+      .set("Authorization", "Bearer sales-token")
+      .send(body)
+      .expect(201);
+    expect(upstream.request).toHaveBeenCalledWith("autorepuesto", {
+      method: "POST",
+      path: "sales",
+      authorization: "Bearer sales-token",
+      body,
+    });
+    await request(app.getHttpServer())
+      .post("/api/sales/sale-id/post")
+      .set("Authorization", "Bearer sales-token")
+      .expect(201);
+    expect(upstream.request).toHaveBeenLastCalledWith("autorepuesto", {
+      method: "POST",
+      path: "sales/sale-id/post",
+      authorization: "Bearer sales-token",
+      body: undefined,
+    });
+    const returnBody = {
+      reason: "Return",
+      items: [
+        {
+          saleItemId: "item-id",
+          destinationLocationId: "location-id",
+          quantityReturned: 2,
+        },
+      ],
+    };
+    await request(app.getHttpServer())
+      .post("/api/sales/sale-id/returns")
+      .set("Authorization", "Bearer sales-token")
+      .send(returnBody)
+      .expect(201);
+    expect(upstream.request).toHaveBeenLastCalledWith("autorepuesto", {
+      method: "POST",
+      path: "sales/sale-id/returns",
+      authorization: "Bearer sales-token",
+      body: returnBody,
     });
   });
 });
