@@ -13,6 +13,14 @@ enum ProductAttributeValueType {
   BOOLEAN
 }
 
+enum InventoryMovementType {
+  INITIAL
+  IN
+  OUT
+  ADJUSTMENT
+  TRANSFER
+}
+
 model ProductCategory {
   id                   String                       @id @default(uuid()) @db.Uuid
   code                 String                       @unique @db.VarChar(60)
@@ -40,19 +48,21 @@ model ProductBrand {
 }
 
 model Product {
-  id              String                  @id @default(uuid()) @db.Uuid
-  code            String                  @unique @db.VarChar(80)
-  name            String                  @db.VarChar(160)
-  description     String?                 @db.VarChar(1000)
-  categoryId      String                  @db.Uuid
-  brandId         String                  @db.Uuid
-  active          Boolean                 @default(true)
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
-  category        ProductCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  brand           ProductBrand            @relation(fields: [brandId], references: [id], onDelete: Restrict)
-  attributes      ProductAttributeValue[]
-  compatibilities ProductCompatibility[]
+  id                 String                  @id @default(uuid()) @db.Uuid
+  code               String                  @unique @db.VarChar(80)
+  name               String                  @db.VarChar(160)
+  description        String?                 @db.VarChar(1000)
+  categoryId         String                  @db.Uuid
+  brandId            String                  @db.Uuid
+  active             Boolean                 @default(true)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  category           ProductCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  brand              ProductBrand            @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  attributes         ProductAttributeValue[]
+  compatibilities    ProductCompatibility[]
+  inventories        Inventory[]
+  inventoryMovements InventoryMovement[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -151,4 +161,63 @@ model ProductCompatibility {
   @@index([active])
 }
 
-// Inventory, sales, workshop, and intelligence data remain out of scope.
+model Location {
+  id                String              @id @default(uuid()) @db.Uuid
+  code              String              @unique @db.VarChar(60)
+  name              String              @db.VarChar(120)
+  description       String?             @db.VarChar(500)
+  zone              String?             @db.VarChar(80)
+  aisle             String?             @db.VarChar(40)
+  rack              String?             @db.VarChar(40)
+  shelf             String?             @db.VarChar(40)
+  bin               String?             @db.VarChar(40)
+  active            Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  inventories       Inventory[]
+  outgoingMovements InventoryMovement[] @relation("MovementSourceLocation")
+  incomingMovements InventoryMovement[] @relation("MovementDestinationLocation")
+
+  @@index([active])
+}
+
+model Inventory {
+  id         String   @id @default(uuid()) @db.Uuid
+  productId  String   @db.Uuid
+  locationId String   @db.Uuid
+  quantity   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Restrict)
+
+  @@unique([productId, locationId])
+  @@index([locationId])
+}
+
+model InventoryMovement {
+  id                        String                @id @default(uuid()) @db.Uuid
+  productId                 String                @db.Uuid
+  sourceLocationId          String?               @db.Uuid
+  destinationLocationId     String?               @db.Uuid
+  type                      InventoryMovementType
+  quantity                  Int
+  reason                    String?               @db.VarChar(500)
+  actorId                   String                @db.VarChar(120)
+  sourceQuantityBefore      Int?
+  sourceQuantityAfter       Int?
+  destinationQuantityBefore Int?
+  destinationQuantityAfter  Int?
+  createdAt                 DateTime              @default(now())
+  product                   Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sourceLocation            Location?             @relation("MovementSourceLocation", fields: [sourceLocationId], references: [id], onDelete: Restrict)
+  destinationLocation       Location?             @relation("MovementDestinationLocation", fields: [destinationLocationId], references: [id], onDelete: Restrict)
+
+  @@index([productId, createdAt])
+  @@index([sourceLocationId, createdAt])
+  @@index([destinationLocationId, createdAt])
+  @@index([type, createdAt])
+  @@index([createdAt])
+}
+
+// Sales, workshop, and intelligence data remain out of scope.

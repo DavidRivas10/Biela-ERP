@@ -8,6 +8,9 @@ import { ProductsModule } from "./products/products.module";
 import { VehiclesModule } from "./vehicles/vehicles.module";
 import { CompatibilitiesModule } from "./compatibilities/compatibilities.module";
 import { AuthModule } from "./auth/auth.module";
+import { LocationsModule } from "./locations/locations.module";
+import { InventoryModule } from "./inventory/inventory.module";
+import { SearchModule } from "./search/search.module";
 
 @Module({
   imports: [
@@ -22,6 +25,9 @@ import { AuthModule } from "./auth/auth.module";
     ProductsModule,
     VehiclesModule,
     CompatibilitiesModule,
+    LocationsModule,
+    InventoryModule,
+    SearchModule,
   ],
 })
 export class AppModule {}

@@ -8,6 +8,7 @@ import { RolesModule } from "./roles/roles.module";
 import { UpstreamModule } from "./upstream/upstream.module";
 import { UsersModule } from "./users/users.module";
 import { CatalogModule } from "./catalog/catalog.module";
+import { OperationsModule } from "./operations/operations.module";
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { CatalogModule } from "./catalog/catalog.module";
     RolesModule,
     HealthModule,
     CatalogModule,
+    OperationsModule,
   ],
 })
 export class AppModule {}

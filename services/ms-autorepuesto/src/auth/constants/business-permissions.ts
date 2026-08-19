@@ -7,4 +7,11 @@ export const BUSINESS_PERMISSIONS = {
   VEHICLES_UPDATE: "vehicles.update",
   COMPATIBILITIES_READ: "compatibilities.read",
   COMPATIBILITIES_MANAGE: "compatibilities.manage",
+  LOCATIONS_READ: "locations.read",
+  LOCATIONS_CREATE: "locations.create",
+  LOCATIONS_UPDATE: "locations.update",
+  INVENTORY_READ: "inventory.read",
+  INVENTORY_ADJUST: "inventory.adjust",
+  INVENTORY_TRANSFER: "inventory.transfer",
+  SEARCH_READ: "search.read",
 } as const;

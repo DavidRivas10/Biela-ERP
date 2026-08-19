@@ -1,0 +1,1146 @@
+{
+  "info": {
+    "_postman_id": "9ff67b7f-0462-4d60-b50a-57bbfbd18a03",
+    "name": "BIELA Backend Phase 3",
+    "description": "Executable Phase 3 Gateway flow for locations, safe inventory movements, transfers, rollback, and deterministic product search.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.environment.get(\"runSuffix\")) {",
+          "  pm.environment.set(\"runSuffix\", Date.now().toString());",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json(); pm.environment.set(\"accessToken\", json.accessToken);",
+              "pm.test(\"access token returned\", function () { pm.expect(json.accessToken).to.be.a(\"string\").and.not.empty; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "02 Create Product Category",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+              "pm.environment.set(\"categoryId\", pm.response.json().id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"p3-cat-{{runSuffix}}\",\n  \"name\": \"Phase 3 Category\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/product-categories",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "product-categories"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "03 Create Product Brand",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+              "pm.environment.set(\"productBrandId\", pm.response.json().id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"p3-brand-{{runSuffix}}\",\n  \"name\": \"Phase 3 Brand\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/product-brands",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "product-brands"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "04 Create Product",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+              "const json = pm.response.json(); pm.environment.set(\"productId\", json.id); pm.environment.set(\"productCode\", json.code);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"P3-{{runSuffix}}-PAD\",\n  \"name\": \"Phase 3 Brake Pad\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"brandId\": \"{{productBrandId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/products",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "products"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "05 Create Vehicle Brand",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+              "pm.environment.set(\"vehicleBrandId\", pm.response.json().id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"p3-toyota-{{runSuffix}}\",\n  \"name\": \"Toyota Phase 3\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/vehicle-brands",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "vehicle-brands"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "06 Create Vehicle Model",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+              "pm.environment.set(\"vehicleModelId\", pm.response.json().id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"brandId\": \"{{vehicleBrandId}}\",\n  \"code\": \"p3-corolla-{{runSuffix}}\",\n  \"name\": \"Corolla\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/vehicle-models",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "vehicle-models"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "07 Create Vehicle",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+              "pm.environment.set(\"vehicleId\", pm.response.json().id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"modelId\": \"{{vehicleModelId}}\",\n  \"year\": 2015,\n  \"engine\": \"1.8L\",\n  \"generation\": \"E170\",\n  \"trim\": \"LE\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/vehicles",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "vehicles"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "08 Create Compatibility",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+              "pm.environment.set(\"compatibilityId\", pm.response.json().id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"vehicleId\": \"{{vehicleId}}\",\n  \"notes\": \"Phase 3 deterministic search fixture\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/compatibilities",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "compatibilities"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "09 Create Location A",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+              "pm.environment.set(\"locationAId\", pm.response.json().id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"P3-A-{{runSuffix}}\",\n  \"name\": \"Phase 3 Location A\",\n  \"zone\": \"Warehouse\",\n  \"aisle\": \"A\",\n  \"rack\": \"01\",\n  \"shelf\": \"01\",\n  \"bin\": \"01\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/locations",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "locations"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "10 Create Location B",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+              "pm.environment.set(\"locationBId\", pm.response.json().id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"P3-B-{{runSuffix}}\",\n  \"name\": \"Phase 3 Location B\",\n  \"zone\": \"Warehouse\",\n  \"aisle\": \"B\",\n  \"rack\": \"01\",\n  \"shelf\": \"01\",\n  \"bin\": \"01\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/locations",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "locations"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "11 INITIAL 10 at A",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+              "pm.test(\"INITIAL audit balances\", function () { const j = pm.response.json(); pm.expect(j.destinationQuantityBefore).to.eql(0); pm.expect(j.destinationQuantityAfter).to.eql(10); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"INITIAL\",\n  \"productId\": \"{{productId}}\",\n  \"destinationLocationId\": \"{{locationAId}}\",\n  \"quantity\": 10,\n  \"reason\": \"Opening count\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/inventory/movements",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "inventory", "movements"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "12 Verify Initial Product Inventory",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"initial total is 10\", function () { pm.expect(pm.response.json().totalQuantity).to.eql(10); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/products/{{productId}}/inventory?inStock=true",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "products", "{{productId}}", "inventory"],
+          "query": [
+            {
+              "key": "inStock",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "13 IN 2 at A",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+              "pm.test(\"IN results in 12\", function () { pm.expect(pm.response.json().destinationQuantityAfter).to.eql(12); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"IN\",\n  \"productId\": \"{{productId}}\",\n  \"destinationLocationId\": \"{{locationAId}}\",\n  \"quantity\": 2,\n  \"reason\": \"Receiving verification\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/inventory/movements",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "inventory", "movements"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "14 OUT 2 from A",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+              "pm.test(\"OUT returns A to 10\", function () { pm.expect(pm.response.json().sourceQuantityAfter).to.eql(10); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"OUT\",\n  \"productId\": \"{{productId}}\",\n  \"sourceLocationId\": \"{{locationAId}}\",\n  \"quantity\": 2,\n  \"reason\": \"Issue verification\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/inventory/movements",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "inventory", "movements"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "15 TRANSFER 3 A to B",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+              "pm.test(\"transfer balances are 7 and 3\", function () { const j = pm.response.json(); pm.expect(j.sourceQuantityAfter).to.eql(7); pm.expect(j.destinationQuantityAfter).to.eql(3); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"TRANSFER\",\n  \"productId\": \"{{productId}}\",\n  \"sourceLocationId\": \"{{locationAId}}\",\n  \"destinationLocationId\": \"{{locationBId}}\",\n  \"quantity\": 3,\n  \"reason\": \"Transfer verification\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/inventory/movements",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "inventory", "movements"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "16 Verify Source A",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"source A is 7\", function () { pm.expect(pm.response.json().data[0].quantity).to.eql(7); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/locations/{{locationAId}}/inventory?productId={{productId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "locations", "{{locationAId}}", "inventory"],
+          "query": [
+            {
+              "key": "productId",
+              "value": "{{productId}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "17 Verify Destination B",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"destination B is 3\", function () { pm.expect(pm.response.json().data[0].quantity).to.eql(3); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/locations/{{locationBId}}/inventory?productId={{productId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "locations", "{{locationBId}}", "inventory"],
+          "query": [
+            {
+              "key": "productId",
+              "value": "{{productId}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "18 Verify Product Total",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"product total remains 10\", function () { pm.expect(pm.response.json().totalQuantity).to.eql(10); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/products/{{productId}}/inventory",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "products", "{{productId}}", "inventory"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "19 Reject Insufficient OUT",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 409\", function () { pm.response.to.have.status(409); });",
+              "pm.test(\"clean insufficient stock error\", function () { pm.expect(pm.response.json().message).to.eql(\"Insufficient stock\"); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"OUT\",\n  \"productId\": \"{{productId}}\",\n  \"sourceLocationId\": \"{{locationAId}}\",\n  \"quantity\": 99,\n  \"reason\": \"Must fail\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/inventory/movements",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "inventory", "movements"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "20 Verify Failed OUT Rollback",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"failed OUT changed nothing\", function () { const j = pm.response.json(); pm.expect(j.totalQuantity).to.eql(10); const quantities = j.data.map(x => x.quantity).sort((a,b) => a-b); pm.expect(quantities).to.eql([3,7]); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/products/{{productId}}/inventory",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "products", "{{productId}}", "inventory"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "21 Search Exact Product Code",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"exact product ranks first\", function () { pm.expect(pm.response.json().data[0].id).to.eql(pm.environment.get(\"productId\")); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/search/products?q={{productCode}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "search", "products"],
+          "query": [
+            {
+              "key": "q",
+              "value": "{{productCode}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "22 Search Partial Product Code",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"partial code finds product\", function () { pm.expect(pm.response.json().data.some(x => x.id === pm.environment.get(\"productId\"))).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/search/products?q=P3-{{runSuffix}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "search", "products"],
+          "query": [
+            {
+              "key": "q",
+              "value": "P3-{{runSuffix}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "23 Search Product Name",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"name finds product\", function () { pm.expect(pm.response.json().data.some(x => x.id === pm.environment.get(\"productId\"))).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/search/products?q=phase%203%20brake",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "search", "products"],
+          "query": [
+            {
+              "key": "q",
+              "value": "phase%203%20brake"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "24 Search Vehicle Compatibility",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"compatibility finds product and vehicle\", function () { const j = pm.response.json().data[0]; pm.expect(j.id).to.eql(pm.environment.get(\"productId\")); pm.expect(j.matchingVehicles[0].id).to.eql(pm.environment.get(\"vehicleId\")); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/search/products?vehicleId={{vehicleId}}&year=2015",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "search", "products"],
+          "query": [
+            {
+              "key": "vehicleId",
+              "value": "{{vehicleId}}"
+            },
+            {
+              "key": "year",
+              "value": "2015"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "25 Query Product Inventory",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"two product locations returned\", function () { const j = pm.response.json(); pm.expect(j.data).to.have.length(2); pm.expect(j.totalQuantity).to.eql(10); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/products/{{productId}}/inventory?page=1&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "products", "{{productId}}", "inventory"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "26 Query Location Inventory",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"location contains product\", function () { pm.expect(pm.response.json().data[0].productId).to.eql(pm.environment.get(\"productId\")); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/locations/{{locationAId}}/inventory?page=1&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "locations", "{{locationAId}}", "inventory"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "27 Query Product Movement History",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"four successful movements are traceable\", function () { const j = pm.response.json(); pm.expect(j.meta.total).to.eql(4); pm.expect(j.data.map(x => x.type)).to.include.members([\"INITIAL\", \"IN\", \"OUT\", \"TRANSFER\"]); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/inventory/movements?productId={{productId}}&page=1&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "inventory", "movements"],
+          "query": [
+            {
+              "key": "productId",
+              "value": "{{productId}}"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
