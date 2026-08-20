@@ -49,7 +49,7 @@ export function Sidebar({
             </div>
           ))}
         </nav>
-        <p className="sidebar__phase">Base frontend · Fase 10</p>
+        <p className="sidebar__phase">Módulos operativos · Fase 11</p>
       </aside>
     </>
   );

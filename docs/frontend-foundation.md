@@ -84,9 +84,10 @@ permission guard.
 | `/forbidden`                                             | authenticated            | permission denial explanation         |
 | `/not-found`                                             | public                   | unknown-route recovery                |
 
-Module placeholders contain no fake CRUD, local-only persistence, or simulated
-business workflow. They reserve stable routes and demonstrate real permission
-boundaries for later approved phases.
+The Phase 10 placeholders established the permission boundaries. Phase 11 now
+implements the approved Catalog, Vehicle, Compatibility, Location, Inventory,
+Movement, Transfer, and Search routes documented in
+`frontend-phase-11-catalog-inventory.md`.
 
 ## Dashboard contract
 
@@ -141,19 +142,21 @@ that API requests go only to the configured Gateway and never to ports 4001 or 4
 - If the Dashboard omits commercial totals, confirm the user actually has
   `commercial-summary.read`. The frontend intentionally makes no request
   without it.
-- If a module is visible but shows a placeholder, that is the intended Phase 10
-  boundary rather than missing backend functionality.
+- If an unimplemented commercial or administration module shows a placeholder,
+  it remains outside the Phase 11 operational scope.
 
 ## Scope boundary
 
 Phase 10 delivers the frontend foundation, authentication, authorization,
-application shell, and lightweight dashboard only. Operational Product,
-Vehicle, Compatibility, Inventory, purchasing, Sales, Cash, settlement, and
-administration screens remain future frontend work. Offline support, refresh
+application shell, and lightweight dashboard. Phase 11 adds Product, Vehicle,
+Compatibility, Location, Inventory, Movement, Transfer, and Search screens.
+Purchasing, Sales, Cash, settlement, and administration screens remain future
+frontend work. Offline support, refresh
 tokens, general accounting, fiscal invoicing, AI, and workshop workflows are
 not added here.
 
 ## Next planned frontend phase
 
-Phase 11 — Catalog, Vehicles, Compatibility, Inventory and Search Frontend.
-This guide records the roadmap name only; Phase 11 is not implemented here.
+Phase 12 — Purchasing, Suppliers, Receiving, Purchase Returns and Accounts
+Payable Frontend. This guide records the roadmap name only; Phase 12 is not
+implemented here.

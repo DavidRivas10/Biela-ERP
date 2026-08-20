@@ -58,6 +58,9 @@ migrations. The API Gateway owns no database and has no ORM dependency.
 - Phase 10 frontend foundation: Vite + React + strict TypeScript workspace,
   Gateway-only API client, session authentication, permission guards, responsive
   ERP shell, and real health/commercial dashboard.
+- Phase 11 operational frontend: Product and Vehicle catalogs, explicit
+  Compatibility, Locations, Inventory balances and movements, atomic Transfer
+  workflow, and deterministic Product Search with permission-aware actions.
 
 No Product contains stock quantity or a physical-location string. See
 [the Phase 3 model](docs/phase-3-data-model.md) for the actual ER diagram,
@@ -75,7 +78,9 @@ cross-domain lock order. See [the stable API contract](docs/backend-api-contract
 and [the release-readiness guide](docs/backend-release-readiness.md) for frontend
 integration and the complete operational release gate. See
 [the frontend foundation guide](docs/frontend-foundation.md) for browser setup,
-auth lifecycle, routes, CORS, architecture, and Phase 10 scope.
+auth lifecycle, CORS, and architecture, and
+[the Phase 11 frontend guide](docs/frontend-phase-11-catalog-inventory.md) for operational routes,
+permissions, workflows, cache behavior, and scope.
 
 ## Setup
 
@@ -384,9 +389,10 @@ prisma:deploy` if migration status is behind.
 
 ## Scope boundary
 
-Cash, Payments, Supplier settlement, operational receivables/payables, and the
-Phase 10 frontend foundation are implemented. Operational frontend module
-workflows, general accounting, Inventory valuation/COGS, fiscal invoicing,
+Cash, Payments, Supplier settlement, operational receivables/payables, the
+Phase 10 frontend foundation, and Phase 11 Catalog/Vehicle/Inventory/Search
+workflows are implemented. Purchasing, Sales/POS, Cash, settlement, and
+administration frontend workflows, general accounting, Inventory valuation/COGS, fiscal invoicing,
 external financial/payment-provider integrations, workshop workflows unless
 separately approved, advanced multisite operations, and AI remain intentionally
 unimplemented. Do not begin a later phase without separate approval.

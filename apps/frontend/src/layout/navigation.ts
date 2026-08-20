@@ -60,7 +60,65 @@ export const NAVIGATION: NavigationGroup[] = [
     ],
   },
   {
-    label: "Operación",
+    label: "Catálogo",
+    items: [
+      {
+        label: "Productos",
+        path: "/app/catalog/products",
+        short: "PT",
+        permission: "products.read",
+      },
+      {
+        label: "Categorías",
+        path: "/app/catalog/categories",
+        short: "CA",
+        permission: "products.read",
+      },
+      {
+        label: "Marcas",
+        path: "/app/catalog/brands",
+        short: "MA",
+        permission: "products.read",
+      },
+      {
+        label: "Atributos",
+        path: "/app/catalog/attributes",
+        short: "AT",
+        permission: "products.read",
+      },
+    ],
+  },
+  {
+    label: "Vehículos",
+    items: [
+      {
+        label: "Vehículos",
+        path: "/app/vehicles",
+        short: "VH",
+        permission: "vehicles.read",
+      },
+      {
+        label: "Marcas",
+        path: "/app/vehicles/brands",
+        short: "MV",
+        permission: "vehicles.read",
+      },
+      {
+        label: "Modelos",
+        path: "/app/vehicles/models",
+        short: "MO",
+        permission: "vehicles.read",
+      },
+      {
+        label: "Compatibilidad",
+        path: "/app/compatibility",
+        short: "CP",
+        permission: "compatibilities.read",
+      },
+    ],
+  },
+  {
+    label: "Almacén",
     items: [
       {
         label: "Inventario",
@@ -69,23 +127,34 @@ export const NAVIGATION: NavigationGroup[] = [
         permission: "inventory.read",
       },
       {
-        label: "Productos",
-        path: "/app/products",
-        short: "PT",
-        permission: "products.read",
-      },
-      {
-        label: "Vehículos",
-        path: "/app/vehicles",
-        short: "VH",
-        permission: "vehicles.read",
-      },
-      {
         label: "Ubicaciones",
-        path: "/app/locations",
+        path: "/app/inventory/locations",
         short: "UB",
         permission: "locations.read",
       },
+      {
+        label: "Movimientos",
+        path: "/app/inventory/movements",
+        short: "MI",
+        permission: "inventory.read",
+      },
+      {
+        label: "Transferencias",
+        path: "/app/inventory/transfers",
+        short: "TR",
+        permission: "inventory.transfer",
+      },
+      {
+        label: "Búsqueda",
+        path: "/app/search",
+        short: "BU",
+        permission: "search.read",
+      },
+    ],
+  },
+  {
+    label: "Operación",
+    items: [
       {
         label: "Caja",
         path: "/app/cash",

@@ -41,7 +41,24 @@ describe("AppRoutes", () => {
     };
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(jsonResponse(systemHealth)),
+      vi.fn((input: string | URL | Request) => {
+        const path = new URL(
+          input instanceof Request ? input.url : input.toString(),
+        ).pathname;
+        if (
+          path === "/api/product-categories" ||
+          path === "/api/product-brands"
+        )
+          return Promise.resolve(jsonResponse([]));
+        if (path === "/api/products")
+          return Promise.resolve(
+            jsonResponse({
+              data: [],
+              meta: { page: 1, limit: 20, total: 0, pages: 0 },
+            }),
+          );
+        return Promise.resolve(jsonResponse(systemHealth));
+      }),
     );
   });
 
@@ -64,14 +81,19 @@ describe("AppRoutes", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders an authorized module placeholder transparently", async () => {
+  it("renders the authorized operational products page", async () => {
     auth = { ...auth, status: "authenticated", user: testUser };
     renderRoute("/app/products");
     expect(
       await screen.findByRole("heading", { name: "Productos" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Módulo preparado para una fase posterior"),
+      screen.getByText(
+        "Datos maestros de producto; el inventario se administra por ubicación.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("No se encontraron productos"),
     ).toBeInTheDocument();
   });
 

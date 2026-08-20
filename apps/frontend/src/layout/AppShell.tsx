@@ -7,9 +7,13 @@ import { NAVIGATION, visibleNavigation } from "./navigation";
 
 function routeTitle(pathname: string): string {
   return (
-    NAVIGATION.flatMap((group) => group.items).find(
-      (item) => item.path === pathname,
-    )?.label ?? "BIELA"
+    NAVIGATION.flatMap((group) => group.items)
+      .filter(
+        (item) =>
+          pathname === item.path || pathname.startsWith(`${item.path}/`),
+      )
+      .sort((left, right) => right.path.length - left.path.length)[0]?.label ??
+    "BIELA"
   );
 }
 
@@ -76,7 +80,7 @@ export function AppShell() {
             </Button>
           </div>
         </header>
-        <main className="content">
+        <main className="content" id="main-content">
           <Outlet />
         </main>
       </div>

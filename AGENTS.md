@@ -30,12 +30,14 @@ exact Sales money, and traceable Inventory integration. Phase 7 implements
 Payment Methods, Cash Registers/Sessions, Payments, Refunds, reversals, and an
 immutable physical-Cash ledger. Phase 8 extends that same ledger with Purchase
 Payments, Supplier Refunds, due dates, operational receivables/payables, and a
-commercial summary. Operational frontend modules, workshop, general accounting, fiscal
+commercial summary. Workshop, general accounting, fiscal
 invoicing, external payment integrations, inventory valuation/COGS, and AI
 remain unimplemented. Phase 9 verifies and documents release readiness across
 the complete Phase 1–8 backend without adding a business module or migration.
 Phase 10 implements only the frontend foundation, authentication, permission
-guards, responsive ERP shell, and real health/commercial dashboard. No
+guards, responsive ERP shell, and real health/commercial dashboard. Phase 11
+implements the Product and Vehicle catalogs, Compatibility, Locations,
+Inventory/Movement/Transfer, and deterministic Search frontend workflows. No
 subsequent roadmap block is approved here. Never implement a future phase
 without explicit instruction.
 
@@ -179,9 +181,25 @@ without explicit instruction.
   UX only. Backend RBAC remains mandatory and authoritative.
 - The dashboard may request commercial summary only with
   `commercial-summary.read`. Never invent KPIs or client-side business totals.
-- Phase 10 module routes are explicit placeholders. Do not implement Product,
-  Inventory, purchasing, Sales, Cash, settlement, or administration workflows
-  before a separately approved frontend phase.
+- Phase 11 replaces only Product, Vehicle, Compatibility, Location, Inventory,
+  Movement, Transfer, and Search placeholders. Purchasing, Sales, Cash,
+  settlement, and administration workflows remain unapproved here.
+
+## Phase 11 frontend rules
+
+- Preserve server pagination and deterministic ordering; never retrieve an
+  operational dataset only to sort or paginate it in the browser.
+- Keep Product stock separate from catalog data and render balances only from
+  Inventory responses. Never optimistically mutate stock.
+- Use only public movement commands. `INITIAL`, `IN`, `OUT`, and target
+  `ADJUSTMENT` require `inventory.adjust`; `TRANSFER` requires
+  `inventory.transfer` and explicit confirmation.
+- Compatibility is the explicit Product + Vehicle relation. Use supported
+  active-state PATCH operations and surface duplicate `409` responses.
+- Keep exact Product price input as a decimal string. Backend validation and
+  business invariants remain authoritative.
+- Phase 12 is not implemented. Its roadmap name is Purchasing, Suppliers,
+  Receiving, Purchase Returns and Accounts Payable Frontend.
 
 ## Engineering expectations
 
