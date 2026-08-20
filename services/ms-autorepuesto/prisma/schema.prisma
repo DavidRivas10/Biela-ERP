@@ -48,6 +48,37 @@ enum SaleStatus {
   CANCELLED
 }
 
+enum PaymentMethodKind {
+  CASH
+  CARD
+  BANK_TRANSFER
+  OTHER
+}
+
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum PaymentType {
+  SALE_PAYMENT
+  SALE_REFUND
+}
+
+enum PaymentStatus {
+  POSTED
+  REVERSED
+}
+
+enum CashMovementType {
+  SALE_PAYMENT
+  SALE_PAYMENT_REVERSAL
+  SALE_REFUND
+  SALE_REFUND_REVERSAL
+  MANUAL_IN
+  MANUAL_OUT
+}
+
 model ProductCategory {
   id                   String                       @id @default(uuid()) @db.Uuid
   code                 String                       @unique @db.VarChar(60)
@@ -440,6 +471,7 @@ model Sale {
   customer           Customer?    @relation(fields: [customerId], references: [id], onDelete: Restrict)
   items              SaleItem[]
   returns            SaleReturn[]
+  payments           Payment[]
 
   @@index([customerId, documentDate])
   @@index([status, documentDate])
@@ -484,6 +516,7 @@ model SaleReturn {
   updatedAt          DateTime         @updatedAt
   sale               Sale             @relation(fields: [saleId], references: [id], onDelete: Restrict)
   items              SaleReturnItem[]
+  refunds            Payment[]
 
   @@index([saleId, createdAt])
   @@index([status, createdAt])
@@ -505,4 +538,110 @@ model SaleReturnItem {
   @@index([destinationLocationId])
 }
 
-// Cash, payments, workshop, and intelligence data remain out of scope.
+model PaymentMethod {
+  id        String            @id @default(uuid()) @db.Uuid
+  code      String            @unique @db.VarChar(60)
+  name      String            @db.VarChar(120)
+  kind      PaymentMethodKind
+  active    Boolean           @default(true)
+  notes     String?           @db.VarChar(500)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  payments  Payment[]
+
+  @@index([kind, active])
+  @@index([active])
+}
+
+model CashRegister {
+  id          String        @id @default(uuid()) @db.Uuid
+  code        String        @unique @db.VarChar(60)
+  name        String        @db.VarChar(120)
+  description String?       @db.VarChar(500)
+  active      Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  sessions    CashSession[]
+
+  @@index([active])
+}
+
+model CashSession {
+  id               String            @id @default(uuid()) @db.Uuid
+  cashRegisterId   String            @db.Uuid
+  status           CashSessionStatus @default(OPEN)
+  openingAmount    Decimal           @db.Decimal(18, 2)
+  openedByActorId  String            @db.VarChar(120)
+  openedAt         DateTime          @default(now())
+  openingNotes     String?           @db.VarChar(500)
+  closedByActorId  String?           @db.VarChar(120)
+  closedAt         DateTime?
+  expectedAmount   Decimal?          @db.Decimal(18, 2)
+  countedAmount    Decimal?          @db.Decimal(18, 2)
+  differenceAmount Decimal?          @db.Decimal(18, 2)
+  closingNotes     String?           @db.VarChar(500)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  cashRegister     CashRegister      @relation(fields: [cashRegisterId], references: [id], onDelete: Restrict)
+  movements        CashMovement[]
+  originalPayments Payment[]         @relation("OriginalPaymentSession")
+  reversalPayments Payment[]         @relation("ReversalPaymentSession")
+
+  @@index([cashRegisterId, openedAt])
+  @@index([status, openedAt])
+  @@index([openedByActorId, openedAt])
+}
+
+model Payment {
+  id                    String         @id @default(uuid()) @db.Uuid
+  number                Int            @unique @default(autoincrement())
+  type                  PaymentType
+  status                PaymentStatus  @default(POSTED)
+  saleId                String         @db.Uuid
+  saleReturnId          String?        @db.Uuid
+  paymentMethodId       String         @db.Uuid
+  cashSessionId         String?        @db.Uuid
+  amount                Decimal        @db.Decimal(18, 2)
+  tenderedAmount        Decimal?       @db.Decimal(18, 2)
+  changeAmount          Decimal?       @db.Decimal(18, 2)
+  externalReference     String?        @db.VarChar(160)
+  notes                 String?        @db.VarChar(500)
+  createdByActorId      String         @db.VarChar(120)
+  createdAt             DateTime       @default(now())
+  reversedAt            DateTime?
+  reversedByActorId     String?        @db.VarChar(120)
+  reversalReason        String?        @db.VarChar(500)
+  reversalCashSessionId String?        @db.Uuid
+  sale                  Sale           @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  saleReturn            SaleReturn?    @relation(fields: [saleReturnId], references: [id], onDelete: Restrict)
+  paymentMethod         PaymentMethod  @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict)
+  cashSession           CashSession?   @relation("OriginalPaymentSession", fields: [cashSessionId], references: [id], onDelete: Restrict)
+  reversalCashSession   CashSession?   @relation("ReversalPaymentSession", fields: [reversalCashSessionId], references: [id], onDelete: Restrict)
+  cashMovements         CashMovement[]
+
+  @@index([saleId, type, status, createdAt])
+  @@index([saleReturnId, status, createdAt])
+  @@index([paymentMethodId, createdAt])
+  @@index([cashSessionId, createdAt])
+  @@index([status, createdAt])
+}
+
+model CashMovement {
+  id            String           @id @default(uuid()) @db.Uuid
+  cashSessionId String           @db.Uuid
+  paymentId     String?          @db.Uuid
+  type          CashMovementType
+  amount        Decimal          @db.Decimal(18, 2)
+  reason        String?          @db.VarChar(500)
+  actorId       String           @db.VarChar(120)
+  createdAt     DateTime         @default(now())
+  cashSession   CashSession      @relation(fields: [cashSessionId], references: [id], onDelete: Restrict)
+  payment       Payment?         @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentId, type])
+  @@index([cashSessionId, createdAt])
+  @@index([paymentId])
+  @@index([type, createdAt])
+}
+
+// Supplier settlement, accounting, workshop, and intelligence remain out of scope.

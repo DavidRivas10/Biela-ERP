@@ -4,7 +4,7 @@ BIELA (Base Integrada Empresarial de Logística Automotriz) is an integrated
 automotive logistics platform. The backend currently implements authentication,
 users, RBAC, the automotive catalog, physical locations, safe inventory
 movements, deterministic Product search, Suppliers, purchasing, Customers, and
-the merchandise Sales/Returns lifecycle.
+the merchandise Sales/Returns lifecycle, Cash Registers, Payments, and Refunds.
 
 ```mermaid
 flowchart TD
@@ -43,6 +43,9 @@ migrations. The API Gateway owns no database and has no ORM dependency.
 - Phase 6 Sales: normalized Customers, walk-in Sales, exact historical price
   snapshots, atomic Inventory `OUT`, partial Returns through Inventory `IN`, and
   concurrency-safe posting.
+- Phase 7 settlement: controlled Payment Methods, Cash Registers and Sessions,
+  immutable Cash Movements, partial/split Sale Payments, Return Refunds,
+  reversals, exact closing snapshots, and concurrency-safe commercial limits.
 
 No Product contains stock quantity or a physical-location string. See
 [the Phase 3 model](docs/phase-3-data-model.md) for the actual ER diagram,
@@ -52,7 +55,8 @@ and the complete Phase 1–4 demonstration procedure. See
 [the Phase 5 purchasing model](docs/phase-5-purchasing-model.md) for commercial
 lifecycle, transaction, money, and concurrency rules, and
 [the Phase 6 sales model](docs/phase-6-sales-model.md) for Customer, Sale, and
-Return behavior.
+Return behavior. See [the Phase 7 cash and payments model](docs/phase-7-cash-payments-model.md)
+for settlement, drawer, refund-allocation, and locking rules.
 
 ## Setup
 
@@ -105,6 +109,10 @@ require a bearer token unless noted otherwise.
 | Customers        | `POST/GET /api/customers`, `GET/PATCH /api/customers/:id`, activate/deactivate                                                    |
 | Sales            | `POST/GET /api/sales`, `GET/PATCH /api/sales/:id`, `POST /api/sales/:id/post`, `POST /api/sales/:id/cancel`                       |
 | Sales returns    | `POST/GET /api/sales/:id/returns`, `GET /api/sale-returns/:id`, `POST /api/sale-returns/:id/post`                                 |
+| Payment methods  | `POST/GET /api/payment-methods`, `GET/PATCH /api/payment-methods/:id`, activate/deactivate                                        |
+| Cash registers   | `POST/GET /api/cash-registers`, `GET/PATCH /api/cash-registers/:id`, activate/deactivate                                          |
+| Cash sessions    | Open/current, list/detail/summary, manual movement, and close routes under `/api/cash-registers` and `/api/cash-sessions`         |
+| Settlement       | `POST/GET /api/sales/:id/payments`, `POST/GET /api/sale-returns/:id/refunds`, `GET /api/payments/:id`, reverse                    |
 
 List endpoints use one contract:
 
@@ -155,6 +163,14 @@ Phase 6 adds:
 - `customers.read`, `customers.create`, `customers.update`
 - `sales.read`, `sales.create`, `sales.update`, `sales.post`, `sales.return`
 
+Phase 7 adds:
+
+- `payment-methods.read`, `payment-methods.manage`
+- `cash-registers.read`, `cash-registers.manage`
+- `cash-sessions.read`, `cash-sessions.open`, `cash-sessions.close`
+- `payments.read`, `payments.create`, `payments.reverse`
+- `cash-movements.read`, `cash-movements.create`
+
 ## Swagger and Postman
 
 | Component       | Swagger                      |
@@ -172,6 +188,8 @@ and Phase 2 assets remain available for regression testing. The Phase 5
 collection demonstrates Supplier → Purchase → Receipt → Inventory IN → Purchase
 Return → Inventory OUT. The Phase 6 collection demonstrates Customer/walk-in
 Sale → Inventory OUT → Sale Return → Inventory IN with rollback and RBAC checks.
+The Phase 7 collection demonstrates partial and split settlement, physical Cash
+effects, Refund eligibility, compensating reversals, manual Cash, and closing.
 
 Committed Postman environments contain no credentials. Inject local seed
 credentials without printing or storing them in the collection:
@@ -179,8 +197,8 @@ credentials without printing or storing them in the collection:
 ```bash
 npx dotenv -e .env -- sh -c '
 npx newman run \
-  docs/postman/BIELA-Phase-6.postman_collection.json \
-  -e docs/postman/BIELA-Phase-6.postman_environment.json \
+  docs/postman/BIELA-Phase-7.postman_collection.json \
+  -e docs/postman/BIELA-Phase-7.postman_environment.json \
   --env-var "adminEmail=$SEED_ADMIN_EMAIL" \
   --env-var "adminPassword=$SEED_ADMIN_PASSWORD"
 '
@@ -222,7 +240,11 @@ Phase 6 adds one migration:
 
 - `20260819143000_phase_6_sales`
 
-Purchase, Receipt, Purchase Return, Sale, and Sale Return numbers use
+Phase 7 adds one migration:
+
+- `20260819170000_phase_7_cash_payments`
+
+Purchase, Receipt, Purchase Return, Sale, Sale Return, and Payment numbers use
 PostgreSQL-backed `SERIAL` sequences.
 Monetary values use Prisma Decimal/PostgreSQL `NUMERIC`; line subtotal is
 quantity × unit cost rounded half-up to two decimals, then discount and tax are
@@ -251,6 +273,16 @@ applied as explicit amounts. Client-submitted totals are not accepted.
    `IN` reference.
 7. Reject an excessive Return and verify returned/net quantities in Sale detail.
 8. Run the Phase 6 Newman collection using safe credential injection.
+
+## Manual Phase 7 verification
+
+1. Create active CASH and CARD methods, a Cash Register, and its single OPEN session.
+2. Record partial CASH and remaining CARD Payments; verify settlement and that only CASH changes expected drawer value.
+3. Post a Sale Return, issue eligible Cash/non-Cash Refunds, and reject over-refunding.
+4. Reverse operations and verify immutable compensating movements without Inventory changes.
+5. Exercise MANUAL_IN/MANUAL_OUT, negative-Cash protection, and actor traceability.
+6. Close with counted Cash, verify snapshots, and reject later movement/duplicate close.
+7. Run the Phase 7 Newman collection using safe credential injection.
 
 ## Manual Phase 3 verification
 

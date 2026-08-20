@@ -1,6 +1,6 @@
 # BIELA Backend MVP
 
-This document describes the implemented backend scope through Phase 6. It does
+This document describes the implemented backend scope through Phase 7. It does
 not describe deployed infrastructure or approve a new
 product phase.
 
@@ -11,7 +11,7 @@ flowchart LR
     Client[Future client] -->|HTTP /api| Gateway[API Gateway :4000]
 
     Gateway -->|Authentication, users, roles| Users[ms-users :4001]
-    Gateway -->|Catalog, stock, purchasing, sales| Auto
+    Gateway -->|Catalog, stock, purchasing, sales, settlement| Auto
 
     subgraph Identity[Identity service boundary]
         Users --> Mongo[(MongoDB :27017)]
@@ -27,6 +27,7 @@ flowchart LR
         Search[Deterministic Product search]
         Purchasing[Suppliers and Purchasing]
         Sales[Customers, Sales, Returns]
+        Finance[Cash Sessions, Payments, Refunds]
 
         Auto --> Catalog
         Auto --> Vehicles
@@ -39,6 +40,7 @@ flowchart LR
         Inventory --> Search
         Purchasing --> Inventory
         Sales --> Inventory
+        Sales --> Finance
     end
 
     Auto --> Postgres[(PostgreSQL :5432)]
@@ -70,8 +72,11 @@ business rules. Inter-service communication uses HTTP APIs.
 - Sales: Customers and walk-in Sales, exact historical price snapshots, atomic
   Inventory OUT posting, partial Returns through Inventory IN, and concurrency
   protection against overselling and over-return.
+- Settlement: controlled Payment Methods, one OPEN Cash Session per register,
+  partial/split Payments, Refund eligibility, reversals, manual drawer
+  movements, and exact Cash close snapshots.
 
-Frontend, Cash/Payments, fiscal invoicing, workshop, accounting, multisite,
+Frontend, fiscal invoicing, workshop, supplier settlement, accounting, multisite,
 notifications, AI, semantic search, and external search systems are not part of
 this MVP.
 
@@ -121,6 +126,21 @@ catalog and availability filters, and the existing explicit Compatibility
 relation. Exact code ranks before partial matches, then stable secondary fields
 and ID order pagination deterministically. `pg_trgm` and GIN indexes are enabled
 by additive migration; no semantic or external search is used.
+
+### Payments, Refunds, and Cash
+
+1. Every Payment/Refund locks its POSTED Sale and recalculates limits with
+   Prisma Decimal inside a serializable transaction.
+2. CASH operations additionally lock an OPEN session whose register is active,
+   then atomically create the financial row and its physical CashMovement.
+3. Non-cash operations create no physical drawer movement and call no provider.
+4. Refund capacity is the lesser of the Return value remaining and active paid
+   money less active Refunds. Return values allocate immutable SaleItem line
+   totals proportionally with cumulative half-up rounding.
+5. Reversals preserve the Payment and append compensating Cash history where
+   applicable. Phase 7 operations never call the Inventory mutation engine.
+6. Closing locks the session, derives expected Cash from the ledger, stores
+   expected/count/difference, and prevents any later movement from committing.
 
 ## Local startup
 

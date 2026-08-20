@@ -14,6 +14,7 @@ import { SuppliersController } from "../src/purchasing/suppliers.controller";
 import { UpstreamService } from "../src/upstream/upstream.service";
 import { CustomersController } from "../src/sales/customers.controller";
 import { SalesController } from "../src/sales/sales.controller";
+import { FinanceController } from "../src/finance/finance.controller";
 
 describe("API Gateway HTTP", () => {
   let app: INestApplication;
@@ -34,6 +35,7 @@ describe("API Gateway HTTP", () => {
         PurchasesController,
         CustomersController,
         SalesController,
+        FinanceController,
       ],
       providers: [{ provide: UpstreamService, useValue: upstream }],
     }).compile();
@@ -314,6 +316,59 @@ describe("API Gateway HTTP", () => {
       path: "sales/sale-id/returns",
       authorization: "Bearer sales-token",
       body: returnBody,
+    });
+  });
+
+  it("forwards Cash Session commands and queries without drawer logic", async () => {
+    const body = { openingAmount: "100.00", notes: "Morning shift" };
+    upstream.request.mockResolvedValue({ id: "session-id", status: "OPEN" });
+    await request(app.getHttpServer())
+      .post("/api/cash-registers/register-id/sessions/open")
+      .set("Authorization", "Bearer finance-token")
+      .send(body)
+      .expect(201);
+    expect(upstream.request).toHaveBeenCalledWith("autorepuesto", {
+      method: "POST",
+      path: "cash-registers/register-id/sessions/open",
+      authorization: "Bearer finance-token",
+      body,
+    });
+    upstream.request.mockResolvedValue({ expectedCash: "100.00" });
+    await request(app.getHttpServer())
+      .get("/api/cash-sessions/session-id/summary")
+      .set("Authorization", "Bearer finance-token")
+      .expect(200);
+    expect(upstream.request).toHaveBeenLastCalledWith("autorepuesto", {
+      path: "cash-sessions/session-id/summary",
+      authorization: "Bearer finance-token",
+    });
+  });
+
+  it("forwards Payments, Refunds, and reversals as thin financial commands", async () => {
+    const payment = { paymentMethodId: "method-id", amount: "25.00" };
+    upstream.request.mockResolvedValue({ id: "payment-id", status: "POSTED" });
+    await request(app.getHttpServer())
+      .post("/api/sales/sale-id/payments")
+      .set("Authorization", "Bearer finance-token")
+      .send(payment)
+      .expect(201);
+    expect(upstream.request).toHaveBeenCalledWith("autorepuesto", {
+      method: "POST",
+      path: "sales/sale-id/payments",
+      authorization: "Bearer finance-token",
+      body: payment,
+    });
+    const reversal = { reason: "Duplicate operation" };
+    await request(app.getHttpServer())
+      .post("/api/payments/payment-id/reverse")
+      .set("Authorization", "Bearer finance-token")
+      .send(reversal)
+      .expect(201);
+    expect(upstream.request).toHaveBeenLastCalledWith("autorepuesto", {
+      method: "POST",
+      path: "payments/payment-id/reverse",
+      authorization: "Bearer finance-token",
+      body: reversal,
     });
   });
 });

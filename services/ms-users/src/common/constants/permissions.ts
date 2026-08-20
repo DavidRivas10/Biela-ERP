@@ -37,6 +37,18 @@ export const PERMISSIONS = {
   SALES_UPDATE: "sales.update",
   SALES_POST: "sales.post",
   SALES_RETURN: "sales.return",
+  PAYMENT_METHODS_READ: "payment-methods.read",
+  PAYMENT_METHODS_MANAGE: "payment-methods.manage",
+  CASH_REGISTERS_READ: "cash-registers.read",
+  CASH_REGISTERS_MANAGE: "cash-registers.manage",
+  CASH_SESSIONS_READ: "cash-sessions.read",
+  CASH_SESSIONS_OPEN: "cash-sessions.open",
+  CASH_SESSIONS_CLOSE: "cash-sessions.close",
+  PAYMENTS_READ: "payments.read",
+  PAYMENTS_CREATE: "payments.create",
+  PAYMENTS_REVERSE: "payments.reverse",
+  CASH_MOVEMENTS_READ: "cash-movements.read",
+  CASH_MOVEMENTS_CREATE: "cash-movements.create",
 } as const;
 
 export const ADMIN_PERMISSIONS = Object.values(PERMISSIONS);

@@ -13,6 +13,7 @@ import {
 import { PrismaService } from "../database/prisma.service";
 import { throwMappedPrismaError } from "../database/prisma-error.util";
 import { InventoryService } from "../inventory/inventory.service";
+import { FinancialSummaryService } from "../finance/financial-summary.service";
 import {
   CreateSaleItemDto,
   CreateSaleDto,
@@ -49,6 +50,7 @@ export class SalesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
+    private readonly financialSummaries: FinancialSummaryService,
   ) {}
 
   async create(dto: CreateSaleDto, actorId: string) {
@@ -134,7 +136,8 @@ export class SalesService {
       },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
-    return { ...this.detail(sale), inventoryMovements };
+    const paymentSummary = await this.financialSummaries.sale(id);
+    return { ...this.detail(sale), inventoryMovements, paymentSummary };
   }
 
   async update(id: string, dto: UpdateSaleDto) {

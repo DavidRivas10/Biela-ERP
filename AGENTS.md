@@ -25,8 +25,10 @@ Phase 4 backend integration, hardening, regression testing, and MVP
 stabilization is complete. Phase 5 implements Suppliers, Purchases, partial
 receiving, Purchase Returns, and traceable Inventory integration in
 `ms-autorepuesto`. Phase 6 implements Customers, walk-in Sales, Sales Returns,
-exact Sales money, and traceable Inventory integration. Cash and Payments are
-deferred to Phase 7. The frontend, workshop, accounting, and AI remain unimplemented. No
+exact Sales money, and traceable Inventory integration. Phase 7 implements
+Payment Methods, Cash Registers/Sessions, Payments, Refunds, reversals, and an
+immutable physical-Cash ledger. The frontend, workshop, supplier settlement,
+accounting, and AI remain unimplemented. No
 subsequent roadmap block is approved here. Never implement a future phase
 without explicit instruction.
 
@@ -92,8 +94,25 @@ without explicit instruction.
 - A posted Sale Return calls the existing Inventory `IN` engine. Eligibility is
   sold quantity minus prior POSTED returns and is protected by Sale row locking.
 - Sale and Return numbers use PostgreSQL sequences. Posted documents are
-  immutable, commercial line effects are unique, and Cash/Payment concepts do
-  not belong to Phase 6.
+  immutable and commercial line effects are unique.
+
+## Phase 7 cash and settlement rules
+
+- PaymentMethod kind, not arbitrary text, distinguishes CASH from non-cash.
+  Inactive methods/registers reject new work but never erase history.
+- A partial unique PostgreSQL index permits only one OPEN CashSession per
+  register. Opening, financial operations, manual movements, and closing use
+  serializable transactions and row locks.
+- Cash is derived from opening amount plus immutable CashMovement semantics.
+  Never store a mutable current drawer balance or use negative ledger amounts.
+- CASH operations require an OPEN session on an active register. Outflows use
+  the locked, derived expected amount and may never make physical Cash negative.
+- Sale Payments cannot exceed the POSTED Sale outstanding amount. Refunds cannot
+  exceed either the deterministic Return value remaining or active money paid
+  minus active Refunds. Reversals retain history and use compensating movements.
+- Phase 7 does not mutate Inventory. Supplier settlement, Accounts Payable,
+  full Accounts Receivable, accounting, provider integrations, and fiscal
+  invoicing remain out of scope.
 
 ## Commands
 
