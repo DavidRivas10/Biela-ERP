@@ -69,6 +69,15 @@ export class CreateSaleDto {
   @IsDateString({ strict: true })
   documentDate!: string;
 
+  @ApiPropertyOptional({
+    type: String,
+    format: "date",
+    description: "Optional financial due date; it does not affect posting",
+  })
+  @IsOptional()
+  @IsDateString({ strict: true })
+  paymentDueDate?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

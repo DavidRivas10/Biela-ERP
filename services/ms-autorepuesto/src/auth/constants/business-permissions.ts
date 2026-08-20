@@ -22,6 +22,7 @@ export const BUSINESS_PERMISSIONS = {
   PURCHASES_UPDATE: "purchases.update",
   PURCHASES_RECEIVE: "purchases.receive",
   PURCHASES_RETURN: "purchases.return",
+  PURCHASES_PAY: "purchases.pay",
   CUSTOMERS_READ: "customers.read",
   CUSTOMERS_CREATE: "customers.create",
   CUSTOMERS_UPDATE: "customers.update",
@@ -42,4 +43,7 @@ export const BUSINESS_PERMISSIONS = {
   PAYMENTS_REVERSE: "payments.reverse",
   CASH_MOVEMENTS_READ: "cash-movements.read",
   CASH_MOVEMENTS_CREATE: "cash-movements.create",
+  COMMERCIAL_RECEIVABLES_READ: "commercial-receivables.read",
+  COMMERCIAL_PAYABLES_READ: "commercial-payables.read",
+  COMMERCIAL_SUMMARY_READ: "commercial-summary.read",
 } as const;

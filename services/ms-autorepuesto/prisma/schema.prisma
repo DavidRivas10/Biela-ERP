@@ -63,6 +63,8 @@ enum CashSessionStatus {
 enum PaymentType {
   SALE_PAYMENT
   SALE_REFUND
+  PURCHASE_PAYMENT
+  SUPPLIER_REFUND
 }
 
 enum PaymentStatus {
@@ -75,6 +77,10 @@ enum CashMovementType {
   SALE_PAYMENT_REVERSAL
   SALE_REFUND
   SALE_REFUND_REVERSAL
+  PURCHASE_PAYMENT
+  PURCHASE_PAYMENT_REVERSAL
+  SUPPLIER_REFUND
+  SUPPLIER_REFUND_REVERSAL
   MANUAL_IN
   MANUAL_OUT
 }
@@ -315,6 +321,7 @@ model Purchase {
   supplierId             String            @db.Uuid
   supplierDocumentNumber String?           @db.VarChar(80)
   documentDate           DateTime          @db.Date
+  paymentDueDate         DateTime?         @db.Date
   status                 PurchaseStatus    @default(DRAFT)
   notes                  String?           @db.VarChar(1000)
   subtotal               Decimal           @default(0) @db.Decimal(18, 2)
@@ -332,9 +339,12 @@ model Purchase {
   items                  PurchaseItem[]
   receipts               PurchaseReceipt[]
   returns                PurchaseReturn[]
+  payments               Payment[]
 
   @@index([supplierId, documentDate])
   @@index([status, documentDate])
+  @@index([supplierId, paymentDueDate, status])
+  @@index([paymentDueDate, status])
   @@index([supplierDocumentNumber])
 }
 
@@ -407,6 +417,7 @@ model PurchaseReturn {
   updatedAt        DateTime                 @updatedAt
   purchase         Purchase                 @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
   items            PurchaseReturnItem[]
+  refunds          Payment[]
 
   @@index([purchaseId, createdAt])
   @@index([status])
@@ -455,6 +466,7 @@ model Sale {
   number             Int          @unique @default(autoincrement())
   customerId         String?      @db.Uuid
   documentDate       DateTime     @db.Date
+  paymentDueDate     DateTime?    @db.Date
   status             SaleStatus   @default(DRAFT)
   notes              String?      @db.VarChar(1000)
   subtotal           Decimal      @default(0) @db.Decimal(18, 2)
@@ -475,6 +487,8 @@ model Sale {
 
   @@index([customerId, documentDate])
   @@index([status, documentDate])
+  @@index([customerId, paymentDueDate, status])
+  @@index([paymentDueDate, status])
   @@index([documentDate])
 }
 
@@ -597,8 +611,10 @@ model Payment {
   number                Int            @unique @default(autoincrement())
   type                  PaymentType
   status                PaymentStatus  @default(POSTED)
-  saleId                String         @db.Uuid
+  saleId                String?        @db.Uuid
   saleReturnId          String?        @db.Uuid
+  purchaseId            String?        @db.Uuid
+  purchaseReturnId      String?        @db.Uuid
   paymentMethodId       String         @db.Uuid
   cashSessionId         String?        @db.Uuid
   amount                Decimal        @db.Decimal(18, 2)
@@ -612,8 +628,10 @@ model Payment {
   reversedByActorId     String?        @db.VarChar(120)
   reversalReason        String?        @db.VarChar(500)
   reversalCashSessionId String?        @db.Uuid
-  sale                  Sale           @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  sale                  Sale?          @relation(fields: [saleId], references: [id], onDelete: Restrict)
   saleReturn            SaleReturn?    @relation(fields: [saleReturnId], references: [id], onDelete: Restrict)
+  purchase              Purchase?      @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  purchaseReturn        PurchaseReturn? @relation(fields: [purchaseReturnId], references: [id], onDelete: Restrict)
   paymentMethod         PaymentMethod  @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict)
   cashSession           CashSession?   @relation("OriginalPaymentSession", fields: [cashSessionId], references: [id], onDelete: Restrict)
   reversalCashSession   CashSession?   @relation("ReversalPaymentSession", fields: [reversalCashSessionId], references: [id], onDelete: Restrict)
@@ -621,6 +639,8 @@ model Payment {
 
   @@index([saleId, type, status, createdAt])
   @@index([saleReturnId, status, createdAt])
+  @@index([purchaseId, type, status, createdAt])
+  @@index([purchaseReturnId, status, createdAt])
   @@index([paymentMethodId, createdAt])
   @@index([cashSessionId, createdAt])
   @@index([status, createdAt])
@@ -644,4 +664,4 @@ model CashMovement {
   @@index([type, createdAt])
 }
 
-// Supplier settlement, accounting, workshop, and intelligence remain out of scope.
+// General accounting, workshop, and intelligence remain out of scope.

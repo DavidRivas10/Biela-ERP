@@ -24,6 +24,8 @@ import { PaginationQueryDto } from "../common/dto/pagination-query.dto";
 import {
   CreateSalePaymentDto,
   CreateSaleRefundDto,
+  CreatePurchasePaymentDto,
+  CreateSupplierRefundDto,
   ReversePaymentDto,
 } from "./dto/payment.dto";
 import { PaymentsService } from "./payments.service";
@@ -64,7 +66,7 @@ export class PaymentsController {
     @Body() dto: CreateSaleRefundDto,
     @Req() req: AuthorizedRequest,
   ) {
-    return this.payments.createRefund(id, dto, req.user.id);
+    return this.payments.createSaleRefund(id, dto, req.user.id);
   }
   @Get("sale-returns/:id/refunds")
   @RequireBusinessPermissions(BUSINESS_PERMISSIONS.PAYMENTS_READ)
@@ -72,7 +74,54 @@ export class PaymentsController {
     @Param("id", ParseUUIDPipe) id: string,
     @Query() query: PaginationQueryDto,
   ) {
-    return this.payments.findRefunds(id, query);
+    return this.payments.findSaleRefunds(id, query);
+  }
+  @Post("purchases/:id/payments")
+  @RequireBusinessPermissions(BUSINESS_PERMISSIONS.PURCHASES_PAY)
+  @ApiOperation({
+    summary: "Record an exact partial or remaining Purchase Payment",
+    description:
+      "CASH decreases physical Cash in an OPEN session; non-cash affects settlement only.",
+  })
+  @ApiConflictResponse({
+    description: "Overpayment, Purchase lifecycle, or Cash conflict",
+  })
+  createPurchasePayment(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: CreatePurchasePaymentDto,
+    @Req() req: AuthorizedRequest,
+  ) {
+    return this.payments.createPurchasePayment(id, dto, req.user.id);
+  }
+  @Get("purchases/:id/payments")
+  @RequireBusinessPermissions(BUSINESS_PERMISSIONS.PAYMENTS_READ)
+  listPurchasePayments(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.payments.findPurchasePayments(id, query);
+  }
+  @Post("purchase-returns/:id/refunds")
+  @RequireBusinessPermissions(BUSINESS_PERMISSIONS.PURCHASES_PAY)
+  @ApiOperation({
+    summary: "Record an eligible Supplier Refund for a POSTED Purchase Return",
+    description:
+      "CASH increases physical Cash; merchandise return posting remains a separate Inventory operation.",
+  })
+  refundFromSupplier(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: CreateSupplierRefundDto,
+    @Req() req: AuthorizedRequest,
+  ) {
+    return this.payments.createSupplierRefund(id, dto, req.user.id);
+  }
+  @Get("purchase-returns/:id/refunds")
+  @RequireBusinessPermissions(BUSINESS_PERMISSIONS.PAYMENTS_READ)
+  supplierRefunds(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.payments.findSupplierRefunds(id, query);
   }
   @Get("payments/:id")
   @RequireBusinessPermissions(BUSINESS_PERMISSIONS.PAYMENTS_READ)

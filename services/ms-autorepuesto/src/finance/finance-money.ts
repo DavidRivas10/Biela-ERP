@@ -30,9 +30,31 @@ export function positiveMoney(
 export function movementDelta(type: CashMovementType, amount: Prisma.Decimal) {
   return type === CashMovementType.SALE_PAYMENT ||
     type === CashMovementType.SALE_REFUND_REVERSAL ||
+    type === CashMovementType.PURCHASE_PAYMENT_REVERSAL ||
+    type === CashMovementType.SUPPLIER_REFUND ||
     type === CashMovementType.MANUAL_IN
     ? amount
     : amount.negated();
+}
+
+export function settlementStatus(
+  paidAmount: Prisma.Decimal,
+  outstandingAmount: Prisma.Decimal,
+) {
+  return outstandingAmount.equals(ZERO)
+    ? "PAID"
+    : paidAmount.equals(ZERO)
+      ? "UNPAID"
+      : "PARTIALLY_PAID";
+}
+
+export function isOverdue(
+  outstandingAmount: Prisma.Decimal,
+  paymentDueDate: Date | null,
+  businessDate: Date,
+) {
+  if (!paymentDueDate || !outstandingAmount.greaterThan(ZERO)) return false;
+  return paymentDueDate.getTime() < businessDate.getTime();
 }
 
 export function sumMoney(values: Prisma.Decimal[]) {

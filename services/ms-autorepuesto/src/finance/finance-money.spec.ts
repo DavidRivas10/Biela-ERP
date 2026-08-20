@@ -5,6 +5,8 @@ import {
   money,
   movementDelta,
   positiveMoney,
+  settlementStatus,
+  isOverdue,
   sumMoney,
 } from "./finance-money";
 
@@ -27,6 +29,42 @@ describe("finance money", () => {
     expect(movementDelta(CashMovementType.SALE_REFUND, amount).toFixed(2)).toBe(
       "-10.00",
     );
+    expect(
+      movementDelta(CashMovementType.PURCHASE_PAYMENT, amount).toFixed(2),
+    ).toBe("-10.00");
+    expect(
+      movementDelta(CashMovementType.PURCHASE_PAYMENT_REVERSAL, amount).toFixed(
+        2,
+      ),
+    ).toBe("10.00");
+    expect(
+      movementDelta(CashMovementType.SUPPLIER_REFUND, amount).toFixed(2),
+    ).toBe("10.00");
+    expect(
+      movementDelta(CashMovementType.SUPPLIER_REFUND_REVERSAL, amount).toFixed(
+        2,
+      ),
+    ).toBe("-10.00");
+  });
+
+  it("derives settlement and overdue state without persisted balances", () => {
+    expect(settlementStatus(money("0"), money("10"))).toBe("UNPAID");
+    expect(settlementStatus(money("2"), money("8"))).toBe("PARTIALLY_PAID");
+    expect(settlementStatus(money("0"), money("0"))).toBe("PAID");
+    expect(
+      isOverdue(
+        money("1"),
+        new Date("2026-08-18T00:00:00.000Z"),
+        new Date("2026-08-19T00:00:00.000Z"),
+      ),
+    ).toBe(true);
+    expect(
+      isOverdue(
+        money("0"),
+        new Date("2026-08-18T00:00:00.000Z"),
+        new Date("2026-08-19T00:00:00.000Z"),
+      ),
+    ).toBe(false);
   });
 
   it("allocates partial Returns cumulatively and reaches the exact line total", () => {

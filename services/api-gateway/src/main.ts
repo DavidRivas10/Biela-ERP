@@ -28,9 +28,9 @@ async function bootstrap(): Promise<void> {
   const swaggerConfig = new DocumentBuilder()
     .setTitle("BIELA API Gateway")
     .setDescription(
-      "Unified BIELA Backend API: identity, automotive catalog, inventory, purchasing, Sales, Cash, Payments, and Refunds",
+      "Unified BIELA Backend API: identity, catalog, inventory, purchasing, Sales, Cash, Payments, supplier settlement, receivables, and payables",
     )
-    .setVersion("7.0")
+    .setVersion("8.0")
     .addBearerAuth()
     .build();
   SwaggerModule.setup(

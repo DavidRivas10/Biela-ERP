@@ -34,6 +34,7 @@ export class PurchasesController {
       properties: {
         supplierId: { type: "string", format: "uuid" },
         documentDate: { type: "string", format: "date" },
+        paymentDueDate: { type: "string", format: "date" },
         items: {
           type: "array",
           items: {

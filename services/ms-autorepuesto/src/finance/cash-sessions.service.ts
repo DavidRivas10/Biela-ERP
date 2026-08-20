@@ -193,6 +193,8 @@ export class CashSessionsService {
         paymentMethod: unknown;
         payments: Prisma.Decimal;
         refunds: Prisma.Decimal;
+        purchasePayments: Prisma.Decimal;
+        supplierRefunds: Prisma.Decimal;
       }
     >();
     for (const movement of session.movements) {
@@ -202,11 +204,17 @@ export class CashSessionsService {
         paymentMethod: movement.payment.paymentMethod,
         payments: ZERO,
         refunds: ZERO,
+        purchasePayments: ZERO,
+        supplierRefunds: ZERO,
       };
       if (movement.type === CashMovementType.SALE_PAYMENT)
         row.payments = row.payments.plus(movement.amount);
       if (movement.type === CashMovementType.SALE_REFUND)
         row.refunds = row.refunds.plus(movement.amount);
+      if (movement.type === CashMovementType.PURCHASE_PAYMENT)
+        row.purchasePayments = row.purchasePayments.plus(movement.amount);
+      if (movement.type === CashMovementType.SUPPLIER_REFUND)
+        row.supplierRefunds = row.supplierRefunds.plus(movement.amount);
       byMethod.set(key, row);
     }
     return {

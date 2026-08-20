@@ -10,7 +10,7 @@ import {
 
 const POSITIVE_MONEY = /^(?=.*[1-9])(0|[1-9]\d{0,15})(\.\d{1,2})?$/;
 
-export class CreateSalePaymentDto {
+export class CreateFinancialOperationDto {
   @ApiProperty({ format: "uuid" })
   @IsUUID()
   paymentMethodId!: string;
@@ -25,12 +25,6 @@ export class CreateSalePaymentDto {
   @IsUUID()
   cashSessionId?: string;
 
-  @ApiPropertyOptional({ example: "300.00" })
-  @IsOptional()
-  @IsString()
-  @Matches(POSITIVE_MONEY)
-  tenderedAmount?: string;
-
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -44,7 +38,17 @@ export class CreateSalePaymentDto {
   notes?: string;
 }
 
-export class CreateSaleRefundDto extends CreateSalePaymentDto {}
+export class CreateSalePaymentDto extends CreateFinancialOperationDto {
+  @ApiPropertyOptional({ example: "300.00" })
+  @IsOptional()
+  @IsString()
+  @Matches(POSITIVE_MONEY)
+  tenderedAmount?: string;
+}
+
+export class CreateSaleRefundDto extends CreateFinancialOperationDto {}
+export class CreatePurchasePaymentDto extends CreateFinancialOperationDto {}
+export class CreateSupplierRefundDto extends CreateFinancialOperationDto {}
 
 export class ReversePaymentDto {
   @ApiProperty({ example: "Duplicate operation" })

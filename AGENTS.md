@@ -27,10 +27,12 @@ receiving, Purchase Returns, and traceable Inventory integration in
 `ms-autorepuesto`. Phase 6 implements Customers, walk-in Sales, Sales Returns,
 exact Sales money, and traceable Inventory integration. Phase 7 implements
 Payment Methods, Cash Registers/Sessions, Payments, Refunds, reversals, and an
-immutable physical-Cash ledger. The frontend, workshop, supplier settlement,
-accounting, and AI remain unimplemented. No
-subsequent roadmap block is approved here. Never implement a future phase
-without explicit instruction.
+immutable physical-Cash ledger. Phase 8 extends that same ledger with Purchase
+Payments, Supplier Refunds, due dates, operational receivables/payables, and a
+commercial summary. The frontend, workshop, general accounting, fiscal
+invoicing, external payment integrations, inventory valuation/COGS, and AI
+remain unimplemented. No subsequent roadmap block is approved here. Never
+implement a future phase without explicit instruction.
 
 ## Migration and credential safety
 
@@ -111,8 +113,30 @@ without explicit instruction.
   exceed either the deterministic Return value remaining or active money paid
   minus active Refunds. Reversals retain history and use compensating movements.
 - Phase 7 does not mutate Inventory. Supplier settlement, Accounts Payable,
-  full Accounts Receivable, accounting, provider integrations, and fiscal
-  invoicing remain out of scope.
+  and Accounts Receivable were deferred to Phase 8. Accounting, provider
+  integrations, and fiscal invoicing remain out of scope.
+
+## Phase 8 commercial integration rules
+
+- Extend the existing Payment and CashMovement architecture; never create a
+  second supplier-payment, customer-balance, supplier-balance, or Cash ledger.
+- A `PURCHASE_PAYMENT` may settle only CONFIRMED, PARTIALLY_RECEIVED, or
+  RECEIVED Purchases and may not exceed the derived net obligation.
+- Posted Purchase Returns reduce obligation by cumulative exact allocation of
+  immutable PurchaseItem line totals. They do not automatically move money.
+- A `SUPPLIER_REFUND` may not exceed both its Return value remaining and the
+  Purchase's current Supplier credit. CASH refunds are physical Cash inflows.
+- Purchase Payment, Supplier Refund, and reversal operations never mutate
+  Inventory. PurchaseReceipt/PurchaseReturn remain the only purchasing stock
+  effects.
+- Receivables and payables are derived operational views over documents and
+  active Payment rows; never persist mutable Customer, Supplier, Sale, or
+  Purchase balances.
+- `paymentDueDate` is optional, independent from document lifecycle, and
+  overdue is derived against the Tegucigalpa business date only while money is
+  outstanding.
+- The final document lock order is Sale/Purchase, optional Return, optional
+  Payment, then CashSession. Serializable retry remains bounded to three.
 
 ## Commands
 

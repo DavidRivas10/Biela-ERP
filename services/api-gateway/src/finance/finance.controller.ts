@@ -328,6 +328,79 @@ export class FinanceController {
   ) {
     return this.list(`sale-returns/${id}/refunds`, query, authorization);
   }
+  @Post("purchases/:id/payments")
+  @ApiOperation({
+    summary: "Record an exact Purchase Payment",
+    description:
+      "CASH decreases expected physical Cash; non-cash changes settlement only.",
+  })
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["paymentMethodId", "amount"],
+      properties: {
+        paymentMethodId: { type: "string", format: "uuid" },
+        amount: { type: "string", example: "250.00" },
+        cashSessionId: { type: "string", format: "uuid" },
+        externalReference: { type: "string" },
+        notes: { type: "string" },
+      },
+    },
+  })
+  createPurchasePayment(
+    @Param("id") id: string,
+    @Body() body: ProxyBody,
+    @Headers("authorization") authorization?: string,
+  ) {
+    return this.write("POST", `purchases/${id}/payments`, authorization, body);
+  }
+  @Get("purchases/:id/payments")
+  listPurchasePayments(
+    @Param("id") id: string,
+    @Query() query: ProxyQuery,
+    @Headers("authorization") authorization?: string,
+  ) {
+    return this.list(`purchases/${id}/payments`, query, authorization);
+  }
+  @Post("purchase-returns/:id/refunds")
+  @ApiOperation({
+    summary: "Record an eligible Supplier Refund",
+    description:
+      "A CASH Supplier Refund increases expected physical Cash and never changes Inventory.",
+  })
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["paymentMethodId", "amount"],
+      properties: {
+        paymentMethodId: { type: "string", format: "uuid" },
+        amount: { type: "string", example: "100.00" },
+        cashSessionId: { type: "string", format: "uuid" },
+        externalReference: { type: "string" },
+        notes: { type: "string" },
+      },
+    },
+  })
+  createSupplierRefund(
+    @Param("id") id: string,
+    @Body() body: ProxyBody,
+    @Headers("authorization") authorization?: string,
+  ) {
+    return this.write(
+      "POST",
+      `purchase-returns/${id}/refunds`,
+      authorization,
+      body,
+    );
+  }
+  @Get("purchase-returns/:id/refunds")
+  listSupplierRefunds(
+    @Param("id") id: string,
+    @Query() query: ProxyQuery,
+    @Headers("authorization") authorization?: string,
+  ) {
+    return this.list(`purchase-returns/${id}/refunds`, query, authorization);
+  }
   @Get("payments/:id")
   getPayment(
     @Param("id") id: string,

@@ -6,9 +6,10 @@ import { PurchaseReturnsController } from "./purchase-returns.controller";
 import { PurchaseReturnsService } from "./purchase-returns.service";
 import { PurchasesController } from "./purchases.controller";
 import { PurchasesService } from "./purchases.service";
+import { FinanceModule } from "../finance/finance.module";
 
 @Module({
-  imports: [InventoryModule],
+  imports: [InventoryModule, FinanceModule],
   controllers: [
     PurchasesController,
     PurchaseReceiptsController,

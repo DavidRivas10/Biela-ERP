@@ -126,9 +126,10 @@ Payment reference shape, coherent reversal metadata, unique business numbers,
 one financial movement of each type per Payment, and restrictive foreign keys.
 
 Payments, Refunds, reversals, and manual Cash never modify Product, Inventory,
-or InventoryMovement. Supplier payments, Accounts Payable, full Accounts
-Receivable, journal accounting, external processors, fiscal invoicing,
-frontend, workshop, and AI are not implemented.
+or InventoryMovement. Supplier payments and operational AR/AP were deferred by
+Phase 7 and are now additive Phase 8 extensions documented in
+`phase-8-commercial-integration.md`. Journal accounting, external processors,
+fiscal invoicing, frontend, workshop, and AI remain unimplemented.
 
 ## Permissions
 

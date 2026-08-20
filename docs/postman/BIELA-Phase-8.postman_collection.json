@@ -1,0 +1,1725 @@
+{
+  "info": {
+    "name": "BIELA Backend Phase 8",
+    "description": "Gateway-only Phase 8 flow for Purchase settlement, Supplier credit/refunds, sales regression, AR/AP, overdue state, Cash, Inventory isolation, authentication, and RBAC. Credentials remain empty and are injected from the ignored local .env.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "exec": [
+          "const special = {'P8 13 Reject Purchase Overpayment':409,'P8 21 Reject Excess Supplier Refund':409,'02 Administrator Login':200,'23 Reject Overpayment':409,'36 Reject Excessive Refund':409,'41 Reject Excessive MANUAL_OUT':409,'43B Reject Invariant-Breaking Reversal':409,'51 Reject Movement After Close':409,'52 Reject Duplicate Close':409,'53 Unauthenticated Request Rejected':401,'55 Restricted User Login':200,'56 Restricted User Forbidden':403};",
+          "const expected = special[pm.info.requestName] ?? (pm.request.method === 'POST' ? 201 : 200);",
+          "pm.test(`${pm.info.requestName} returns ${expected}`, () => pm.response.to.have.status(expected));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "01 System Health and Run Data",
+      "auth": {
+        "type": "noauth"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const suffix = `${Date.now()}-${Math.floor(Math.random()*100000)}`;",
+              "const yesterday = new Date(Date.now()-172800000).toISOString().slice(0,10);",
+              "pm.environment.set('runSuffix', suffix);",
+              "pm.environment.set('pastDueDate', yesterday);",
+              "pm.environment.set('restrictedEmail', `phase8-${suffix}@example.invalid`);",
+              "pm.environment.set('restrictedPassword', `Phase8-${suffix}-Aa1!`);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/system/health"
+      }
+    },
+    {
+      "name": "02 Administrator Login",
+      "auth": {
+        "type": "noauth"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const body=pm.response.json(); pm.environment.set('accessToken',body.accessToken); pm.environment.set('adminAccessToken',body.accessToken);",
+              "pm.test('token is returned without password hash',()=>{pm.expect(body.accessToken).to.be.a('string');pm.expect(body).not.to.have.property('passwordHash');});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{adminEmail}}\",\"password\":\"{{adminPassword}}\"}"
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "03 Create Product Category",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('categoryId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P7-CAT-{{runSuffix}}\",\"name\":\"Phase 7 Category\"}"
+        },
+        "url": "{{baseUrl}}/api/product-categories"
+      }
+    },
+    {
+      "name": "04 Create Product Brand",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('brandId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P7-BRAND-{{runSuffix}}\",\"name\":\"Phase 7 Brand\"}"
+        },
+        "url": "{{baseUrl}}/api/product-brands"
+      }
+    },
+    {
+      "name": "05 Create Product",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('productId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P7-PROD-{{runSuffix}}\",\"name\":\"Phase 7 Part\",\"categoryId\":\"{{categoryId}}\",\"brandId\":\"{{brandId}}\",\"defaultSalePrice\":\"50.0000\"}"
+        },
+        "url": "{{baseUrl}}/api/products"
+      }
+    },
+    {
+      "name": "06 Create Location",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('locationId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P7-LOC-{{runSuffix}}\",\"name\":\"Phase 7 Location\"}"
+        },
+        "url": "{{baseUrl}}/api/locations"
+      }
+    },
+    {
+      "name": "07 Establish Known Inventory",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"type\":\"INITIAL\",\"productId\":\"{{productId}}\",\"destinationLocationId\":\"{{locationId}}\",\"quantity\":10,\"reason\":\"Phase 7 deterministic fixture\"}"
+        },
+        "url": "{{baseUrl}}/api/inventory/movements"
+      }
+    },
+    {
+      "name": "08 Create Customer",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('customerId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P7-CUS-{{runSuffix}}\",\"name\":\"Phase 7 Customer\"}"
+        },
+        "url": "{{baseUrl}}/api/customers"
+      }
+    },
+    {
+      "name": "09 Create CASH Payment Method",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const body=pm.response.json();pm.environment.set('cashMethodId',body.id);pm.test('kind is controlled CASH',()=>pm.expect(body.kind).to.eql('CASH'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P7-CASH-{{runSuffix}}\",\"name\":\"Phase 7 Cash\",\"kind\":\"CASH\"}"
+        },
+        "url": "{{baseUrl}}/api/payment-methods"
+      }
+    },
+    {
+      "name": "10 Create CARD Payment Method",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('cardMethodId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P7-CARD-{{runSuffix}}\",\"name\":\"Phase 7 Card\",\"kind\":\"CARD\"}"
+        },
+        "url": "{{baseUrl}}/api/payment-methods"
+      }
+    },
+    {
+      "name": "11 Create Cash Register",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('registerId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P7-REG-{{runSuffix}}\",\"name\":\"Phase 7 Register\"}"
+        },
+        "url": "{{baseUrl}}/api/cash-registers"
+      }
+    },
+    {
+      "name": "12 Open Cash Session",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('sessionId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"openingAmount\":\"100.00\",\"notes\":\"Phase 7 opening\"}"
+        },
+        "url": "{{baseUrl}}/api/cash-registers/{{registerId}}/sessions/open"
+      }
+    },
+    {
+      "name": "13 Verify Opening Expected Cash",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('expected Cash equals opening',()=>pm.expect(pm.response.json().expectedCash).to.eql('100'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/summary"
+      }
+    },
+    {
+      "name": "P8 01 Create Supplier",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('supplierId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"code\":\"P8-SUP-{{runSuffix}}\",\"businessName\":\"Phase 8 Supplier\"}"
+        },
+        "url": "{{baseUrl}}/api/suppliers"
+      }
+    },
+    {
+      "name": "P8 02 Create Purchase With Due Date",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const b=pm.response.json();pm.environment.set('purchaseId',b.id);pm.environment.set('purchaseItemId',b.items[0].id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"supplierId\":\"{{supplierId}}\",\"documentDate\":\"{{pastDueDate}}\",\"paymentDueDate\":\"{{pastDueDate}}\",\"items\":[{\"productId\":\"{{productId}}\",\"orderedQuantity\":2,\"unitCost\":\"20.0000\"}]}"
+        },
+        "url": "{{baseUrl}}/api/purchases"
+      }
+    },
+    {
+      "name": "P8 03 Confirm Purchase",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}/confirm"
+      }
+    },
+    {
+      "name": "P8 04 Create Purchase Receipt",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('purchaseReceiptId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"destinationLocationId\":\"{{locationId}}\",\"items\":[{\"purchaseItemId\":\"{{purchaseItemId}}\",\"quantityReceived\":2}]}"
+        },
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}/receipts"
+      }
+    },
+    {
+      "name": "P8 05 Post Purchase Receipt",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/purchase-receipts/{{purchaseReceiptId}}/post"
+      }
+    },
+    {
+      "name": "P8 06 Verify Inventory Increased",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('receipt increased Inventory',()=>pm.expect(pm.response.json().totalQuantity).to.eql(12));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "P8 07 Verify Purchase UNPAID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Purchase is UNPAID',()=>pm.expect(pm.response.json().paymentSummary.settlementStatus).to.eql('UNPAID'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}"
+      }
+    },
+    {
+      "name": "P8 08 Partial CASH Purchase Payment",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('p8CashPurchasePaymentId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentMethodId\":\"{{cashMethodId}}\",\"cashSessionId\":\"{{sessionId}}\",\"amount\":\"10.00\"}"
+        },
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}/payments"
+      }
+    },
+    {
+      "name": "P8 09 Verify Purchase Payment Cash OUT",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Purchase Cash Payment decreases Cash',()=>pm.expect(Number(pm.response.json().expectedCash)).to.eql(90));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/summary"
+      }
+    },
+    {
+      "name": "P8 10 Remaining BANK Purchase Payment",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('p8BankPurchasePaymentId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentMethodId\":\"{{cardMethodId}}\",\"amount\":\"30.00\",\"externalReference\":\"P8-BANK\"}"
+        },
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}/payments"
+      }
+    },
+    {
+      "name": "P8 11 Verify Purchase PAID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Purchase is PAID',()=>pm.expect(pm.response.json().paymentSummary.settlementStatus).to.eql('PAID'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}"
+      }
+    },
+    {
+      "name": "P8 12 Verify Non Cash Did Not Affect Cash",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('non-Cash did not move drawer',()=>pm.expect(Number(pm.response.json().expectedCash)).to.eql(90));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/summary"
+      }
+    },
+    {
+      "name": "P8 13 Reject Purchase Overpayment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentMethodId\":\"{{cardMethodId}}\",\"amount\":\"0.01\"}"
+        },
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}/payments"
+      }
+    },
+    {
+      "name": "P8 14 Create Purchase Return",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('purchaseReturnId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reason\":\"Phase 8 Supplier credit\",\"items\":[{\"purchaseItemId\":\"{{purchaseItemId}}\",\"sourceLocationId\":\"{{locationId}}\",\"quantityReturned\":1}]}"
+        },
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}/returns"
+      }
+    },
+    {
+      "name": "P8 15 Post Purchase Return",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/purchase-returns/{{purchaseReturnId}}/post"
+      }
+    },
+    {
+      "name": "P8 16 Verify Return Inventory OUT",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('return decreased Inventory',()=>pm.expect(pm.response.json().totalQuantity).to.eql(11));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "P8 17 Verify Supplier Credit",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Return creates exact Supplier credit',()=>pm.expect(Number(pm.response.json().paymentSummary.supplierCreditAmount)).to.eql(20));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}"
+      }
+    },
+    {
+      "name": "P8 18 Partial CASH Supplier Refund",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('p8CashSupplierRefundId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentMethodId\":\"{{cashMethodId}}\",\"cashSessionId\":\"{{sessionId}}\",\"amount\":\"10.00\"}"
+        },
+        "url": "{{baseUrl}}/api/purchase-returns/{{purchaseReturnId}}/refunds"
+      }
+    },
+    {
+      "name": "P8 19 Remaining Non Cash Supplier Refund",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('p8BankSupplierRefundId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentMethodId\":\"{{cardMethodId}}\",\"amount\":\"10.00\",\"externalReference\":\"P8-REFUND\"}"
+        },
+        "url": "{{baseUrl}}/api/purchase-returns/{{purchaseReturnId}}/refunds"
+      }
+    },
+    {
+      "name": "P8 20 Verify Supplier Credit Cleared",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Supplier credit cleared',()=>pm.expect(Number(pm.response.json().paymentSummary.supplierCreditAmount)).to.eql(0));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/purchases/{{purchaseId}}"
+      }
+    },
+    {
+      "name": "P8 21 Reject Excess Supplier Refund",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentMethodId\":\"{{cardMethodId}}\",\"amount\":\"0.01\"}"
+        },
+        "url": "{{baseUrl}}/api/purchase-returns/{{purchaseReturnId}}/refunds"
+      }
+    },
+    {
+      "name": "P8 22 Reverse Non Cash Supplier Refund",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reason\":\"Phase 8 non-Cash refund correction\"}"
+        },
+        "url": "{{baseUrl}}/api/payments/{{p8BankSupplierRefundId}}/reverse"
+      }
+    },
+    {
+      "name": "P8 23 Reverse CASH Supplier Refund",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reason\":\"Phase 8 Cash refund correction\",\"cashSessionId\":\"{{sessionId}}\"}"
+        },
+        "url": "{{baseUrl}}/api/payments/{{p8CashSupplierRefundId}}/reverse"
+      }
+    },
+    {
+      "name": "P8 24 Reverse Non Cash Purchase Payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reason\":\"Phase 8 bank payment correction\"}"
+        },
+        "url": "{{baseUrl}}/api/payments/{{p8BankPurchasePaymentId}}/reverse"
+      }
+    },
+    {
+      "name": "P8 25 Reverse CASH Purchase Payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reason\":\"Phase 8 Cash payment correction\",\"cashSessionId\":\"{{sessionId}}\"}"
+        },
+        "url": "{{baseUrl}}/api/payments/{{p8CashPurchasePaymentId}}/reverse"
+      }
+    },
+    {
+      "name": "P8 26 Verify Purchase Reversals and Restored Cash",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const b=pm.response.json();pm.test('purchase-side compensations restore Cash',()=>{pm.expect(Number(b.expectedCash)).to.eql(100);pm.expect(Number(b.movementTotals.PURCHASE_PAYMENT_REVERSAL)).to.eql(10);pm.expect(Number(b.movementTotals.SUPPLIER_REFUND_REVERSAL)).to.eql(10);});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/summary"
+      }
+    },
+    {
+      "name": "P8 27 Verify Finance Inventory Isolation",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Purchase finance and reversals are Inventory-neutral',()=>pm.expect(pm.response.json().totalQuantity).to.eql(11));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "P8 28 Query Supplier Account",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Supplier account exposes overdue payable',()=>{const b=pm.response.json();pm.expect(Number(b.summary.outstandingAmount)).to.eql(20);pm.expect(b.summary.overdueCount).to.eql(1);});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/suppliers/{{supplierId}}/account?page=1&limit=20"
+      }
+    },
+    {
+      "name": "P8 29 Query Global Payables",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/commercial/payables?overdueOnly=true&page=1&limit=20"
+      }
+    },
+    {
+      "name": "14 Create First Sale",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const body=pm.response.json();pm.environment.set('saleId',body.id);pm.environment.set('saleItemId',body.items[0].id);pm.test('Sale total is exact',()=>pm.expect(body.total).to.eql('100.00'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"customerId\":\"{{customerId}}\",\"documentDate\":\"2026-08-19\",\"items\":[{\"productId\":\"{{productId}}\",\"sourceLocationId\":\"{{locationId}}\",\"quantity\":2,\"unitPrice\":\"50.0000\"}],\"paymentDueDate\":\"{{pastDueDate}}\"}"
+        },
+        "url": "{{baseUrl}}/api/sales"
+      }
+    },
+    {
+      "name": "15 Post First Sale",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/sales/{{saleId}}/post"
+      }
+    },
+    {
+      "name": "16 Verify Sale UNPAID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Sale starts UNPAID',()=>pm.expect(pm.response.json().paymentSummary.settlementStatus).to.eql('UNPAID'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/sales/{{saleId}}"
+      }
+    },
+    {
+      "name": "17 Record Partial CASH Payment",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('cashPaymentId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentMethodId\":\"{{cashMethodId}}\",\"cashSessionId\":\"{{sessionId}}\",\"amount\":\"30.00\"}"
+        },
+        "url": "{{baseUrl}}/api/sales/{{saleId}}/payments"
+      }
+    },
+    {
+      "name": "18 Verify Sale PARTIALLY_PAID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const s=pm.response.json().paymentSummary;pm.test('partial balance is exact',()=>{pm.expect(s.paidAmount).to.eql('30');pm.expect(s.outstandingAmount).to.eql('70');pm.expect(s.settlementStatus).to.eql('PARTIALLY_PAID');});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/sales/{{saleId}}"
+      }
+    },
+    {
+      "name": "P8 30 Query Customer Account",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Customer account is partial and overdue',()=>{const b=pm.response.json();pm.expect(b.summary.partiallyPaidCount).to.eql(1);pm.expect(b.summary.overdueCount).to.eql(1);});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/customers/{{customerId}}/account?page=1&limit=20"
+      }
+    },
+    {
+      "name": "P8 31 Query Global Receivables",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/commercial/receivables?overdueOnly=true&page=1&limit=20"
+      }
+    },
+    {
+      "name": "P8 32 Query Commercial Summary",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/commercial/summary"
+      }
+    },
+    {
+      "name": "19 Verify CASH Increased Expected",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('CASH applies net amount',()=>pm.expect(pm.response.json().expectedCash).to.eql('130'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/summary"
+      }
+    },
+    {
+      "name": "20 Pay Remaining with CARD",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('cardPaymentId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentMethodId\":\"{{cardMethodId}}\",\"amount\":\"70.00\",\"externalReference\":\"P7-CARD-AUTH\"}"
+        },
+        "url": "{{baseUrl}}/api/sales/{{saleId}}/payments"
+      }
+    },
+    {
+      "name": "21 Verify Sale PAID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('split Payment settles Sale',()=>pm.expect(pm.response.json().paymentSummary.settlementStatus).to.eql('PAID'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/sales/{{saleId}}"
+      }
+    },
+    {
+      "name": "22 Verify CARD Did Not Change Cash",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('non-cash has no physical effect',()=>pm.expect(pm.response.json().expectedCash).to.eql('130'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/summary"
+      }
+    },
+    {
+      "name": "23 Reject Overpayment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentMethodId\":\"{{cardMethodId}}\",\"amount\":\"0.01\"}"
+        },
+        "url": "{{baseUrl}}/api/sales/{{saleId}}/payments"
+      }
+    },
+    {
+      "name": "24 Create Second Sale",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('secondSaleId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"documentDate\":\"2026-08-19\",\"items\":[{\"productId\":\"{{productId}}\",\"sourceLocationId\":\"{{locationId}}\",\"quantity\":1,\"unitPrice\":\"20.0000\"}]}"
+        },
+        "url": "{{baseUrl}}/api/sales"
+      }
+    },
+    {
+      "name": "25 Post Second Sale",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/sales/{{secondSaleId}}/post"
+      }
+    },
+    {
+      "name": "26 Pay with Tender and Change",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const body=pm.response.json();pm.environment.set('secondPaymentId',body.id);pm.test('change is exact',()=>{pm.expect(body.tenderedAmount).to.eql('25');pm.expect(body.changeAmount).to.eql('5');});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentMethodId\":\"{{cashMethodId}}\",\"cashSessionId\":\"{{sessionId}}\",\"amount\":\"20.00\",\"tenderedAmount\":\"25.00\"}"
+        },
+        "url": "{{baseUrl}}/api/sales/{{secondSaleId}}/payments"
+      }
+    },
+    {
+      "name": "27 Read Tender Payment",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/payments/{{secondPaymentId}}"
+      }
+    },
+    {
+      "name": "28 Verify Net CASH Amount",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('drawer gains applied amount only',()=>pm.expect(pm.response.json().expectedCash).to.eql('150'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/summary"
+      }
+    },
+    {
+      "name": "29 Create Sale Return",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('returnId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reason\":\"Phase 7 eligible Return\",\"items\":[{\"saleItemId\":\"{{saleItemId}}\",\"destinationLocationId\":\"{{locationId}}\",\"quantityReturned\":1}]}"
+        },
+        "url": "{{baseUrl}}/api/sales/{{saleId}}/returns"
+      }
+    },
+    {
+      "name": "30 Post Sale Return",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/sale-returns/{{returnId}}/post"
+      }
+    },
+    {
+      "name": "31 Verify Refund Eligibility",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const s=pm.response.json().refundSummary;pm.test('Return value/refundable are exact',()=>{pm.expect(s.returnValue).to.eql('50');pm.expect(s.refundableAmount).to.eql('50');});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/sale-returns/{{returnId}}"
+      }
+    },
+    {
+      "name": "32 Capture Inventory Before Refund",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('inventoryBeforeRefund',String(pm.response.json().totalQuantity));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "33 Create CASH Refund",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('refundId',pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentMethodId\":\"{{cashMethodId}}\",\"cashSessionId\":\"{{sessionId}}\",\"amount\":\"31.00\"}"
+        },
+        "url": "{{baseUrl}}/api/sale-returns/{{returnId}}/refunds"
+      }
+    },
+    {
+      "name": "34 Verify Refund Decreased Cash",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Cash Refund is physical outflow',()=>pm.expect(pm.response.json().expectedCash).to.eql('119'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/summary"
+      }
+    },
+    {
+      "name": "35 Verify Refund Did Not Change Inventory",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Refund is Inventory-neutral',()=>pm.expect(String(pm.response.json().totalQuantity)).to.eql(pm.environment.get('inventoryBeforeRefund')));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/{{productId}}/inventory"
+      }
+    },
+    {
+      "name": "36 Reject Excessive Refund",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentMethodId\":\"{{cardMethodId}}\",\"amount\":\"20.00\"}"
+        },
+        "url": "{{baseUrl}}/api/sale-returns/{{returnId}}/refunds"
+      }
+    },
+    {
+      "name": "37 Create MANUAL_IN",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"type\":\"MANUAL_IN\",\"amount\":\"10.00\",\"reason\":\"Add change fund\"}"
+        },
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/movements"
+      }
+    },
+    {
+      "name": "38 Verify MANUAL_IN",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('MANUAL_IN increases expected',()=>pm.expect(pm.response.json().expectedCash).to.eql('129'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/summary"
+      }
+    },
+    {
+      "name": "39 Create MANUAL_OUT",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"type\":\"MANUAL_OUT\",\"amount\":\"5.00\",\"reason\":\"Remove change fund\"}"
+        },
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/movements"
+      }
+    },
+    {
+      "name": "40 Verify MANUAL_OUT",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('MANUAL_OUT decreases expected',()=>pm.expect(pm.response.json().expectedCash).to.eql('124'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/summary"
+      }
+    },
+    {
+      "name": "41 Reject Excessive MANUAL_OUT",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"type\":\"MANUAL_OUT\",\"amount\":\"1000.00\",\"reason\":\"Must remain non-negative\"}"
+        },
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/movements"
+      }
+    },
+    {
+      "name": "42 Read Complete Session Summary",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const b=pm.response.json();pm.test('summary contains ledger categories',()=>{pm.expect(b.movementTotals.SALE_PAYMENT).to.eql('50');pm.expect(b.movementTotals.SALE_REFUND).to.eql('31');pm.expect(b.paymentTotalsByMethod).to.be.an('array');});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/summary"
+      }
+    },
+    {
+      "name": "43 Read Sale Payment History",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/sales/{{saleId}}/payments?page=1&limit=20"
+      }
+    },
+    {
+      "name": "43B Reject Invariant-Breaking Reversal",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reason\":\"Would leave Refunds above active Payments\"}"
+        },
+        "url": "{{baseUrl}}/api/payments/{{cardPaymentId}}/reverse"
+      }
+    },
+    {
+      "name": "44 Reverse Eligible CASH Payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reason\":\"Reverse second tender\",\"cashSessionId\":\"{{sessionId}}\"}"
+        },
+        "url": "{{baseUrl}}/api/payments/{{secondPaymentId}}/reverse"
+      }
+    },
+    {
+      "name": "45 Verify Reversed Sale Balance",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const s=pm.response.json().paymentSummary;pm.test('reversal restores outstanding',()=>{pm.expect(s.settlementStatus).to.eql('UNPAID');pm.expect(s.outstandingAmount).to.eql('20');});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/sales/{{secondSaleId}}"
+      }
+    },
+    {
+      "name": "46 Reverse CASH Refund",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reason\":\"Reverse test Refund\",\"cashSessionId\":\"{{sessionId}}\"}"
+        },
+        "url": "{{baseUrl}}/api/payments/{{refundId}}/reverse"
+      }
+    },
+    {
+      "name": "47 Verify Refund Capacity Restored",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Refund reversal restores capacity',()=>pm.expect(pm.response.json().refundSummary.refundableAmount).to.eql('50'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/sale-returns/{{returnId}}"
+      }
+    },
+    {
+      "name": "48 Verify Compensating Cash Movements",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const b=pm.response.json();pm.test('compensations restore expected Cash',()=>{pm.expect(b.expectedCash).to.eql('135');pm.expect(b.movementTotals.SALE_PAYMENT_REVERSAL).to.eql('20');pm.expect(b.movementTotals.SALE_REFUND_REVERSAL).to.eql('31');});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/summary"
+      }
+    },
+    {
+      "name": "49 Close Cash Session",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const b=pm.response.json();pm.test('close snapshots expected/count/difference',()=>{pm.expect(b.status).to.eql('CLOSED');pm.expect(b.expectedAmount).to.eql('135');pm.expect(b.countedAmount).to.eql('136');pm.expect(b.differenceAmount).to.eql('1');});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"countedAmount\":\"136.00\",\"notes\":\"One unit close difference\"}"
+        },
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/close"
+      }
+    },
+    {
+      "name": "50 Read CLOSED Session",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/summary"
+      }
+    },
+    {
+      "name": "51 Reject Movement After Close",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"type\":\"MANUAL_IN\",\"amount\":\"1.00\",\"reason\":\"Closed session rejection\"}"
+        },
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/movements"
+      }
+    },
+    {
+      "name": "52 Reject Duplicate Close",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"countedAmount\":\"135.00\"}"
+        },
+        "url": "{{baseUrl}}/api/cash-sessions/{{sessionId}}/close"
+      }
+    },
+    {
+      "name": "53 Unauthenticated Request Rejected",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.environment.set('accessToken','');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('accessToken',pm.environment.get('adminAccessToken'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/commercial/summary"
+      }
+    },
+    {
+      "name": "54 Create Restricted User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{restrictedEmail}}\",\"password\":\"{{restrictedPassword}}\",\"firstName\":\"Phase\",\"lastName\":\"Seven\"}"
+        },
+        "url": "{{baseUrl}}/api/users"
+      }
+    },
+    {
+      "name": "55 Restricted User Login",
+      "auth": {
+        "type": "noauth"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('restrictedAccessToken',pm.response.json().accessToken);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{restrictedEmail}}\",\"password\":\"{{restrictedPassword}}\"}"
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "56 Restricted User Forbidden",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.environment.set('accessToken',pm.environment.get('restrictedAccessToken'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.environment.set('accessToken',pm.environment.get('adminAccessToken'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/commercial/summary"
+      }
+    }
+  ]
+}

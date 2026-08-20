@@ -16,6 +16,7 @@ import { throwMappedPrismaError } from "../database/prisma-error.util";
 import { InventoryService } from "../inventory/inventory.service";
 import { ListPurchasingDocumentsQueryDto } from "./dto/list-purchasing-documents-query.dto";
 import { CreatePurchaseReturnDto } from "./dto/purchase-return.dto";
+import { FinancialSummaryService } from "../finance/financial-summary.service";
 
 const returnInclude = {
   purchase: { select: { id: true, number: true, status: true } },
@@ -33,6 +34,7 @@ export class PurchaseReturnsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
+    private readonly financialSummaries: FinancialSummaryService,
   ) {}
 
   async create(
@@ -122,7 +124,8 @@ export class PurchaseReturnsService {
       },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
-    return { ...purchaseReturn, inventoryMovements };
+    const refundSummary = await this.financialSummaries.purchaseReturn(id);
+    return { ...purchaseReturn, inventoryMovements, refundSummary };
   }
 
   async post(id: string, actorId: string) {

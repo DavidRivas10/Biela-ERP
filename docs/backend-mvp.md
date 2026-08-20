@@ -1,6 +1,6 @@
 # BIELA Backend MVP
 
-This document describes the implemented backend scope through Phase 7. It does
+This document describes the implemented backend scope through Phase 8. It does
 not describe deployed infrastructure or approve a new
 product phase.
 
@@ -27,7 +27,7 @@ flowchart LR
         Search[Deterministic Product search]
         Purchasing[Suppliers and Purchasing]
         Sales[Customers, Sales, Returns]
-        Finance[Cash Sessions, Payments, Refunds]
+        Finance[Cash, Payments, Refunds, AR and AP]
 
         Auto --> Catalog
         Auto --> Vehicles
@@ -41,6 +41,7 @@ flowchart LR
         Purchasing --> Inventory
         Sales --> Inventory
         Sales --> Finance
+        Purchasing --> Finance
     end
 
     Auto --> Postgres[(PostgreSQL :5432)]
@@ -75,10 +76,13 @@ business rules. Inter-service communication uses HTTP APIs.
 - Settlement: controlled Payment Methods, one OPEN Cash Session per register,
   partial/split Payments, Refund eligibility, reversals, manual drawer
   movements, and exact Cash close snapshots.
+- Commercial integration: Purchase Payments and Supplier Refunds on the same
+  Payment/Cash ledgers, exact Return credits, optional due dates, overdue state,
+  Customer/Supplier accounts, and paginated operational AR/AP queries.
 
-Frontend, fiscal invoicing, workshop, supplier settlement, accounting, multisite,
-notifications, AI, semantic search, and external search systems are not part of
-this MVP.
+Frontend, fiscal invoicing, workshop, general accounting, inventory
+valuation/COGS, multisite, notifications, AI, semantic search, and external
+provider integrations are not part of this MVP.
 
 ## Main domain relationships
 
@@ -141,6 +145,21 @@ by additive migration; no semantic or external search is used.
    applicable. Phase 7 operations never call the Inventory mutation engine.
 6. Closing locks the session, derives expected Cash from the ledger, stores
    expected/count/difference, and prevents any later movement from committing.
+
+### Purchase settlement and operational AR/AP
+
+1. Confirmed or received Purchases may receive partial/split Payments. Posted
+   Purchase Returns reduce net obligation using immutable PurchaseItem values.
+2. A Supplier Refund is separately registered only when both Return value and
+   Supplier credit remain; CASH enters the shared Cash ledger.
+3. CASH Purchase Payments leave the drawer. Their reversals enter it. CASH
+   Supplier Refund reversals leave it. Every outflow checks expected Cash.
+4. Optional `paymentDueDate` does not change Sale/Purchase lifecycle or
+   Inventory. Overdue is derived when a due date precedes the current
+   Tegucigalpa business date and an exact amount remains outstanding.
+5. Customer/Supplier accounts and global receivable/payable lists use grouped
+   PostgreSQL queries over documents and active Payment rows. No mutable
+   balance column or accounting journal is maintained.
 
 ## Local startup
 

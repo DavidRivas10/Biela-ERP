@@ -18,6 +18,7 @@ import {
   UpdatePurchaseDto,
 } from "./dto/purchase.dto";
 import { calculatePurchaseMoney } from "./purchase-money";
+import { FinancialSummaryService } from "../finance/financial-summary.service";
 
 const purchaseDetailInclude = {
   supplier: true,
@@ -34,7 +35,10 @@ const purchaseDetailInclude = {
 
 @Injectable()
 export class PurchasesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly financialSummaries: FinancialSummaryService,
+  ) {}
 
   async create(dto: CreatePurchaseDto, actorId: string) {
     const money = calculatePurchaseMoney(dto.items);
@@ -52,6 +56,9 @@ export class PurchasesService {
               supplierId: dto.supplierId,
               supplierDocumentNumber: dto.supplierDocumentNumber?.trim(),
               documentDate: this.date(dto.documentDate),
+              paymentDueDate: dto.paymentDueDate
+                ? this.date(dto.paymentDueDate)
+                : undefined,
               notes: dto.notes?.trim(),
               createdByActorId: actorId,
               subtotal: money.subtotal,
@@ -111,7 +118,10 @@ export class PurchasesService {
       include: purchaseDetailInclude,
     });
     if (!purchase) throw new NotFoundException("Purchase not found");
-    return this.detail(purchase);
+    const { returnValues: _returnValues, ...paymentSummary } =
+      await this.financialSummaries.purchase(id);
+    void _returnValues;
+    return { ...this.detail(purchase), paymentSummary };
   }
 
   async update(id: string, dto: UpdatePurchaseDto) {
@@ -147,6 +157,9 @@ export class PurchasesService {
               supplierDocumentNumber: dto.supplierDocumentNumber?.trim(),
               documentDate: dto.documentDate
                 ? this.date(dto.documentDate)
+                : undefined,
+              paymentDueDate: dto.paymentDueDate
+                ? this.date(dto.paymentDueDate)
                 : undefined,
               notes: dto.notes?.trim(),
               subtotal: money?.subtotal,
@@ -213,16 +226,18 @@ export class PurchasesService {
         where: { id },
         include: {
           receipts: { where: { status: PurchasingDocumentStatus.POSTED } },
+          payments: { where: { status: "POSTED" }, select: { id: true } },
         },
       });
       if (!current) throw new NotFoundException("Purchase not found");
       if (
         (current.status !== PurchaseStatus.DRAFT &&
           current.status !== PurchaseStatus.CONFIRMED) ||
-        current.receipts.length > 0
+        current.receipts.length > 0 ||
+        current.payments.length > 0
       )
         throw new ConflictException(
-          "A purchase with posted receiving cannot be cancelled",
+          "A purchase with posted receiving or active Payments cannot be cancelled",
         );
       await transaction.purchaseReceipt.updateMany({
         where: { purchaseId: id, status: PurchasingDocumentStatus.DRAFT },

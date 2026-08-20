@@ -39,6 +39,7 @@ export class SalesController {
           description: "Omit or use null for a walk-in Sale",
         },
         documentDate: { type: "string", format: "date" },
+        paymentDueDate: { type: "string", format: "date" },
         notes: { type: "string" },
         items: {
           type: "array",

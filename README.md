@@ -4,7 +4,8 @@ BIELA (Base Integrada Empresarial de Logística Automotriz) is an integrated
 automotive logistics platform. The backend currently implements authentication,
 users, RBAC, the automotive catalog, physical locations, safe inventory
 movements, deterministic Product search, Suppliers, purchasing, Customers, and
-the merchandise Sales/Returns lifecycle, Cash Registers, Payments, and Refunds.
+the merchandise Sales/Returns lifecycle, Cash Registers, Payments, Supplier
+settlement, operational receivables/payables, and Refunds.
 
 ```mermaid
 flowchart TD
@@ -46,6 +47,10 @@ migrations. The API Gateway owns no database and has no ORM dependency.
 - Phase 7 settlement: controlled Payment Methods, Cash Registers and Sessions,
   immutable Cash Movements, partial/split Sale Payments, Return Refunds,
   reversals, exact closing snapshots, and concurrency-safe commercial limits.
+- Phase 8 commercial integration: Purchase Payments, exact Purchase Return
+  credits, Supplier Refunds/reversals, due dates, overdue state, Customer
+  accounts, Supplier accounts, paginated receivables/payables, and a lightweight
+  operational commercial summary.
 
 No Product contains stock quantity or a physical-location string. See
 [the Phase 3 model](docs/phase-3-data-model.md) for the actual ER diagram,
@@ -57,6 +62,9 @@ lifecycle, transaction, money, and concurrency rules, and
 [the Phase 6 sales model](docs/phase-6-sales-model.md) for Customer, Sale, and
 Return behavior. See [the Phase 7 cash and payments model](docs/phase-7-cash-payments-model.md)
 for settlement, drawer, refund-allocation, and locking rules.
+See [the Phase 8 commercial integration model](docs/phase-8-commercial-integration.md)
+for purchasing settlement, Supplier credits, AR/AP, due dates, and the final
+cross-domain lock order.
 
 ## Setup
 
@@ -113,6 +121,8 @@ require a bearer token unless noted otherwise.
 | Cash registers   | `POST/GET /api/cash-registers`, `GET/PATCH /api/cash-registers/:id`, activate/deactivate                                          |
 | Cash sessions    | Open/current, list/detail/summary, manual movement, and close routes under `/api/cash-registers` and `/api/cash-sessions`         |
 | Settlement       | `POST/GET /api/sales/:id/payments`, `POST/GET /api/sale-returns/:id/refunds`, `GET /api/payments/:id`, reverse                    |
+| Supplier finance | `POST/GET /api/purchases/:id/payments`, `POST/GET /api/purchase-returns/:id/refunds`                                                |
+| Commercial       | `GET /api/customers/:id/account`, `GET /api/suppliers/:id/account`, `/api/commercial/receivables`, `/payables`, `/summary`       |
 
 List endpoints use one contract:
 
@@ -171,6 +181,17 @@ Phase 7 adds:
 - `payments.read`, `payments.create`, `payments.reverse`
 - `cash-movements.read`, `cash-movements.create`
 
+Phase 8 adds:
+
+- `purchases.pay`
+- `commercial-receivables.read`
+- `commercial-payables.read`
+- `commercial-summary.read`
+
+Existing `payments.read`, `payments.create`, and `payments.reverse` continue to
+cover the shared Payment history and reversal architecture. Purchase-side
+creation/refunding additionally requires `purchases.pay`.
+
 ## Swagger and Postman
 
 | Component       | Swagger                      |
@@ -190,6 +211,9 @@ Return → Inventory OUT. The Phase 6 collection demonstrates Customer/walk-in
 Sale → Inventory OUT → Sale Return → Inventory IN with rollback and RBAC checks.
 The Phase 7 collection demonstrates partial and split settlement, physical Cash
 effects, Refund eligibility, compensating reversals, manual Cash, and closing.
+The Phase 8 collection demonstrates Purchase settlement and returns, Supplier
+credit/refunds, purchase-side Cash effects, Customer/Supplier accounts, overdue
+queries, and the operational commercial summary.
 
 Committed Postman environments contain no credentials. Inject local seed
 credentials without printing or storing them in the collection:
@@ -197,8 +221,8 @@ credentials without printing or storing them in the collection:
 ```bash
 npx dotenv -e .env -- sh -c '
 npx newman run \
-  docs/postman/BIELA-Phase-7.postman_collection.json \
-  -e docs/postman/BIELA-Phase-7.postman_environment.json \
+  docs/postman/BIELA-Phase-8.postman_collection.json \
+  -e docs/postman/BIELA-Phase-8.postman_environment.json \
   --env-var "adminEmail=$SEED_ADMIN_EMAIL" \
   --env-var "adminPassword=$SEED_ADMIN_PASSWORD"
 '
@@ -244,6 +268,12 @@ Phase 7 adds one migration:
 
 - `20260819170000_phase_7_cash_payments`
 
+Phase 8 adds two ordered additive migrations because PostgreSQL requires new
+enum values to commit before a later constraint can reference them:
+
+- `20260819210000_phase_8_commercial_integration`
+- `20260819210100_phase_8_commercial_fields`
+
 Purchase, Receipt, Purchase Return, Sale, Sale Return, and Payment numbers use
 PostgreSQL-backed `SERIAL` sequences.
 Monetary values use Prisma Decimal/PostgreSQL `NUMERIC`; line subtotal is
@@ -283,6 +313,20 @@ applied as explicit amounts. Client-submitted totals are not accepted.
 5. Exercise MANUAL_IN/MANUAL_OUT, negative-Cash protection, and actor traceability.
 6. Close with counted Cash, verify snapshots, and reject later movement/duplicate close.
 7. Run the Phase 7 Newman collection using safe credential injection.
+
+## Manual Phase 8 verification
+
+1. Confirm a Purchase with a due date and record partial CASH plus remaining
+   BANK_TRANSFER settlement; only CASH reduces expected drawer value.
+2. Post a Purchase Return and verify its exact cumulative line allocation
+   reduces obligation and creates Supplier credit without moving money.
+3. Record partial CASH and remaining non-cash Supplier Refunds, reject excess,
+   and verify only CASH increases expected drawer value.
+4. Reverse purchase-side operations and inspect immutable compensating Cash
+   movements; verify Inventory and InventoryMovement counts are unchanged.
+5. Query Customer/Supplier accounts, overdue filters, global receivables and
+   payables, and `/api/commercial/summary` through the Gateway.
+6. Run the Phase 8 Newman collection using safe credential injection.
 
 ## Manual Phase 3 verification
 

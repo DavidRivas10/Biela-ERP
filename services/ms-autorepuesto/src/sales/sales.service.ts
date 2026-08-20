@@ -65,6 +65,9 @@ export class SalesService {
           data: {
             customerId: dto.customerId ?? null,
             documentDate: this.date(dto.documentDate),
+            paymentDueDate: dto.paymentDueDate
+              ? this.date(dto.paymentDueDate)
+              : undefined,
             notes: dto.notes?.trim(),
             createdByActorId: actorId,
             subtotal: money.subtotal,
@@ -174,6 +177,9 @@ export class SalesService {
             customerId,
             documentDate: dto.documentDate
               ? this.date(dto.documentDate)
+              : undefined,
+            paymentDueDate: dto.paymentDueDate
+              ? this.date(dto.paymentDueDate)
               : undefined,
             notes: dto.notes?.trim(),
             subtotal: money.subtotal,

@@ -1,9 +1,24 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { PaymentStatus, PaymentType, Prisma, SaleStatus } from "@prisma/client";
+import {
+  PaymentStatus,
+  PaymentType,
+  Prisma,
+  PurchasingDocumentStatus,
+  SaleStatus,
+} from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
-import { allocatedReturnValue, ZERO } from "./finance-money";
+import {
+  allocatedReturnValue,
+  settlementStatus,
+  sumMoney,
+  ZERO,
+} from "./finance-money";
 
 type DbClient = Prisma.TransactionClient | PrismaService;
+type ReturnAllocation = {
+  id: string;
+  items: Array<{ itemId: string; quantity: number }>;
+};
 
 @Injectable()
 export class FinancialSummaryService {
@@ -39,11 +54,7 @@ export class FinancialSummaryService {
       paidAmount,
       outstandingAmount,
       refundedAmount,
-      settlementStatus: paidAmount.equals(ZERO)
-        ? "UNPAID"
-        : outstandingAmount.equals(ZERO)
-          ? "PAID"
-          : "PARTIALLY_PAID",
+      settlementStatus: settlementStatus(paidAmount, outstandingAmount),
       payments,
     };
   }
@@ -54,15 +65,17 @@ export class FinancialSummaryService {
       select: { id: true, saleId: true },
     });
     if (!saleReturn) throw new NotFoundException("Sale Return not found");
-    const [returnValue, refunds, saleSummary] = await Promise.all([
-      this.returnValue(saleReturn.saleId, saleReturnId, client),
-      client.payment.findMany({
-        where: { saleReturnId },
-        include: { paymentMethod: true },
-        orderBy: [{ createdAt: "asc" }, { number: "asc" }],
-      }),
-      this.sale(saleReturn.saleId, client),
-    ]);
+    const returnValue = await this.saleReturnValue(
+      saleReturn.saleId,
+      saleReturnId,
+      client,
+    );
+    const refunds = await client.payment.findMany({
+      where: { saleReturnId },
+      include: { paymentMethod: true },
+      orderBy: [{ createdAt: "asc" }, { number: "asc" }],
+    });
+    const saleSummary = await this.sale(saleReturn.saleId, client);
     const refundedAmount = this.total(
       refunds,
       PaymentType.SALE_REFUND,
@@ -84,12 +97,130 @@ export class FinancialSummaryService {
     };
   }
 
-  async returnValue(saleId: string, targetId: string, client: DbClient) {
+  async purchase(purchaseId: string, client: DbClient = this.prisma) {
+    const purchase = await client.purchase.findUnique({
+      where: { id: purchaseId },
+      select: {
+        id: true,
+        total: true,
+        items: {
+          select: { id: true, orderedQuantity: true, lineTotal: true },
+        },
+        returns: {
+          where: { status: PurchasingDocumentStatus.POSTED },
+          select: {
+            id: true,
+            items: {
+              select: { purchaseItemId: true, quantityReturned: true },
+            },
+          },
+          orderBy: [{ postedAt: "asc" }, { number: "asc" }, { id: "asc" }],
+        },
+      },
+    });
+    if (!purchase) throw new NotFoundException("Purchase not found");
+    const payments = await client.payment.findMany({
+      where: { purchaseId },
+      include: { paymentMethod: true },
+      orderBy: [{ createdAt: "asc" }, { number: "asc" }],
+    });
+    const returnValues = this.allocateValues(
+      purchase.items.map((item) => ({
+        id: item.id,
+        quantity: item.orderedQuantity,
+        lineTotal: item.lineTotal,
+      })),
+      purchase.returns.map((purchaseReturn) => ({
+        id: purchaseReturn.id,
+        items: purchaseReturn.items.map((item) => ({
+          itemId: item.purchaseItemId,
+          quantity: item.quantityReturned,
+        })),
+      })),
+    );
+    const purchaseReturnValue = sumMoney([...returnValues.values()]);
+    const netPurchaseObligation = Prisma.Decimal.max(
+      purchase.total.minus(purchaseReturnValue),
+      ZERO,
+    );
+    const paidAmount = this.total(
+      payments,
+      PaymentType.PURCHASE_PAYMENT,
+      PaymentStatus.POSTED,
+    );
+    const supplierRefundedAmount = this.total(
+      payments,
+      PaymentType.SUPPLIER_REFUND,
+      PaymentStatus.POSTED,
+    );
+    const netPaidAmount = paidAmount.minus(supplierRefundedAmount);
+    const outstandingAmount = Prisma.Decimal.max(
+      netPurchaseObligation.minus(netPaidAmount),
+      ZERO,
+    );
+    const supplierCreditAmount = Prisma.Decimal.max(
+      netPaidAmount.minus(netPurchaseObligation),
+      ZERO,
+    );
+    return {
+      grossPurchaseValue: purchase.total,
+      purchaseReturnValue,
+      netPurchaseObligation,
+      paidAmount,
+      supplierRefundedAmount,
+      netPaidAmount,
+      outstandingAmount,
+      supplierCreditAmount,
+      settlementStatus: settlementStatus(netPaidAmount, outstandingAmount),
+      returnValues,
+      payments,
+    };
+  }
+
+  async purchaseReturn(
+    purchaseReturnId: string,
+    client: DbClient = this.prisma,
+  ) {
+    const purchaseReturn = await client.purchaseReturn.findUnique({
+      where: { id: purchaseReturnId },
+      select: { id: true, purchaseId: true },
+    });
+    if (!purchaseReturn)
+      throw new NotFoundException("Purchase Return not found");
+    const purchaseSummary = await this.purchase(
+      purchaseReturn.purchaseId,
+      client,
+    );
+    const refunds = purchaseSummary.payments.filter(
+      (payment) => payment.purchaseReturnId === purchaseReturnId,
+    );
+    const refundedAmount = this.total(
+      refunds,
+      PaymentType.SUPPLIER_REFUND,
+      PaymentStatus.POSTED,
+    );
+    const returnValue =
+      purchaseSummary.returnValues.get(purchaseReturnId) ?? ZERO;
+    const returnRemaining = Prisma.Decimal.max(
+      returnValue.minus(refundedAmount),
+      ZERO,
+    );
+    return {
+      returnValue,
+      refundedAmount,
+      refundableAmount: Prisma.Decimal.min(
+        returnRemaining,
+        purchaseSummary.supplierCreditAmount,
+      ),
+      refunds,
+    };
+  }
+
+  async saleReturnValue(saleId: string, targetId: string, client: DbClient) {
     const saleItems = await client.saleItem.findMany({
       where: { saleId },
       select: { id: true, quantity: true, lineTotal: true },
     });
-    const itemById = new Map(saleItems.map((item) => [item.id, item]));
     const returns = await client.saleReturn.findMany({
       where: { saleId, status: SaleStatus.POSTED },
       select: {
@@ -98,33 +229,51 @@ export class FinancialSummaryService {
       },
       orderBy: [{ postedAt: "asc" }, { number: "asc" }, { id: "asc" }],
     });
+    return (
+      this.allocateValues(
+        saleItems.map((item) => ({
+          id: item.id,
+          quantity: item.quantity,
+          lineTotal: item.lineTotal,
+        })),
+        returns.map((saleReturn) => ({
+          id: saleReturn.id,
+          items: saleReturn.items.map((item) => ({
+            itemId: item.saleItemId,
+            quantity: item.quantityReturned,
+          })),
+        })),
+      ).get(targetId) ?? ZERO
+    );
+  }
+
+  private allocateValues(
+    lines: Array<{ id: string; quantity: number; lineTotal: Prisma.Decimal }>,
+    returns: ReturnAllocation[],
+  ) {
+    const lineById = new Map(lines.map((line) => [line.id, line]));
     const cumulative = new Map<string, number>();
+    const result = new Map<string, Prisma.Decimal>();
     for (const current of returns) {
       let currentValue = ZERO;
       const quantities = new Map<string, number>();
       for (const item of current.items)
         quantities.set(
-          item.saleItemId,
-          (quantities.get(item.saleItemId) ?? 0) + item.quantityReturned,
+          item.itemId,
+          (quantities.get(item.itemId) ?? 0) + item.quantity,
         );
-      for (const [saleItemId, quantity] of quantities) {
-        const saleItem = itemById.get(saleItemId);
-        if (!saleItem) continue;
-        const before = cumulative.get(saleItemId) ?? 0;
-        const after = before + quantity;
+      for (const [itemId, quantity] of quantities) {
+        const line = lineById.get(itemId);
+        if (!line) continue;
+        const before = cumulative.get(itemId) ?? 0;
         currentValue = currentValue.plus(
-          allocatedReturnValue(
-            saleItem.lineTotal,
-            saleItem.quantity,
-            before,
-            quantity,
-          ),
+          allocatedReturnValue(line.lineTotal, line.quantity, before, quantity),
         );
-        cumulative.set(saleItemId, after);
+        cumulative.set(itemId, before + quantity);
       }
-      if (current.id === targetId) return currentValue;
+      result.set(current.id, currentValue);
     }
-    return ZERO;
+    return result;
   }
 
   private total(

@@ -15,6 +15,7 @@ import { UpstreamService } from "../src/upstream/upstream.service";
 import { CustomersController } from "../src/sales/customers.controller";
 import { SalesController } from "../src/sales/sales.controller";
 import { FinanceController } from "../src/finance/finance.controller";
+import { CommercialController } from "../src/commercial/commercial.controller";
 
 describe("API Gateway HTTP", () => {
   let app: INestApplication;
@@ -36,6 +37,7 @@ describe("API Gateway HTTP", () => {
         CustomersController,
         SalesController,
         FinanceController,
+        CommercialController,
       ],
       providers: [{ provide: UpstreamService, useValue: upstream }],
     }).compile();
@@ -369,6 +371,53 @@ describe("API Gateway HTTP", () => {
       path: "payments/payment-id/reverse",
       authorization: "Bearer finance-token",
       body: reversal,
+    });
+  });
+
+  it("forwards Phase 8 settlement and commercial queries without calculations", async () => {
+    const payment = { paymentMethodId: "method-id", amount: "250.00" };
+    upstream.request.mockResolvedValue({ id: "payment-id", status: "POSTED" });
+    await request(app.getHttpServer())
+      .post("/api/purchases/purchase-id/payments")
+      .set("Authorization", "Bearer commercial-token")
+      .send(payment)
+      .expect(201);
+    expect(upstream.request).toHaveBeenCalledWith("autorepuesto", {
+      method: "POST",
+      path: "purchases/purchase-id/payments",
+      authorization: "Bearer commercial-token",
+      body: payment,
+    });
+    await request(app.getHttpServer())
+      .post("/api/purchase-returns/return-id/refunds")
+      .set("Authorization", "Bearer commercial-token")
+      .send(payment)
+      .expect(201);
+    expect(upstream.request).toHaveBeenLastCalledWith("autorepuesto", {
+      method: "POST",
+      path: "purchase-returns/return-id/refunds",
+      authorization: "Bearer commercial-token",
+      body: payment,
+    });
+
+    upstream.request.mockResolvedValue({ data: [], summary: {} });
+    await request(app.getHttpServer())
+      .get("/api/commercial/payables?overdueOnly=true&page=2")
+      .set("Authorization", "Bearer commercial-token")
+      .expect(200);
+    expect(upstream.request).toHaveBeenLastCalledWith("autorepuesto", {
+      path: "commercial/payables",
+      authorization: "Bearer commercial-token",
+      query: expect.objectContaining({ overdueOnly: "true", page: "2" }),
+    });
+    await request(app.getHttpServer())
+      .get("/api/customers/customer-id/account?limit=10")
+      .set("Authorization", "Bearer commercial-token")
+      .expect(200);
+    expect(upstream.request).toHaveBeenLastCalledWith("autorepuesto", {
+      path: "customers/customer-id/account",
+      authorization: "Bearer commercial-token",
+      query: expect.objectContaining({ limit: "10" }),
     });
   });
 });
