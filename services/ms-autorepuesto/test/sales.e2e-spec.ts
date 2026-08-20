@@ -220,7 +220,7 @@ describe("Customers, Sales, and Sales Returns HTTP", () => {
       .send({ code: `BAD-${suffix}`, name: "Bad", email: "not-email" })
       .expect(400);
     const listed = await request(app.getHttpServer())
-      .get(`/customers?search=Trading&taxId=0801&active=true&page=1&limit=5`)
+      .get(`/customers?search=${suffix}&taxId=0801&active=true&page=1&limit=5`)
       .expect(200);
     expect(listed.body.data.map((item: { id: string }) => item.id)).toContain(
       customerId,

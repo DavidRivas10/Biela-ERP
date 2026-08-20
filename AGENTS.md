@@ -31,8 +31,10 @@ immutable physical-Cash ledger. Phase 8 extends that same ledger with Purchase
 Payments, Supplier Refunds, due dates, operational receivables/payables, and a
 commercial summary. The frontend, workshop, general accounting, fiscal
 invoicing, external payment integrations, inventory valuation/COGS, and AI
-remain unimplemented. No subsequent roadmap block is approved here. Never
-implement a future phase without explicit instruction.
+remain unimplemented. Phase 9 verifies and documents release readiness across
+the complete Phase 1–8 backend without adding a business module or migration.
+No subsequent roadmap block is approved here. Never implement a future phase
+without explicit instruction.
 
 ## Migration and credential safety
 
@@ -147,6 +149,18 @@ implement a future phase without explicit instruction.
 --workspace @biela/ms-autorepuesto`
 - `npm audit --omit=dev`, `git diff --check`
 - `docker compose up -d`, `docker compose down`
+
+## Phase 9 release rules
+
+- Treat the 13 Phase 1–8 PostgreSQL migrations as immutable history and prove
+  them from zero when performing a release audit.
+- The future React frontend consumes only `api-gateway :4000`; it must not call
+  internal services or databases directly.
+- Keep `docs/postman/BIELA-Backend-ERP.*.json` credential-free and inject seed
+  credentials only at Newman runtime.
+- Phase 9 is stabilization only. General accounting, valuation/COGS, fiscal
+  invoicing, provider integrations, frontend, AI, workshop, and advanced
+  multisite work remain outside the approved backend scope.
 
 ## Engineering expectations
 

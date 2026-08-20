@@ -1,8 +1,8 @@
 # BIELA Backend MVP
 
-This document describes the implemented backend scope through Phase 8. It does
-not describe deployed infrastructure or approve a new
-product phase.
+This document describes the implemented business backend scope through Phase 8
+and the Phase 9 release-readiness verification. It does not describe deployed
+infrastructure or approve a new product phase.
 
 ## Architecture and ownership
 
@@ -188,25 +188,31 @@ Swagger is available at `http://localhost:4000/docs`,
 
 ## MVP demonstration
 
-Use the consolidated collection to exercise the real Gateway without placing
-credentials in tracked JSON:
+Use the consolidated ERP collection to exercise the real Gateway without
+placing credentials in tracked JSON:
 
 ```bash
 npx dotenv -e .env -- sh -c '
 npx newman run \
-  docs/postman/BIELA-Backend-MVP.postman_collection.json \
-  -e docs/postman/BIELA-Backend-MVP.postman_environment.json \
+  docs/postman/BIELA-Backend-ERP.postman_collection.json \
+  -e docs/postman/BIELA-Backend-ERP.postman_environment.json \
   --env-var "adminEmail=$SEED_ADMIN_EMAIL" \
   --env-var "adminPassword=$SEED_ADMIN_PASSWORD"
 '
 ```
 
 The collection uses generated fixture codes and demonstrates system health,
-login/current user, Product and Vehicle setup, explicit fitment, two Locations,
-INITIAL/IN/OUT/TRANSFER, balance and ledger queries, deterministic searches,
-insufficient-stock rollback, and an authenticated `403` authorization case.
+login/current user, Product and Vehicle setup, explicit fitment, Location and
+Inventory, deterministic search, Purchase/Receipt/Payment/Return/Refund, Sale
+POST/Payment/Return/Refund, Cash effects and closing, Customer/Supplier accounts,
+receivables/payables, Commercial Summary, and authenticated 401/403 behavior.
 It intentionally leaves demonstration records in the development database; do
 not run it against a production or shared non-test database.
+
+The stable frontend-facing contract is summarized in
+[`backend-api-contract.md`](backend-api-contract.md). Operational setup,
+verification evidence, and troubleshooting are in
+[`backend-release-readiness.md`](backend-release-readiness.md).
 
 ## Verification
 

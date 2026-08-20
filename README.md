@@ -51,6 +51,9 @@ migrations. The API Gateway owns no database and has no ORM dependency.
   credits, Supplier Refunds/reversals, due dates, overdue state, Customer
   accounts, Supplier accounts, paginated receivables/payables, and a lightweight
   operational commercial summary.
+- Phase 9 release readiness: full Phase 1–8 regression, fresh migration proof,
+  live health/degraded-health and Swagger verification, consolidated Gateway-only
+  ERP Newman coverage, frontend contract documentation, and security review.
 
 No Product contains stock quantity or a physical-location string. See
 [the Phase 3 model](docs/phase-3-data-model.md) for the actual ER diagram,
@@ -64,7 +67,9 @@ Return behavior. See [the Phase 7 cash and payments model](docs/phase-7-cash-pay
 for settlement, drawer, refund-allocation, and locking rules.
 See [the Phase 8 commercial integration model](docs/phase-8-commercial-integration.md)
 for purchasing settlement, Supplier credits, AR/AP, due dates, and the final
-cross-domain lock order.
+cross-domain lock order. See [the stable API contract](docs/backend-api-contract.md)
+and [the release-readiness guide](docs/backend-release-readiness.md) for frontend
+integration and the complete operational release gate.
 
 ## Setup
 
@@ -121,8 +126,8 @@ require a bearer token unless noted otherwise.
 | Cash registers   | `POST/GET /api/cash-registers`, `GET/PATCH /api/cash-registers/:id`, activate/deactivate                                          |
 | Cash sessions    | Open/current, list/detail/summary, manual movement, and close routes under `/api/cash-registers` and `/api/cash-sessions`         |
 | Settlement       | `POST/GET /api/sales/:id/payments`, `POST/GET /api/sale-returns/:id/refunds`, `GET /api/payments/:id`, reverse                    |
-| Supplier finance | `POST/GET /api/purchases/:id/payments`, `POST/GET /api/purchase-returns/:id/refunds`                                                |
-| Commercial       | `GET /api/customers/:id/account`, `GET /api/suppliers/:id/account`, `/api/commercial/receivables`, `/payables`, `/summary`       |
+| Supplier finance | `POST/GET /api/purchases/:id/payments`, `POST/GET /api/purchase-returns/:id/refunds`                                              |
+| Commercial       | `GET /api/customers/:id/account`, `GET /api/suppliers/:id/account`, `/api/commercial/receivables`, `/payables`, `/summary`        |
 
 List endpoints use one contract:
 
@@ -214,6 +219,8 @@ effects, Refund eligibility, compensating reversals, manual Cash, and closing.
 The Phase 8 collection demonstrates Purchase settlement and returns, Supplier
 credit/refunds, purchase-side Cash effects, Customer/Supplier accounts, overdue
 queries, and the operational commercial summary.
+The consolidated `BIELA-Backend-ERP` collection is the Phase 9 release flow
+covering the complete Phase 1–8 ERP through the Gateway.
 
 Committed Postman environments contain no credentials. Inject local seed
 credentials without printing or storing them in the collection:
@@ -221,8 +228,8 @@ credentials without printing or storing them in the collection:
 ```bash
 npx dotenv -e .env -- sh -c '
 npx newman run \
-  docs/postman/BIELA-Phase-8.postman_collection.json \
-  -e docs/postman/BIELA-Phase-8.postman_environment.json \
+  docs/postman/BIELA-Backend-ERP.postman_collection.json \
+  -e docs/postman/BIELA-Backend-ERP.postman_environment.json \
   --env-var "adminEmail=$SEED_ADMIN_EMAIL" \
   --env-var "adminPassword=$SEED_ADMIN_PASSWORD"
 '
@@ -365,8 +372,9 @@ prisma:deploy` if migration status is behind.
 
 ## Scope boundary
 
-Cash, Payments, and commercial settlement are intentionally deferred to Phase 7. Fiscal invoicing and accounts payable/receivable,
-accounting, workshop, advanced reporting, frontend, AI, OCR, embeddings,
-semantic search, external search engines, and multisite workflows remain
+Cash, Payments, Supplier settlement, and operational receivables/payables are
+implemented. General accounting, Inventory valuation/COGS, fiscal invoicing,
+external financial/payment-provider integrations, workshop workflows unless
+separately approved, advanced multisite operations, frontend, and AI remain
 intentionally unimplemented. Do not begin a later phase without separate
 approval.
