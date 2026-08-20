@@ -1,8 +1,8 @@
 # BIELA Backend API Contract
 
 This document summarizes the stable public contract implemented through Backend
-Phase 8 and verified in Phase 9. Swagger is the detailed schema source. A future
-React application must use only the API Gateway at `http://localhost:4000`.
+Phase 8 and verified in Phase 9. Swagger is the detailed schema source. The
+Phase 10 React application uses only the API Gateway at `http://localhost:4000`.
 
 Unless explicitly marked public, routes require `Authorization: Bearer <token>`.
 The Gateway forwards authorization, path parameters, query parameters, bodies,

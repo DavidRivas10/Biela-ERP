@@ -2,14 +2,16 @@
   "name": "biela",
   "version": "0.1.0",
   "private": true,
-  "description": "BIELA backend monorepo with authentication, automotive catalog, inventory, and deterministic search",
+  "description": "BIELA ERP monorepo with a React frontend and NestJS backend services",
   "workspaces": [
-    "services/*"
+    "services/*",
+    "apps/*"
   ],
   "scripts": {
     "dev:users": "npm run start:dev --workspace @biela/ms-users",
     "dev:autorepuesto": "npm run start:dev --workspace @biela/ms-autorepuesto",
     "dev:gateway": "npm run start:dev --workspace @biela/api-gateway",
+    "dev:frontend": "npm run dev --workspace @biela/frontend",
     "seed:admin": "npm run seed:admin --workspace @biela/ms-users",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",

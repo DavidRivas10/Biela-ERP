@@ -2,13 +2,13 @@
 
 Backend Phase 9 verifies the complete traditional ERP backend implemented by
 Phases 1–8. Phase 9 adds no business module and no database migration. The
-release boundary is suitable for a future React client consuming only the API
-Gateway.
+Phase 10 React client now consumes this release boundary only through the API
+Gateway; backend ownership and behavior remain unchanged.
 
 ## Architecture and ports
 
 ```text
-React client → API Gateway :4000
+React client :5173 → API Gateway :4000
                  ├─ HTTP → ms-users :4001 → MongoDB :27017
                  └─ HTTP → ms-autorepuesto :4002 → PostgreSQL :5432
 ```
@@ -133,10 +133,13 @@ walk-in Sales, Sale Returns, Payments and Customer Refunds; Payment Methods,
 Cash Registers/Sessions, reversals, manual Cash movements; receivables,
 payables, due/overdue state, and operational commercial summary.
 
-A frontend must call only the Gateway at port 4000. It must never connect to
+The Phase 10 frontend calls only the Gateway at port 4000. It must never connect to
 ports 4001/4002 or either database. Existing list/detail APIs provide selectors
 and workflow detail without exposing raw Prisma structures; redundant dropdown
 APIs are unnecessary.
+
+The frontend foundation, authentication, permission-aware shell, and real
+health/commercial dashboard are documented in `frontend-foundation.md`.
 
 ## Troubleshooting
 
@@ -156,7 +159,7 @@ APIs are unnecessary.
 ## Known limitations
 
 General accounting, journal entries, Inventory valuation/COGS, fiscal or
-government invoicing, external financial/payment-provider integrations, the
-frontend, AI, workshop workflows unless separately approved, and advanced
-multisite operations remain deferred. Operational receivables/payables are not
-an accounting ledger or financial statements.
+government invoicing, external financial/payment-provider integrations,
+operational frontend module workflows, AI, workshop workflows unless separately
+approved, and advanced multisite operations remain deferred. Operational
+receivables/payables are not an accounting ledger or financial statements.

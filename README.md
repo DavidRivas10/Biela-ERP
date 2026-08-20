@@ -1,15 +1,16 @@
-# BIELA Backend
+# BIELA ERP
 
 BIELA (Base Integrada Empresarial de Logística Automotriz) is an integrated
-automotive logistics platform. The backend currently implements authentication,
-users, RBAC, the automotive catalog, physical locations, safe inventory
+automotive logistics platform. Its React application provides authentication,
+permission-aware navigation, an ERP shell, and a real operational dashboard.
+The backend implements users, RBAC, the automotive catalog, physical locations, safe inventory
 movements, deterministic Product search, Suppliers, purchasing, Customers, and
 the merchandise Sales/Returns lifecycle, Cash Registers, Payments, Supplier
 settlement, operational receivables/payables, and Refunds.
 
 ```mermaid
 flowchart TD
-    Client[Future React client] --> Gateway[API Gateway :4000]
+    Client[React + TypeScript :5173] --> Gateway[API Gateway :4000]
     Gateway -->|REST/HTTP| Users[ms-users :4001]
     Gateway -->|REST/HTTP| Auto[ms-autorepuesto :4002]
     Users --> Mongo[(MongoDB :27017)]
@@ -54,6 +55,9 @@ migrations. The API Gateway owns no database and has no ORM dependency.
 - Phase 9 release readiness: full Phase 1–8 regression, fresh migration proof,
   live health/degraded-health and Swagger verification, consolidated Gateway-only
   ERP Newman coverage, frontend contract documentation, and security review.
+- Phase 10 frontend foundation: Vite + React + strict TypeScript workspace,
+  Gateway-only API client, session authentication, permission guards, responsive
+  ERP shell, and real health/commercial dashboard.
 
 No Product contains stock quantity or a physical-location string. See
 [the Phase 3 model](docs/phase-3-data-model.md) for the actual ER diagram,
@@ -69,7 +73,9 @@ See [the Phase 8 commercial integration model](docs/phase-8-commercial-integrati
 for purchasing settlement, Supplier credits, AR/AP, due dates, and the final
 cross-domain lock order. See [the stable API contract](docs/backend-api-contract.md)
 and [the release-readiness guide](docs/backend-release-readiness.md) for frontend
-integration and the complete operational release gate.
+integration and the complete operational release gate. See
+[the frontend foundation guide](docs/frontend-foundation.md) for browser setup,
+auth lifecycle, routes, CORS, architecture, and Phase 10 scope.
 
 ## Setup
 
@@ -94,7 +100,13 @@ Start services in separate terminals:
 npm run dev:users
 npm run dev:autorepuesto
 npm run dev:gateway
+npm run dev:frontend
 ```
+
+The frontend opens at `http://localhost:5173` and calls only the Gateway. Its
+public base URL is configured with `VITE_API_BASE_URL`; copy
+`apps/frontend/.env.example` to an ignored `apps/frontend/.env.local` when an
+override is needed. Never put secrets in `VITE_*` variables.
 
 ## Public API
 
@@ -372,9 +384,9 @@ prisma:deploy` if migration status is behind.
 
 ## Scope boundary
 
-Cash, Payments, Supplier settlement, and operational receivables/payables are
-implemented. General accounting, Inventory valuation/COGS, fiscal invoicing,
+Cash, Payments, Supplier settlement, operational receivables/payables, and the
+Phase 10 frontend foundation are implemented. Operational frontend module
+workflows, general accounting, Inventory valuation/COGS, fiscal invoicing,
 external financial/payment-provider integrations, workshop workflows unless
-separately approved, advanced multisite operations, frontend, and AI remain
-intentionally unimplemented. Do not begin a later phase without separate
-approval.
+separately approved, advanced multisite operations, and AI remain intentionally
+unimplemented. Do not begin a later phase without separate approval.

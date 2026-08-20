@@ -10,7 +10,8 @@ architecture. Do not redesign it without explicit human approval.
 - `ms-autorepuesto` owns PostgreSQL and its Prisma schema/migrations.
 - `api-gateway` owns no database and communicates with services only through APIs.
 - Services do not read or write another service's database.
-- The future frontend is React + TypeScript; it is not implemented yet.
+- `apps/frontend` is the React + TypeScript + Vite browser application. It calls
+  only `api-gateway` through the configured public base URL.
 - The future AI service is Python/FastAPI; it is not implemented yet.
 
 ## Roadmap boundaries
@@ -29,11 +30,13 @@ exact Sales money, and traceable Inventory integration. Phase 7 implements
 Payment Methods, Cash Registers/Sessions, Payments, Refunds, reversals, and an
 immutable physical-Cash ledger. Phase 8 extends that same ledger with Purchase
 Payments, Supplier Refunds, due dates, operational receivables/payables, and a
-commercial summary. The frontend, workshop, general accounting, fiscal
+commercial summary. Operational frontend modules, workshop, general accounting, fiscal
 invoicing, external payment integrations, inventory valuation/COGS, and AI
 remain unimplemented. Phase 9 verifies and documents release readiness across
 the complete Phase 1–8 backend without adding a business module or migration.
-No subsequent roadmap block is approved here. Never implement a future phase
+Phase 10 implements only the frontend foundation, authentication, permission
+guards, responsive ERP shell, and real health/commercial dashboard. No
+subsequent roadmap block is approved here. Never implement a future phase
 without explicit instruction.
 
 ## Migration and credential safety
@@ -142,7 +145,8 @@ without explicit instruction.
 
 ## Commands
 
-- `npm run dev:users`, `npm run dev:autorepuesto`, `npm run dev:gateway`
+- `npm run dev:users`, `npm run dev:autorepuesto`, `npm run dev:gateway`,
+  `npm run dev:frontend`
 - `npm run seed:admin`
 - `npm run lint`, `npm test`, `npm run test:e2e`, `npm run build`
 - `npm run prisma:generate`, `npm run prisma:deploy`, `npm run prisma:status
@@ -154,13 +158,30 @@ without explicit instruction.
 
 - Treat the 13 Phase 1–8 PostgreSQL migrations as immutable history and prove
   them from zero when performing a release audit.
-- The future React frontend consumes only `api-gateway :4000`; it must not call
+- The React frontend consumes only `api-gateway :4000`; it must not call
   internal services or databases directly.
 - Keep `docs/postman/BIELA-Backend-ERP.*.json` credential-free and inject seed
   credentials only at Newman runtime.
 - Phase 9 is stabilization only. General accounting, valuation/COGS, fiscal
-  invoicing, provider integrations, frontend, AI, workshop, and advanced
+  invoicing, provider integrations, frontend business modules, AI, workshop, and advanced
   multisite work remain outside the approved backend scope.
+
+## Phase 10 frontend rules
+
+- Keep the browser API base URL centralized in `VITE_API_BASE_URL`; never call
+  `ms-users :4001`, `ms-autorepuesto :4002`, or either database from frontend code.
+- Store only the access token in `sessionStorage` under `biela.accessToken`.
+  Restore identity through Gateway `/api/auth/me`, and clear token, identity,
+  and query cache on logout or an authenticated `401`.
+- Do not erase a potentially valid token when restoration fails because of a
+  network error, `502`, or `503`; expose retry and logout paths.
+- Frontend navigation and route guards use backend-issued permission strings for
+  UX only. Backend RBAC remains mandatory and authoritative.
+- The dashboard may request commercial summary only with
+  `commercial-summary.read`. Never invent KPIs or client-side business totals.
+- Phase 10 module routes are explicit placeholders. Do not implement Product,
+  Inventory, purchasing, Sales, Cash, settlement, or administration workflows
+  before a separately approved frontend phase.
 
 ## Engineering expectations
 
