@@ -87,10 +87,14 @@ npm audit --omit=dev
 git diff --check
 ```
 
-Phase 9 observed 14 passing unit suites (37 tests), 19 passing E2E suites (133
-tests), and four passing concurrency suites (21 scenarios), with zero failures.
-The concurrency suites are part of the E2E total. They cover purchasing, sales,
-Cash/Payments, and cross-domain commercial races. Transaction retry is bounded
+The final Phase 12 baseline contains 15 passing backend unit suites (38 tests),
+19 passing E2E suites (134 tests), and five E2E suite files representing 22
+concurrency scenarios, with zero failures. The concurrency scenarios are part
+of the E2E total. They cover Inventory, purchasing, sales, Cash/Payments, and
+cross-domain commercial races. The Phase 13 closure candidate has 26 frontend
+files / 126 tests, for 298 automated tests overall; the 79/79 Phase 12
+functional matrix is separate evidence.
+Transaction retry is bounded
 to three attempts for Prisma `P2034` and PostgreSQL `40001`/`40P01` surfaced
 through Prisma. Financial lock order is document, optional Return, optional
 Payment, then CashSession.
@@ -138,8 +142,8 @@ ports 4001/4002 or either database. Existing list/detail APIs provide selectors
 and workflow detail without exposing raw Prisma structures; redundant dropdown
 APIs are unnecessary.
 
-The frontend foundation, authentication, permission-aware shell, and real
-health/commercial dashboard are documented in `frontend-foundation.md`.
+The complete Phase 10 frontend, official Phase 11 integration and official
+Phase 12 functional verification are documented from the index in `README.md`.
 
 ## Troubleshooting
 
@@ -158,8 +162,8 @@ health/commercial dashboard are documented in `frontend-foundation.md`.
 
 ## Known limitations
 
-General accounting, journal entries, Inventory valuation/COGS, fiscal or
-government invoicing, external financial/payment-provider integrations,
-operational frontend module workflows, AI, workshop workflows unless separately
-approved, and advanced multisite operations remain deferred. Operational
-receivables/payables are not an accounting ledger or financial statements.
+General accounting, journal entries, Inventory valuation/COGS accounting,
+fiscal or government invoicing, external financial/payment-provider
+integrations, offline operation, AI, and advanced workshop/multisite expansion
+remain deferred. Operational receivables/payables are not an accounting ledger
+or financial statements. The complete operational frontend is implemented.

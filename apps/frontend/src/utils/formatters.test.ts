@@ -4,6 +4,8 @@ import {
   formatCalendarDate,
   formatDateTime,
   formatMoney,
+  formatPaymentMethodKind,
+  formatPaymentType,
   isPositiveMoneyAtMost,
 } from "./formatters";
 
@@ -26,5 +28,14 @@ describe("display formatters", () => {
     expect(formatBusinessDate("2026-08-19")).toMatch(/19/);
     expect(formatCalendarDate("2026-08-19T00:00:00.000Z")).toMatch(/19/);
     expect(formatDateTime("2026-08-19T18:30:00.000Z")).toMatch(/19/);
+  });
+
+  it("presents Payment types and methods as business-facing Spanish labels", () => {
+    expect(formatPaymentType("SALE_PAYMENT")).toBe("Cobro de venta");
+    expect(formatPaymentType("SUPPLIER_REFUND")).toBe("Reembolso de proveedor");
+    expect(formatPaymentMethodKind("CASH")).toBe("Efectivo");
+    expect(formatPaymentMethodKind("BANK_TRANSFER")).toBe(
+      "Transferencia bancaria",
+    );
   });
 });

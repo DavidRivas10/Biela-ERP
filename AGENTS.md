@@ -52,10 +52,29 @@ business domain or migration.
 Official Phases 10, 11, and 12 are complete. Phase 12 exercised realistic
 end-to-end ERP operation, failure/recovery, concurrency, RBAC, pagination,
 responsive UI, accessibility, and cross-domain reconciliation without a schema
-change. The roadmap continues with Phase 13 — Traditional ERP closure,
-documentation, Jira, demo, and stable release. AI comes only after the
-traditional ERP. No subsequent roadmap block is approved here.
+change. Phase 13 — Traditional ERP closure, documentation, Jira, demo, and
+stable release — is the current engineering closure preparation. It adds no
+business domain or migration. Final commit, push, Jira synchronization, stable
+tag and demo are human/external actions. AI comes only after the traditional
+ERP. No subsequent roadmap block is approved here.
 Never implement a future phase without explicit instruction.
+
+## Official Phase 13 closure rules
+
+- Preserve the committed Phase 12 functional baseline and its 79/79 matrix;
+  Phase 13 changes documentation, safe operations/release artifacts and only
+  confirmed closure defects.
+- Add no business module, migration, Prisma schema change, architecture redesign
+  or major dependency upgrade. Keep Prisma on 6.19.3.
+- Maintain separate PostgreSQL and MongoDB backup/restore procedures. Verify
+  restoration only against new disposable database names; never overwrite or
+  reset the primary development databases.
+- Do not track `.env`, credentials, JWTs, dumps, logs or generated backup data.
+- Do not commit, push, tag, create a GitHub Release or mutate Jira externally.
+  Prepare evidence and leave those actions to the authorized human.
+- A stable handoff requires green lint/unit/E2E/build/audit, 13 migrations with
+  zero pending, no BLOCKER/HIGH defect, complete manuals/diagrams/release docs,
+  and explicit human-action status.
 
 ## Official Phase 11 integration rules
 

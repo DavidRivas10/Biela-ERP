@@ -30,6 +30,7 @@ import { apiErrorMessage } from "../utils/api-error";
 import {
   formatDateTime,
   formatMoney,
+  formatPaymentMethodKind,
   isPositiveMoneyAtMost,
 } from "../utils/formatters";
 import { invalidateInventory } from "./ReceiptReturnPages";
@@ -172,7 +173,7 @@ export function PurchasePaymentsPage() {
             {method?.kind === "CASH" ? (
               <OpenCashSessionSelector
                 id="purchase-payment-session"
-                label="Sesión de caja OPEN"
+                label="Sesión de caja ABIERTA"
                 required
                 enabled={hasPermission("cash-sessions.read")}
                 value={form.cashSessionId ?? ""}
@@ -422,7 +423,7 @@ export function PurchaseReturnDetailPage() {
             {method?.kind === "CASH" ? (
               <OpenCashSessionSelector
                 id="supplier-refund-session"
-                label="Sesión de caja OPEN"
+                label="Sesión de caja ABIERTA"
                 required
                 enabled={hasPermission("cash-sessions.read")}
                 value={form.cashSessionId ?? ""}
@@ -567,7 +568,7 @@ function PaymentHistory({
       cell: (row) => (
         <>
           <strong>{row.paymentMethod.name}</strong>
-          <small>{row.paymentMethod.kind}</small>
+          <small>{formatPaymentMethodKind(row.paymentMethod.kind)}</small>
         </>
       ),
     },
@@ -639,7 +640,7 @@ function PaymentHistory({
           {target.paymentMethod.kind === "CASH" ? (
             <OpenCashSessionSelector
               id="reversal-session"
-              label="Sesión OPEN para compensación"
+              label="Sesión ABIERTA para compensación"
               required
               enabled={hasPermission("cash-sessions.read")}
               value={cashSessionId}

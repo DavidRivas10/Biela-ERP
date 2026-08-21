@@ -76,7 +76,7 @@ describe("Frontend Phase 10.D sales financial permissions", () => {
     renderPage();
     await screen.findByRole("option", { name: /Efectivo/ });
     await user.selectOptions(screen.getByRole("combobox", { name: /Método de pago/ }), "cash-1");
-    expect(await screen.findByText(/Se requiere cash-sessions.read/)).toBeVisible();
+    expect(await screen.findByText(/No tiene permiso para consultar sesiones de caja/)).toBeVisible();
     expect(mock.mock.calls.some(([input]) => new URL(input instanceof Request ? input.url : input.toString()).pathname === "/api/cash-sessions")).toBe(false);
   });
 });

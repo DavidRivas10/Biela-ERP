@@ -282,7 +282,7 @@ export function CompatibilityPage() {
         <Field label="Producto exacto" htmlFor="compat-product-filter">
           <input
             id="compat-product-filter"
-            placeholder="UUID"
+            placeholder="Identificador del producto"
             value={filters.values.productId ?? ""}
             onChange={(e) => filters.update({ productId: e.target.value })}
           />
@@ -290,7 +290,7 @@ export function CompatibilityPage() {
         <Field label="Vehículo exacto" htmlFor="compat-vehicle-filter">
           <input
             id="compat-vehicle-filter"
-            placeholder="UUID"
+            placeholder="Identificador del vehículo"
             value={filters.values.vehicleId ?? ""}
             onChange={(e) => filters.update({ vehicleId: e.target.value })}
           />

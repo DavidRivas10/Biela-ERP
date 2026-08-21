@@ -249,7 +249,9 @@ describe("Frontend Phase 10.C purchasing permission contract", () => {
       await screen.findByRole("heading", { name: "Historial de pagos" }),
     ).toBeVisible();
     expect(await screen.findByText("#501")).toBeVisible();
-    expect(await screen.findByRole("button", { name: "Reversar" })).toBeVisible();
+    expect(
+      await screen.findByRole("button", { name: "Reversar" }),
+    ).toBeVisible();
     expect(
       screen.queryByRole("heading", { name: "Registrar pago" }),
     ).toBeNull();
@@ -302,7 +304,7 @@ describe("Frontend Phase 10.C purchasing permission contract", () => {
       cashMethod.id,
     );
     await waitFor(() =>
-      expect(screen.getByLabelText(/^Sesión de caja OPEN/)).toBeVisible(),
+      expect(screen.getByLabelText(/^Sesión de caja ABIERTA/)).toBeVisible(),
     );
     expect(
       fetchMock.mock.calls.some(

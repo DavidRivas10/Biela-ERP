@@ -1,3 +1,5 @@
+import type { PaymentMethodKind, PaymentType } from "../types/purchasing";
+
 const wholeNumber = new Intl.NumberFormat("es-HN", {
   maximumFractionDigits: 0,
 });
@@ -5,6 +7,28 @@ const dateFormatter = new Intl.DateTimeFormat("es-HN", {
   dateStyle: "medium",
   timeZone: "America/Tegucigalpa",
 });
+
+const paymentMethodKindLabels: Record<PaymentMethodKind, string> = {
+  CASH: "Efectivo",
+  CARD: "Tarjeta",
+  BANK_TRANSFER: "Transferencia bancaria",
+  OTHER: "Otro",
+};
+
+const paymentTypeLabels: Record<PaymentType, string> = {
+  PURCHASE_PAYMENT: "Pago de compra",
+  SUPPLIER_REFUND: "Reembolso de proveedor",
+  SALE_PAYMENT: "Cobro de venta",
+  SALE_REFUND: "Reembolso a cliente",
+};
+
+export function formatPaymentMethodKind(value: PaymentMethodKind): string {
+  return paymentMethodKindLabels[value];
+}
+
+export function formatPaymentType(value: PaymentType): string {
+  return paymentTypeLabels[value];
+}
 
 export function formatMoney(value: string): string {
   const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(value);

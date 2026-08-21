@@ -1,4 +1,4 @@
-# BIELA ERP
+# BIELA — Base Integrada Empresarial de Logística Automotriz
 
 BIELA (Base Integrada Empresarial de Logística Automotriz) is an integrated
 automotive logistics platform. Its React application provides authentication,
@@ -117,6 +117,10 @@ and Phase 12 handoff. See the
 and [functional matrix](docs/phase-12-functional-test-matrix.md) for the
 realistic business-day evidence, defects/corrections, recovery tests,
 reconciliation, and official Phase 13 handoff.
+The complete release-oriented documentation is indexed in
+[docs/README.md](docs/README.md), including architecture/ER diagrams, Spanish
+user and administrator manuals, operations, backup/restore, release notes,
+Jira reconciliation, demo script, and the Phase 13 closure matrix.
 
 ## Setup
 
@@ -125,7 +129,7 @@ Prerequisites are Node.js 20+, npm, Docker Engine, and Docker Compose.
 ```bash
 cp .env.example .env
 # Replace all example credentials and secrets with local values.
-npm install
+npm ci
 docker compose up -d
 npm run prisma:generate
 npm run prisma:deploy
@@ -427,9 +431,10 @@ prisma:deploy` if migration status is behind.
 
 Cash, Payments, Supplier settlement, operational receivables/payables, Frontend
 Phase 10.A–10.E, official Phase 11 integration, and official Phase 12 functional
-testing/corrections are complete. Official Phase 13 traditional ERP closure,
-general accounting, Inventory valuation/COGS, fiscal invoicing, external
-financial/payment-provider integrations, offline operation, workshop workflows
-unless separately approved, advanced multisite operations, and AI remain
-intentionally unimplemented. Do not begin a later phase without separate
-approval.
+testing/corrections are complete. Phase 13 engineering closure preparation is
+the current release-candidate work; final commit, push, Jira synchronization,
+stable tag and demo remain human/external actions. General accounting,
+Inventory valuation/COGS accounting, fiscal invoicing, external payment
+integrations, offline operation, advanced workshop/multisite expansion and AI
+remain intentionally deferred. There is no approved Phase 14; AI may begin only
+after the human closes the traditional ERP release.

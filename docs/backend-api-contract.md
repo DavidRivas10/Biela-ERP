@@ -78,6 +78,32 @@ uses transformation, whitelisting, and unknown-field rejection. Actor IDs,
 lifecycle status, posting/reversal timestamps, Inventory balances, expected
 Cash, and closing snapshots are server-controlled.
 
+## Exact permission catalog
+
+The current backend catalog contains exactly **54** codes. `ms-users` validates
+Role writes against this list and the administrator seed assigns this same
+controlled set:
+
+- Users/Roles: `users.read`, `users.create`, `users.update`, `users.activate`,
+  `users.deactivate`, `roles.read`, `roles.manage`.
+- Products/Vehicles/Compatibility: `products.read`, `products.create`,
+  `products.update`, `vehicles.read`, `vehicles.create`, `vehicles.update`,
+  `compatibilities.read`, `compatibilities.manage`.
+- Warehouse/Search: `locations.read`, `locations.create`, `locations.update`,
+  `inventory.read`, `inventory.adjust`, `inventory.transfer`, `search.read`.
+- Purchasing: `suppliers.read`, `suppliers.create`, `suppliers.update`,
+  `purchases.read`, `purchases.create`, `purchases.update`,
+  `purchases.receive`, `purchases.return`, `purchases.pay`.
+- Sales: `customers.read`, `customers.create`, `customers.update`, `sales.read`,
+  `sales.create`, `sales.update`, `sales.post`, `sales.return`.
+- Payment/Cash: `payment-methods.read`, `payment-methods.manage`,
+  `cash-registers.read`, `cash-registers.manage`, `cash-sessions.read`,
+  `cash-sessions.open`, `cash-sessions.close`, `payments.read`,
+  `payments.create`, `payments.reverse`, `cash-movements.read`,
+  `cash-movements.create`.
+- Commercial views: `commercial-receivables.read`,
+  `commercial-payables.read`, `commercial-summary.read`.
+
 ## Errors and dependencies
 
 Expected validation/auth/business results preserve HTTP 400, 401, 403, 404, and

@@ -5,6 +5,7 @@ import { suppliersApi } from "../api/suppliers-api";
 import { useDebouncedValue } from "../hooks/use-debounced-value";
 import { queryKeys } from "../query/query-keys";
 import type { CashSession, PaymentMethod, Supplier } from "../types/purchasing";
+import { formatPaymentMethodKind } from "../utils/formatters";
 import { Field } from "./Field";
 import { Pagination } from "./Pagination";
 
@@ -145,7 +146,7 @@ export function PaymentMethodSelector({
           <option value="">Seleccionar</option>
           {rows.map((row) => (
             <option key={row.id} value={row.id}>
-              {row.name} · {row.kind}
+              {row.name} · {formatPaymentMethodKind(row.kind)}
             </option>
           ))}
         </select>
@@ -198,7 +199,7 @@ export function OpenCashSessionSelector({
             );
           }}
         >
-          <option value="">Seleccionar sesión OPEN</option>
+          <option value="">Seleccionar sesión ABIERTA</option>
           {rows.map((row) => (
             <option key={row.id} value={row.id}>
               {row.cashRegister.code} · {row.cashRegister.name}
