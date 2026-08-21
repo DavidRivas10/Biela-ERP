@@ -49,10 +49,12 @@ Phase 10 is complete after 10.E. Official Phase 11 completes and verifies the
 Frontend ↔ Backend integration across every approved module without adding a
 business domain or migration.
 
-Official Phases 10 and 11 are complete. The roadmap continues with Phase 12 —
-Functional end-to-end ERP testing and corrections — and Phase 13 — Traditional
-ERP closure, documentation, Jira, demo, and stable release. AI comes only after
-the traditional ERP. No subsequent roadmap block is approved here.
+Official Phases 10, 11, and 12 are complete. Phase 12 exercised realistic
+end-to-end ERP operation, failure/recovery, concurrency, RBAC, pagination,
+responsive UI, accessibility, and cross-domain reconciliation without a schema
+change. The roadmap continues with Phase 13 — Traditional ERP closure,
+documentation, Jira, demo, and stable release. AI comes only after the
+traditional ERP. No subsequent roadmap block is approved here.
 Never implement a future phase without explicit instruction.
 
 ## Official Phase 11 integration rules
@@ -71,7 +73,10 @@ Never implement a future phase without explicit instruction.
 - A 401 clears authentication; a 403 preserves the valid session. Temporary
   502/503 or network failure during `/auth/me` preserves the stored token and
   offers retry/logout rather than masquerading as invalid credentials.
-- Official Phase 12 is not part of Phase 11 and requires separate instruction.
+- Official Phase 12 is documented in
+  `docs/phase-12-functional-test-report.md` and
+  `docs/phase-12-functional-test-matrix.md`; its controlled data uses the
+  `FUNC12-` prefix.
 
 ## Frontend Phase 10.C rules
 

@@ -83,7 +83,11 @@ export function CashRegisterSelector({
         </select>
       </Field>
       <div className="entity-selector__pagination">
-        <Pagination meta={list.data?.meta} onPageChange={setPage} />
+        <Pagination
+          meta={list.data?.meta}
+          onPageChange={setPage}
+          ariaLabel="Paginación de cajas"
+        />
       </div>
     </div>
   );

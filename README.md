@@ -78,10 +78,12 @@ implemented and official Phase 10 is complete. Official Phase 11 — Complete
 Frontend ↔ Backend Integration — is also complete: every approved frontend
 domain is mapped through the thin Gateway, cross-domain cache invalidation is
 covered, and targeted live purchasing, sales, Cash, RBAC, pagination, error,
-network-boundary, and responsive checks pass. The next roadmap block is official
-Phase 12 — Functional end-to-end ERP testing and corrections. Official Phase 13
-remains Traditional ERP closure, documentation, Jira, demo, and stable release.
-AI comes only after the traditional ERP.
+network-boundary, and responsive checks pass. Official Phase 12 — Functional
+end-to-end ERP testing and corrections — is complete: a realistic `FUNC12-`
+business day, failure recovery, concurrency, RBAC, page-two scale, mobile UX,
+accessibility, and Inventory/Cash/AR/AP reconciliation passed. The next roadmap
+block is official Phase 13 — Traditional ERP closure, documentation, Jira, demo,
+and stable release. AI comes only after the traditional ERP.
 
 No Product contains stock quantity or a physical-location string. See
 [the Phase 3 model](docs/phase-3-data-model.md) for the actual ER diagram,
@@ -110,7 +112,11 @@ for Cash and User/Role workflows and the official Phase 10 completion audit.
 See [the official Phase 11 integration report](docs/phase-11-frontend-backend-integration.md)
 and [integration matrix](docs/phase-11-integration-matrix.md) for the verified
 module contracts, permissions, cross-domain flows, cache rules, live evidence,
-and Phase 12 handoff.
+and Phase 12 handoff. See the
+[official Phase 12 functional report](docs/phase-12-functional-test-report.md)
+and [functional matrix](docs/phase-12-functional-test-matrix.md) for the
+realistic business-day evidence, defects/corrections, recovery tests,
+reconciliation, and official Phase 13 handoff.
 
 ## Setup
 
@@ -420,8 +426,8 @@ prisma:deploy` if migration status is behind.
 ## Scope boundary
 
 Cash, Payments, Supplier settlement, operational receivables/payables, Frontend
-Phase 10.A–10.E, and official Phase 11 integration are implemented. Official
-Phase 12 end-to-end correction, official Phase 13 traditional ERP closure,
+Phase 10.A–10.E, official Phase 11 integration, and official Phase 12 functional
+testing/corrections are complete. Official Phase 13 traditional ERP closure,
 general accounting, Inventory valuation/COGS, fiscal invoicing, external
 financial/payment-provider integrations, offline operation, workshop workflows
 unless separately approved, advanced multisite operations, and AI remain

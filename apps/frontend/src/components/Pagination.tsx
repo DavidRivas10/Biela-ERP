@@ -4,13 +4,15 @@ import { Button } from "./Button";
 export function Pagination({
   meta,
   onPageChange,
+  ariaLabel = "Paginación",
 }: {
   meta?: PaginationMeta;
   onPageChange: (page: number) => void;
+  ariaLabel?: string;
 }) {
   if (!meta || meta.total === 0) return null;
   return (
-    <nav className="pagination" aria-label="Paginación">
+    <nav className="pagination" aria-label={ariaLabel}>
       <p>
         Página <strong>{meta.page}</strong> de{" "}
         <strong>{Math.max(meta.pages, 1)}</strong> · {meta.total} registros

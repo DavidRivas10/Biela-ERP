@@ -40,7 +40,12 @@ export function ErpTable<T>({
   if (!rows?.length)
     return <EmptyState title={emptyTitle}>{emptyDescription}</EmptyState>;
   return (
-    <div className="table-scroll" tabIndex={0} aria-label="Tabla desplazable">
+    <div
+      className="table-scroll"
+      role="region"
+      tabIndex={0}
+      aria-label="Tabla desplazable"
+    >
       <table className="erp-table">
         <thead>
           <tr>

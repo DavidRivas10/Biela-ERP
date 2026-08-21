@@ -24,13 +24,19 @@ type SelectorProps<T> = {
 function SelectorPagination({
   meta,
   onPageChange,
+  label,
 }: {
   meta?: PaginationMeta;
   onPageChange: (page: number) => void;
+  label: string;
 }) {
   return (
     <div className="entity-selector__pagination">
-      <Pagination meta={meta} onPageChange={onPageChange} />
+      <Pagination
+        meta={meta}
+        onPageChange={onPageChange}
+        ariaLabel={`Paginación de ${label.toLowerCase()}`}
+      />
     </div>
   );
 }
@@ -110,7 +116,11 @@ export function ProductSelector({
           ))}
         </select>
       </Field>
-      <SelectorPagination meta={list.data?.meta} onPageChange={setPage} />
+      <SelectorPagination
+        meta={list.data?.meta}
+        onPageChange={setPage}
+        label={label}
+      />
     </div>
   );
 }
@@ -185,7 +195,11 @@ export function LocationSelector({
           ))}
         </select>
       </Field>
-      <SelectorPagination meta={list.data?.meta} onPageChange={setPage} />
+      <SelectorPagination
+        meta={list.data?.meta}
+        onPageChange={setPage}
+        label={label}
+      />
     </div>
   );
 }
@@ -263,6 +277,7 @@ export function VehicleSelector({
       </Field>
       <SelectorPagination
         meta={list.data?.meta}
+        label={label}
         onPageChange={(nextPage) =>
           setPagination({ signature, page: nextPage })
         }

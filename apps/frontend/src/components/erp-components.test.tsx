@@ -54,8 +54,12 @@ describe("reusable ERP components", () => {
       <Pagination
         meta={{ page: 2, limit: 20, total: 60, pages: 3 }}
         onPageChange={onPageChange}
+        ariaLabel="Paginación de productos"
       />,
     );
+    expect(
+      screen.getByRole("navigation", { name: "Paginación de productos" }),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Anterior" }));
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
     expect(onPageChange).toHaveBeenNthCalledWith(1, 1);
