@@ -43,8 +43,9 @@ Search; 10.C provides Suppliers, Purchases, partial Receiving, Purchase Returns,
 purchase-side Payments/Refunds, Supplier accounts, and operational Accounts
 Payable; 10.D provides Customers, registered and walk-in Sales, Sale Returns,
 sales-side Payments/Refunds, Customer accounts, and operational Accounts
-Receivable. Phase 10.E — Cash Registers, Cash Sessions, Cash Movements and
-Remaining Frontend Completion — is planned but not implemented here.
+Receivable; 10.E completes Cash Registers, Cash Sessions, paginated Cash
+Movements, Users, Roles, and the remaining approved frontend routes. Official
+Phase 10 is complete after 10.E.
 
 After 10.E, the official roadmap continues with Phase 11 — Complete Frontend ↔
 Backend Integration, Phase 12 — Functional end-to-end ERP testing and
@@ -87,6 +88,22 @@ Never implement a future phase without explicit instruction.
 - Financial and Inventory mutations are not optimistic. Invalidate Sale,
   Return, history, Inventory, Receivables, and Customer-account caches as
   appropriate.
+
+## Frontend Phase 10.E rules
+
+- Cash Register, Cash Session, Cash Movement, User, and Role screens call only
+  Gateway `/api/...` contracts and use the exact backend permissions.
+- Cash Movement history is server-paginated and server-filtered. Session
+  summaries request `includeMovements=false`; expected Cash remains a
+  server-derived value and is never recomputed authoritatively in React.
+- Register, Session, Movement, and User operational datasets remain fully
+  reachable through server pagination/search. Role data uses the backend's
+  small controlled list and never hardcodes role identifiers.
+- Cash mutations are explicit, confirmed, non-optimistic commands. Backend
+  lifecycle, one-open-session, negative-Cash, reversal, and concurrency rules
+  remain authoritative.
+- User creation passwords are write-only form values and are neither persisted
+  nor logged. User/Role responses must never expose credential hashes.
 
 ## Migration and credential safety
 

@@ -51,6 +51,17 @@ export const queryKeys = {
   paymentMethod: (id: string) => ["finance", "method", id] as const,
   cashSessions: (filters: object) => ["finance", "sessions", filters] as const,
   cashSession: (id: string) => ["finance", "session", id] as const,
+  cashRegistersRoot: ["finance", "registers"] as const,
+  cashRegisters: (filters: object) => ["finance", "registers", filters] as const,
+  cashRegister: (id: string) => ["finance", "register", id] as const,
+  currentCashSession: (registerId: string) =>
+    ["finance", "register", registerId, "current-session"] as const,
+  cashSessionsRoot: ["finance", "sessions"] as const,
+  cashSessionSummary: (id: string) =>
+    ["finance", "session", id, "summary"] as const,
+  cashMovementsRoot: ["finance", "cash-movements"] as const,
+  cashMovements: (filters: object) =>
+    ["finance", "cash-movements", filters] as const,
   purchasePaymentsRoot: ["finance", "purchase-payments"] as const,
   purchasePayments: (purchaseId: string, filters: object) =>
     ["finance", "purchase-payments", purchaseId, filters] as const,
@@ -81,4 +92,9 @@ export const queryKeys = {
   receivablesRoot: ["commercial", "receivables"] as const,
   receivables: (filters: object) => ["commercial", "receivables", filters] as const,
   customerAccountsRoot: ["commercial", "customer-account"] as const,
+  usersRoot: ["administration", "users"] as const,
+  users: (filters: object) => ["administration", "users", filters] as const,
+  user: (id: string) => ["administration", "user", id] as const,
+  rolesRoot: ["administration", "roles"] as const,
+  role: (id: string) => ["administration", "role", id] as const,
 };

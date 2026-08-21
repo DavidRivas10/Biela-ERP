@@ -79,4 +79,27 @@ describe("permission-aware navigation", () => {
       ]),
     );
   });
+
+  it("shows separate business-facing Cash navigation under exact read permissions", () => {
+    const cashier = {
+      ...testUser,
+      roles: [{
+        id: "cashier-role",
+        name: "cashier",
+        permissions: [
+          "cash-registers.read",
+          "cash-sessions.read",
+          "cash-movements.read",
+        ],
+      }],
+    };
+    const entries = visibleNavigation(cashier).flatMap((group) =>
+      group.items.map((item) => [item.label, item.path]),
+    );
+    expect(entries).toEqual(expect.arrayContaining([
+      ["Cajas", "/app/cash/registers"],
+      ["Sesiones", "/app/cash/sessions"],
+      ["Movimientos", "/app/cash/movements"],
+    ]));
+  });
 });

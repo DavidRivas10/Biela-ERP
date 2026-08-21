@@ -197,9 +197,20 @@ export class FinanceController {
   })
   getSessionSummary(
     @Param("id") id: string,
+    @Query() query: ProxyQuery,
     @Headers("authorization") authorization?: string,
   ) {
-    return this.get(`cash-sessions/${id}/summary`, authorization);
+    return this.list(`cash-sessions/${id}/summary`, query, authorization);
+  }
+  @Get("cash-movements")
+  @ApiOperation({
+    summary: "List paginated Cash Movements through ms-autorepuesto",
+  })
+  listCashMovements(
+    @Query() query: ProxyQuery,
+    @Headers("authorization") authorization?: string,
+  ) {
+    return this.list("cash-movements", query, authorization);
   }
   @Post("cash-sessions/:id/movements")
   @ApiBody({

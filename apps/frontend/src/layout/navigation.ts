@@ -153,13 +153,25 @@ export const NAVIGATION: NavigationGroup[] = [
     ],
   },
   {
-    label: "Operación",
+    label: "Caja",
     items: [
       {
-        label: "Caja",
-        path: "/app/cash",
+        label: "Cajas",
+        path: "/app/cash/registers",
         short: "CJ",
+        permission: "cash-registers.read",
+      },
+      {
+        label: "Sesiones",
+        path: "/app/cash/sessions",
+        short: "SE",
         permission: "cash-sessions.read",
+      },
+      {
+        label: "Movimientos",
+        path: "/app/cash/movements",
+        short: "MC",
+        permission: "cash-movements.read",
       },
     ],
   },
@@ -168,13 +180,13 @@ export const NAVIGATION: NavigationGroup[] = [
     items: [
       {
         label: "Usuarios",
-        path: "/app/users",
+        path: "/app/admin/users",
         short: "US",
         permission: "users.read",
       },
       {
         label: "Roles",
-        path: "/app/roles",
+        path: "/app/admin/roles",
         short: "RO",
         permission: "roles.read",
       },

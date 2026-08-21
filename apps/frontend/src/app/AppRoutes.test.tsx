@@ -57,6 +57,9 @@ describe("AppRoutes", () => {
               meta: { page: 1, limit: 20, total: 0, pages: 0 },
             }),
           );
+        if (path === "/api/cash-registers" || path === "/api/cash-movements" || path === "/api/users")
+          return Promise.resolve(jsonResponse({ data: [], meta: { page: 1, limit: 20, total: 0, pages: 0 } }));
+        if (path === "/api/roles") return Promise.resolve(jsonResponse([]));
         if (path === "/api/suppliers")
           return Promise.resolve(
             jsonResponse({
@@ -181,5 +184,31 @@ describe("AppRoutes", () => {
     expect(
       screen.getByRole("link", { name: "Ir a iniciar sesión" }),
     ).toHaveAttribute("href", "/login");
+  });
+
+  it("renders Phase 10.E operational routes only with exact read permissions", async () => {
+    auth = {
+      ...auth,
+      status: "authenticated",
+      user: {
+        ...testUser,
+        roles: [{ id: "cash-reader", name: "cash-reader", permissions: ["cash-movements.read"] }],
+      },
+    };
+    renderRoute("/app/cash/movements");
+    expect(await screen.findByRole("heading", { name: "Movimientos de efectivo" })).toBeVisible();
+  });
+
+  it("protects Users with users.read rather than a broad administrator label", async () => {
+    auth = {
+      ...auth,
+      status: "authenticated",
+      user: {
+        ...testUser,
+        roles: [{ id: "users-reader", name: "users-reader", permissions: ["users.read"] }],
+      },
+    };
+    renderRoute("/app/admin/users");
+    expect(await screen.findByRole("heading", { name: "Usuarios" })).toBeVisible();
   });
 });

@@ -22,7 +22,6 @@ import { LocationsPage } from "../inventory/LocationsPage";
 import { AppShell } from "../layout/AppShell";
 import { ForbiddenPage } from "../pages/ForbiddenPage";
 import { LoginPage } from "../pages/LoginPage";
-import { ModulePlaceholderPage } from "../pages/ModulePlaceholderPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { SearchPage } from "../search/SearchPage";
 import {
@@ -71,12 +70,22 @@ import {
   VehicleModelsPage,
   VehiclesPage,
 } from "../vehicles/VehiclePages";
-
-const modules = [
-  ["cash", "Caja", "cash-sessions.read"],
-  ["users", "Usuarios", "users.read"],
-  ["roles", "Roles", "roles.read"],
-] as const;
+import {
+  CashMovementsPage,
+  CashRegisterDetailPage,
+  CashRegisterFormPage,
+  CashRegistersPage,
+  CashSessionDetailPage,
+  CashSessionsPage,
+} from "../cash/CashPages";
+import {
+  RoleDetailPage,
+  RoleFormPage,
+  RolesPage,
+  UserDetailPage,
+  UserFormPage,
+  UsersPage,
+} from "../admin/AdminPages";
 
 export function AppRoutes() {
   return (
@@ -366,6 +375,24 @@ export function AppRoutes() {
           <Route path="commercial/receivables" element={<RequirePermission permission="commercial-receivables.read"><ReceivablesPage /></RequirePermission>} />
           <Route path="customers/*" element={<Navigate to="/app/sales/customers" replace />} />
           <Route path="receivables/*" element={<Navigate to="/app/commercial/receivables" replace />} />
+          <Route path="cash/registers" element={<RequirePermission permission="cash-registers.read"><CashRegistersPage /></RequirePermission>} />
+          <Route path="cash/registers/new" element={<RequirePermission permission="cash-registers.manage"><CashRegisterFormPage /></RequirePermission>} />
+          <Route path="cash/registers/:id" element={<RequirePermission permission="cash-registers.read"><CashRegisterDetailPage /></RequirePermission>} />
+          <Route path="cash/registers/:id/edit" element={<RequirePermission permission="cash-registers.manage"><CashRegisterFormPage /></RequirePermission>} />
+          <Route path="cash/sessions" element={<RequirePermission permission="cash-sessions.read"><CashSessionsPage /></RequirePermission>} />
+          <Route path="cash/sessions/:id" element={<RequirePermission permission="cash-sessions.read"><CashSessionDetailPage /></RequirePermission>} />
+          <Route path="cash/movements" element={<RequirePermission permission="cash-movements.read"><CashMovementsPage /></RequirePermission>} />
+          <Route path="admin/users" element={<RequirePermission permission="users.read"><UsersPage /></RequirePermission>} />
+          <Route path="admin/users/new" element={<RequirePermission permission="users.create"><UserFormPage /></RequirePermission>} />
+          <Route path="admin/users/:id" element={<RequirePermission permission="users.read"><UserDetailPage /></RequirePermission>} />
+          <Route path="admin/users/:id/edit" element={<RequirePermission permission="users.update"><UserFormPage /></RequirePermission>} />
+          <Route path="admin/roles" element={<RequirePermission permission="roles.read"><RolesPage /></RequirePermission>} />
+          <Route path="admin/roles/new" element={<RequirePermission permission="roles.manage"><RoleFormPage /></RequirePermission>} />
+          <Route path="admin/roles/:id" element={<RequirePermission permission="roles.read"><RoleDetailPage /></RequirePermission>} />
+          <Route path="admin/roles/:id/edit" element={<RequirePermission permission="roles.manage"><RoleFormPage /></RequirePermission>} />
+          <Route path="cash" element={<Navigate to="/app/cash/registers" replace />} />
+          <Route path="users/*" element={<Navigate to="/app/admin/users" replace />} />
+          <Route path="roles/*" element={<Navigate to="/app/admin/roles" replace />} />
           <Route
             path="purchases/*"
             element={<Navigate to="/app/purchasing/purchases" replace />}
@@ -386,17 +413,6 @@ export function AppRoutes() {
             path="locations/*"
             element={<Navigate to="/app/inventory/locations" replace />}
           />
-          {modules.map(([path, title, permission]) => (
-            <Route
-              key={path}
-              path={path}
-              element={
-                <RequirePermission permission={permission}>
-                  <ModulePlaceholderPage title={title} />
-                </RequirePermission>
-              }
-            />
-          ))}
         </Route>
         <Route path="/forbidden" element={<ForbiddenPage />} />
       </Route>

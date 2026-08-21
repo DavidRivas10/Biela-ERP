@@ -148,8 +148,8 @@ that API requests go only to the configured Gateway and never to ports 4001 or 4
 - If the Dashboard omits commercial totals, confirm the user actually has
   `commercial-summary.read`. The frontend intentionally makes no request
   without it.
-- If an unimplemented Cash-management or administration module shows a
-  placeholder, it remains outside the Frontend Phase 10.D operational scope.
+- Cash-management and administration navigation now resolves to real Phase
+  10.E routes; no approved Phase 10 module retains a placeholder.
 
 ## Scope boundary
 
@@ -159,16 +159,17 @@ Compatibility, Location, Inventory, Movement, Transfer, and Search screens.
 Frontend Phase 10.C adds purchasing, Supplier, Receiving, Purchase Return, purchase-side
 settlement, Supplier-account, and Accounts Payable screens. Frontend Phase 10.D adds
 Customers, Sales/POS, Sale Returns, sales-side settlement, Customer accounts,
-and Accounts Receivable. Full Cash management and administration screens remain
-future frontend work. Offline support, refresh
+and Accounts Receivable. Frontend Phase 10.E completes Cash management and
+User/Role administration. Offline support, refresh
 tokens, general accounting, fiscal invoicing, AI, and workshop workflows are
 not added here.
 
 Phases 10.A through 10.E are implementation subphases of the official Phase 10.
 They do not renumber the official roadmap.
 
-## Next planned frontend phase
+## Next official phase
 
 Frontend Phase 10.E — Cash Registers, Cash Sessions, Cash Movements and
-Remaining Frontend Completion. After 10.E comes official Phase 11 — Complete
-Frontend ↔ Backend Integration. This guide records roadmap names only.
+Remaining Frontend Completion — is implemented. Official Phase 10 is complete.
+Next comes official Phase 11 — Complete Frontend ↔ Backend Integration. This
+guide records the roadmap name only; Phase 11 is not implemented here.

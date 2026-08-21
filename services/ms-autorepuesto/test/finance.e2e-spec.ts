@@ -497,6 +497,71 @@ describe("Payment Methods, Cash, Payments, and Refunds HTTP", () => {
       .expect(({ body }) => expect(body.expectedCash).toBe("100"));
   });
 
+  it("paginates and filters the Cash Movement ledger without truncating later records", async () => {
+    const first = await request(app.getHttpServer())
+      .get(`/cash-movements?cashSessionId=${sessionId}&page=1&limit=2`)
+      .expect(200);
+    const second = await request(app.getHttpServer())
+      .get(`/cash-movements?cashSessionId=${sessionId}&page=2&limit=2`)
+      .expect(200);
+    expect(first.body.meta).toEqual(
+      expect.objectContaining({ page: 1, limit: 2 }),
+    );
+    expect(first.body.meta.total).toBeGreaterThan(2);
+    expect(second.body.data).toHaveLength(2);
+    expect(second.body.data[0].id).not.toBe(first.body.data[0].id);
+    expect(
+      Date.parse(first.body.data[0].createdAt),
+    ).toBeGreaterThanOrEqual(Date.parse(first.body.data[1].createdAt));
+
+    await request(app.getHttpServer())
+      .get(
+        `/cash-movements?cashRegisterId=${registerId}&type=SALE_PAYMENT&page=1&limit=1`,
+      )
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.meta.total).toBe(1);
+        expect(body.data[0]).toEqual(
+          expect.objectContaining({
+            cashSessionId: sessionId,
+            paymentId: cashPaymentId,
+            type: "SALE_PAYMENT",
+          }),
+        );
+        expect(body.data[0].cashSession.cashRegister.id).toBe(registerId);
+      });
+    await request(app.getHttpServer())
+      .get(`/cash-movements?paymentId=${cashPaymentId}`)
+      .expect(200)
+      .expect(({ body }) => expect(body.meta.total).toBe(2));
+    await request(app.getHttpServer())
+      .get(`/cash-movements?reference=${cashPaymentId}`)
+      .expect(200)
+      .expect(({ body }) => expect(body.meta.total).toBe(2));
+    await request(app.getHttpServer())
+      .get(
+        "/cash-movements?createdFrom=2020-01-01T00:00:00.000Z&createdTo=2030-01-01T00:00:00.000Z&limit=1",
+      )
+      .expect(200)
+      .expect(({ body }) => expect(body.meta.total).toBeGreaterThan(2));
+
+    await request(app.getHttpServer())
+      .get(`/cash-sessions/${sessionId}/summary?includeMovements=false`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.movements).toEqual([]);
+        expect(body.expectedCash).toBe("100");
+        expect(body.movementTotals.SALE_PAYMENT).toBe("40");
+        expect(body.paymentTotalsByMethod).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              paymentMethod: expect.objectContaining({ id: cashMethodId }),
+            }),
+          ]),
+        );
+      });
+  });
+
   it("handles manual Cash, exact close snapshots, and CLOSED immutability", async () => {
     await request(app.getHttpServer())
       .post(`/cash-sessions/${sessionId}/movements`)
@@ -541,6 +606,7 @@ describe("Payment Methods, Cash, Payments, and Refunds HTTP", () => {
   it("enforces authentication, granular RBAC, and inactive-register opening", async () => {
     permissions = [];
     await request(app.getHttpServer()).get("/payment-methods").expect(403);
+    await request(app.getHttpServer()).get("/cash-movements").expect(403);
     permissions = [...allPermissions];
     authenticated = false;
     await request(app.getHttpServer()).get("/payment-methods").expect(401);

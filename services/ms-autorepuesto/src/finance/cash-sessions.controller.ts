@@ -26,6 +26,7 @@ import {
   CreateManualCashMovementDto,
 } from "./dto/cash-session.dto";
 import { ListCashSessionsQueryDto } from "./dto/list-cash-sessions-query.dto";
+import { CashSessionSummaryQueryDto } from "./dto/cash-session-summary-query.dto";
 
 @ApiTags("cash-sessions")
 @ApiBearerAuth()
@@ -48,8 +49,14 @@ export class CashSessionsController {
     BUSINESS_PERMISSIONS.CASH_SESSIONS_READ,
     BUSINESS_PERMISSIONS.CASH_MOVEMENTS_READ,
   )
-  summary(@Param("id", ParseUUIDPipe) id: string) {
-    return this.sessions.summary(id);
+  @ApiOperation({
+    summary: "Read exact Cash Session totals and optional movement detail",
+  })
+  summary(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: CashSessionSummaryQueryDto,
+  ) {
+    return this.sessions.summary(id, query.includeMovements);
   }
   @Post(":id/movements")
   @RequireBusinessPermissions(BUSINESS_PERMISSIONS.CASH_MOVEMENTS_CREATE)

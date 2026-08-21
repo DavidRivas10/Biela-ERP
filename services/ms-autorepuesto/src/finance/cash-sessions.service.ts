@@ -165,7 +165,8 @@ export class CashSessionsService {
     });
   }
 
-  async summary(id: string) {
+  async summary(id: string, includeMovements = true) {
+    if (!includeMovements) return this.summaryWithoutMovements(id);
     const session = await this.prisma.cashSession.findUnique({
       where: { id },
       include: {
@@ -220,6 +221,107 @@ export class CashSessionsService {
     return {
       ...session,
       movements: session.movements,
+      movementTotals: totals,
+      expectedCash:
+        session.status === CashSessionStatus.CLOSED
+          ? session.expectedAmount
+          : liveExpected,
+      paymentTotalsByMethod: [...byMethod.values()],
+    };
+  }
+
+  private async summaryWithoutMovements(id: string) {
+    const session = await this.prisma.cashSession.findUnique({
+      where: { id },
+      include: { cashRegister: true },
+    });
+    if (!session) throw new NotFoundException("Cash Session not found");
+
+    const [movementGroups, paymentGroups] = await Promise.all([
+      this.prisma.cashMovement.groupBy({
+        by: ["type"],
+        where: { cashSessionId: id },
+        _sum: { amount: true },
+      }),
+      this.prisma.$queryRaw<
+        Array<{
+          id: string;
+          code: string;
+          name: string;
+          kind: string;
+          active: boolean;
+          notes: string | null;
+          createdAt: Date;
+          updatedAt: Date;
+          type: CashMovementType;
+          amount: Prisma.Decimal;
+        }>
+      >`
+        SELECT
+          pm."id",
+          pm."code",
+          pm."name",
+          pm."kind"::text AS "kind",
+          pm."active",
+          pm."notes",
+          pm."createdAt",
+          pm."updatedAt",
+          cm."type"::text AS "type",
+          SUM(cm."amount") AS "amount"
+        FROM "CashMovement" cm
+        INNER JOIN "Payment" p ON p."id" = cm."paymentId"
+        INNER JOIN "PaymentMethod" pm ON pm."id" = p."paymentMethodId"
+        WHERE cm."cashSessionId" = ${id}::uuid
+        GROUP BY
+          pm."id", pm."code", pm."name", pm."kind", pm."active", pm."notes",
+          pm."createdAt", pm."updatedAt", cm."type"
+      `,
+    ]);
+
+    const totals = Object.values(CashMovementType).reduce<
+      Record<string, Prisma.Decimal>
+    >((all, type) => ({ ...all, [type]: ZERO }), {});
+    for (const group of movementGroups)
+      totals[group.type] = group._sum.amount ?? ZERO;
+    const liveExpected = Object.entries(totals).reduce(
+      (value, [type, amount]) =>
+        value.plus(movementDelta(type as CashMovementType, amount)),
+      session.openingAmount,
+    );
+
+    const byMethod = new Map<
+      string,
+      {
+        paymentMethod: Omit<(typeof paymentGroups)[number], "type" | "amount">;
+        payments: Prisma.Decimal;
+        refunds: Prisma.Decimal;
+        purchasePayments: Prisma.Decimal;
+        supplierRefunds: Prisma.Decimal;
+      }
+    >();
+    for (const group of paymentGroups) {
+      const { type, amount, ...paymentMethod } = group;
+      const row = byMethod.get(group.id) ?? {
+        paymentMethod,
+        payments: ZERO,
+        refunds: ZERO,
+        purchasePayments: ZERO,
+        supplierRefunds: ZERO,
+      };
+      if (type === CashMovementType.SALE_PAYMENT)
+        row.payments = row.payments.plus(amount);
+      if (type === CashMovementType.SALE_REFUND)
+        row.refunds = row.refunds.plus(amount);
+      if (type === CashMovementType.PURCHASE_PAYMENT)
+        row.purchasePayments = row.purchasePayments.plus(amount);
+      if (type === CashMovementType.SUPPLIER_REFUND)
+        row.supplierRefunds = row.supplierRefunds.plus(amount);
+      byMethod.set(group.id, row);
+    }
+
+    return {
+      ...session,
+      movements: [],
       movementTotals: totals,
       expectedCash:
         session.status === CashSessionStatus.CLOSED

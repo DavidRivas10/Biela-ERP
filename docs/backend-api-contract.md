@@ -25,7 +25,7 @@ and upstream status codes without owning business logic or persistence.
 | Customers               | `/api/customers`                                                                                                      | `customers.*`                                                   | Customer is optional on a Sale; a null Customer is a walk-in Sale. Deactivation preserves history.                                                                                                           |
 | Sales                   | `/api/sales`, nested `/returns`, `/api/sale-returns/:id`                                                              | `sales.*`                                                       | Sale DRAFT has no stock effect; POST is Inventory OUT. Sale Return POST is Inventory IN. `SaleItem.unitPrice` is the historical price snapshot.                                                              |
 | Payment methods         | `/api/payment-methods`                                                                                                | `payment-methods.*`                                             | Kind is one of CASH, CARD, BANK_TRANSFER, OTHER. Kind cannot change after use. Inactive methods retain history but reject new operations.                                                                    |
-| Cash registers/sessions | `/api/cash-registers`, `/api/cash-sessions`                                                                           | `cash-registers.*`, `cash-sessions.*`, `cash-movements.*`       | One OPEN session per register. Cash is derived from opening amount plus immutable typed movements. Closing snapshots expected, counted, and difference amounts.                                              |
+| Cash registers/sessions | `/api/cash-registers`, `/api/cash-sessions`, `GET /api/cash-movements`                                                     | `cash-registers.*`, `cash-sessions.*`, `cash-movements.*`       | One OPEN session per register. Cash is derived from opening amount plus immutable typed movements. Movement reads are paginated newest-first; closing snapshots expected, counted, and difference amounts.   |
 | Payments/refunds        | nested `/payments` and `/refunds`, `/api/payments/:id`, `/api/payments/:id/reverse`                                   | `payments.*`; purchase-side writes also require `purchases.pay` | Payment status is POSTED or REVERSED. Reversal preserves the original and appends a compensating Cash movement for CASH. Financial operations never mutate Inventory.                                        |
 | Receivables/payables    | `/api/customers/:id/account`, `/api/suppliers/:id/account`, `/api/commercial/receivables`, `/api/commercial/payables` | `commercial-receivables.read`, `commercial-payables.read`       | Operational balances are derived from posted documents and active Payment rows. Settlement is UNPAID, PARTIALLY_PAID, or PAID. Walk-in receivables remain globally visible.                                  |
 | Commercial summary      | `GET /api/commercial/summary`                                                                                         | `commercial-summary.read`                                       | Reports operational AR/AP, overdue, OPEN sessions, and expected physical Cash. It is not profit, COGS, valuation, or accounting.                                                                             |
@@ -45,6 +45,20 @@ Paginated endpoints return:
 `page` starts at 1 and `limit` is bounded to 1–100. Ordering is deterministic
 within each family. Commercial lists additionally return an exact aggregate
 `summary` and `businessDate`.
+
+`GET /api/cash-movements` requires `cash-movements.read` and supports bounded
+`page`/`limit` plus `cashSessionId`, `cashRegisterId`, `type`, `paymentId`,
+`reference`, `createdFrom`, and `createdTo`. `reference` matches a Payment or
+related document UUID, Payment number, or external Payment reference. Results
+include their Cash Session/Register and optional Payment/Payment Method in the
+same query and order by `createdAt DESC, id DESC`.
+
+`GET /api/cash-sessions/:id/summary` remains backward-compatible: omitting
+`includeMovements` retains the existing embedded movement history. Clients that
+only need exact summary totals and expected Cash may send
+`includeMovements=false`; the response keeps the summary shape with an empty
+`movements` array while database aggregation avoids an ever-growing ledger
+payload.
 
 Money is submitted as decimal strings and stored as PostgreSQL `NUMERIC` through
 Prisma Decimal. JSON responses serialize exact monetary values as strings (for

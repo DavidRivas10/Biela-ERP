@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 import { CashLedgerService } from "./cash-ledger.service";
+import { CashMovementsController } from "./cash-movements.controller";
+import { CashMovementsService } from "./cash-movements.service";
 import { CashRegistersController } from "./cash-registers.controller";
 import { CashRegistersService } from "./cash-registers.service";
 import { CashSessionsController } from "./cash-sessions.controller";
@@ -15,12 +17,14 @@ import { PaymentsService } from "./payments.service";
     PaymentMethodsController,
     CashRegistersController,
     CashSessionsController,
+    CashMovementsController,
     PaymentsController,
   ],
   providers: [
     PaymentMethodsService,
     CashRegistersService,
     CashSessionsService,
+    CashMovementsService,
     CashLedgerService,
     FinancialSummaryService,
     PaymentsService,

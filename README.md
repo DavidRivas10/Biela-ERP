@@ -67,11 +67,14 @@ migrations. The API Gateway owns no database and has no ORM dependency.
 - Frontend Phase 10.D: Customers, registered and walk-in Sales, atomic Sale
   posting, Sale Returns, partial/split Payments, Customer Refunds, Customer
   accounts, and paginated operational Accounts Receivable.
+- Frontend Phase 10.E: Cash Register lifecycle, Cash Session opening/summary/
+  closing, server-paginated immutable Cash Movements, manual Cash operations,
+  and User/Role administration.
 
 Frontend Phases 10.A through 10.E are implementation subphases of the official
 Phase 10, not replacements for the official roadmap numbers. Phase 10.E — Cash
 Registers, Cash Sessions, Cash Movements and Remaining Frontend Completion — is
-the next planned subphase. After 10.E comes official Phase 11 — Complete
+implemented. After 10.E comes official Phase 11 — Complete
 Frontend ↔ Backend Integration, followed by official Phase 12 — Functional
 end-to-end ERP testing and corrections, and official Phase 13 — Traditional ERP
 closure, documentation, Jira, demo, and stable release. AI comes only after the
@@ -99,6 +102,8 @@ inventory workflows, and [the Frontend Phase 10.C purchasing guide](docs/fronten
 for purchasing routes, permissions, settlement, cache behavior, and scope. See
 [the Frontend Phase 10.D sales guide](docs/frontend-phase-10d-sales-receivables.md) for the
 corresponding sales, return, settlement, and receivables workflows.
+See [the Frontend Phase 10.E cash and administration guide](docs/frontend-phase-10e-cash-admin.md)
+for Cash and User/Role workflows and the official Phase 10 completion audit.
 
 ## Setup
 
@@ -159,7 +164,7 @@ require a bearer token unless noted otherwise.
 | Sales returns    | `POST/GET /api/sales/:id/returns`, `GET /api/sale-returns/:id`, `POST /api/sale-returns/:id/post`                                 |
 | Payment methods  | `POST/GET /api/payment-methods`, `GET/PATCH /api/payment-methods/:id`, activate/deactivate                                        |
 | Cash registers   | `POST/GET /api/cash-registers`, `GET/PATCH /api/cash-registers/:id`, activate/deactivate                                          |
-| Cash sessions    | Open/current, list/detail/summary, manual movement, and close routes under `/api/cash-registers` and `/api/cash-sessions`         |
+| Cash sessions    | Open/current, list/detail/bounded summary, manual movement, close, and paginated `/api/cash-movements` ledger routes              |
 | Settlement       | `POST/GET /api/sales/:id/payments`, `POST/GET /api/sale-returns/:id/refunds`, `GET /api/payments/:id`, reverse                    |
 | Supplier finance | `POST/GET /api/purchases/:id/payments`, `POST/GET /api/purchase-returns/:id/refunds`                                              |
 | Commercial       | `GET /api/customers/:id/account`, `GET /api/suppliers/:id/account`, `/api/commercial/receivables`, `/payables`, `/summary`        |
@@ -408,8 +413,7 @@ prisma:deploy` if migration status is behind.
 ## Scope boundary
 
 Cash, Payments, Supplier settlement, operational receivables/payables, and
-Frontend Phase 10.A–10.D workflows are implemented. Frontend Phase 10.E Cash
-management and remaining completion, official Phase 11 integration, official
+Frontend Phase 10.A–10.E workflows are implemented. Official Phase 11 integration, official
 Phase 12 end-to-end correction, official Phase 13 traditional ERP closure,
 general accounting, Inventory valuation/COGS, fiscal invoicing, external
 financial/payment-provider integrations, workshop workflows unless separately

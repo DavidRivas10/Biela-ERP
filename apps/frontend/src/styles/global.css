@@ -981,6 +981,7 @@ h2 {
 }
 .detail-card dd {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 .dialog-backdrop {
   position: fixed;
@@ -1092,6 +1093,32 @@ h2 {
   background: #fff7e6;
   padding: 0.85rem 1rem;
   color: #704500;
+}
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.permission-groups {
+  display: grid;
+  gap: 1rem;
+}
+.permission-groups > div {
+  display: grid;
+  gap: 0.55rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.9rem;
+}
+.permission-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.45rem 1rem;
+}
+.permission-grid .check-field {
+  min-height: 2.25rem;
+  align-self: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
 }
 
 @media (max-width: 820px) {

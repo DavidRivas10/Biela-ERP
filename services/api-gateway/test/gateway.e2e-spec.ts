@@ -337,12 +337,33 @@ describe("API Gateway HTTP", () => {
     });
     upstream.request.mockResolvedValue({ expectedCash: "100.00" });
     await request(app.getHttpServer())
-      .get("/api/cash-sessions/session-id/summary")
+      .get("/api/cash-sessions/session-id/summary?includeMovements=false")
       .set("Authorization", "Bearer finance-token")
       .expect(200);
     expect(upstream.request).toHaveBeenLastCalledWith("autorepuesto", {
       path: "cash-sessions/session-id/summary",
       authorization: "Bearer finance-token",
+      query: { includeMovements: "false" },
+    });
+    upstream.request.mockResolvedValue({
+      data: [],
+      meta: { page: 2, limit: 20, total: 25, pages: 2 },
+    });
+    await request(app.getHttpServer())
+      .get(
+        "/api/cash-movements?page=2&limit=20&cashSessionId=session-id&type=MANUAL_IN",
+      )
+      .set("Authorization", "Bearer finance-token")
+      .expect(200);
+    expect(upstream.request).toHaveBeenLastCalledWith("autorepuesto", {
+      path: "cash-movements",
+      authorization: "Bearer finance-token",
+      query: {
+        page: "2",
+        limit: "20",
+        cashSessionId: "session-id",
+        type: "MANUAL_IN",
+      },
     });
   });
 
