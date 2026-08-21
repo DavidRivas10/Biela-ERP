@@ -3,6 +3,8 @@
 This document summarizes the stable public contract implemented through Backend
 Phase 8 and verified in Phase 9. Swagger is the detailed schema source. The
 Phase 10 React application uses only the API Gateway at `http://localhost:4000`.
+Official Phase 11 verified every approved frontend endpoint family against this
+contract and found no missing Gateway forwarding or need for backend redesign.
 
 Unless explicitly marked public, routes require `Authorization: Bearer <token>`.
 The Gateway forwards authorization, path parameters, query parameters, bodies,
@@ -83,3 +85,18 @@ Expected validation/auth/business results preserve HTTP 400, 401, 403, 404, and
 When `ms-autorepuesto` cannot validate a bearer token because `ms-users` is
 unavailable, it returns 503 rather than misreporting invalid credentials. Error
 responses do not expose database SQL, credentials, or stack traces.
+
+## Phase 11 integration verification
+
+Targeted live verification exercised the complete Supplier → Purchase → Receipt
+→ Inventory → Payment → Payables → Cash path and the Customer/Walk-in → Sale →
+Inventory → Payment → Receivables → Cash path, including both Return/Refund
+branches and Cash reversals. The Gateway preserved backend 400, 401, 403, 404,
+and 409 responses without adding domain calculations.
+
+The Cash Movement contract was verified with records beyond the first 100:
+distinct later pages remained reachable, all supported filters were applied in
+the service query, and Cash Session summary retrieval used
+`includeMovements=false`. Frontend network inspection showed API Fetch/XHR only
+to Gateway `:4000`; Vite `:5173` served development assets only. No browser call
+targeted `:4001`, `:4002`, PostgreSQL, or MongoDB.

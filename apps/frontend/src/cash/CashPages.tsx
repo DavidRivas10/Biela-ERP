@@ -15,6 +15,10 @@ import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
+import {
+  invalidateCashIntegration,
+  invalidateCommercialSummary,
+} from "../query/invalidation";
 import type {
   CashMovement,
   CashMovementType,
@@ -118,7 +122,7 @@ function CashRegisterEditor({ id, initial }: { id?: string; initial?: CashRegist
   const navigate = useNavigate();
   const client = useQueryClient();
   const [form, setForm] = useState<CashRegisterInput>(() => initial ? { code: initial.code, name: initial.name, description: initial.description ?? "", active: initial.active } : emptyRegister);
-  const mutation = useMutation({ mutationFn: (body: CashRegisterInput) => id ? cashApi.updateRegister(id, body) : cashApi.createRegister(body), onSuccess: async (row) => { client.setQueryData(queryKeys.cashRegister(row.id), row); await client.invalidateQueries({ queryKey: queryKeys.cashRegistersRoot }); void navigate(`/app/cash/registers/${row.id}`, { replace: true }); } });
+  const mutation = useMutation({ mutationFn: (body: CashRegisterInput) => id ? cashApi.updateRegister(id, body) : cashApi.createRegister(body), onSuccess: async (row) => { client.setQueryData(queryKeys.cashRegister(row.id), row); await Promise.all([client.invalidateQueries({ queryKey: queryKeys.cashRegistersRoot }), invalidateCashIntegration(client)]); void navigate(`/app/cash/registers/${row.id}`, { replace: true }); } });
   return <div className="page-stack"><PageHeader eyebrow="Caja" title={id ? "Editar caja" : "Nueva caja"} description="La desactivación no elimina sesiones ni movimientos históricos." />
     <form className="panel erp-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate({ ...form, description: form.description || undefined }); }}>
       <FormFeedback error={mutation.error ? apiErrorMessage(mutation.error) : null} />
@@ -142,8 +146,8 @@ export function CashRegisterDetailPage() {
   const [openConfirm, setOpenConfirm] = useState(false);
   const detail = useQuery({ queryKey: queryKeys.cashRegister(id), queryFn: () => cashApi.register(id) });
   const current = useQuery({ queryKey: queryKeys.currentCashSession(id), queryFn: () => cashApi.currentSession(id), enabled: hasPermission("cash-sessions.read") });
-  const lifecycle = useMutation({ mutationFn: (active: boolean) => cashApi.setRegisterActive(id, active), onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: queryKeys.cashRegister(id) }), client.invalidateQueries({ queryKey: queryKeys.cashRegistersRoot })]); setLifecycleConfirm(false); } });
-  const open = useMutation({ mutationFn: () => cashApi.openSession(id, { openingAmount: opening.amount, notes: opening.notes || undefined }), onSuccess: async () => { setOpening({ amount: "", notes: "" }); setOpenConfirm(false); await Promise.all([client.invalidateQueries({ queryKey: queryKeys.currentCashSession(id) }), client.invalidateQueries({ queryKey: queryKeys.cashSessionsRoot })]); } });
+  const lifecycle = useMutation({ mutationFn: (active: boolean) => cashApi.setRegisterActive(id, active), onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: queryKeys.cashRegister(id) }), client.invalidateQueries({ queryKey: queryKeys.cashRegistersRoot }), invalidateCashIntegration(client)]); setLifecycleConfirm(false); } });
+  const open = useMutation({ mutationFn: () => cashApi.openSession(id, { openingAmount: opening.amount, notes: opening.notes || undefined }), onSuccess: async () => { setOpening({ amount: "", notes: "" }); setOpenConfirm(false); await Promise.all([client.invalidateQueries({ queryKey: queryKeys.currentCashSession(id) }), client.invalidateQueries({ queryKey: queryKeys.cashSessionsRoot }), invalidateCommercialSummary(client)]); } });
   if (detail.isLoading) return <div className="panel">Cargando caja…</div>;
   if (detail.error || !detail.data) return <FormFeedback error={apiErrorMessage(detail.error)} />;
   const row = detail.data;
@@ -193,7 +197,7 @@ export function CashSessionDetailPage() {
   const basic = useQuery({ queryKey: queryKeys.cashSession(id), queryFn: () => cashApi.session(id), enabled: !canReadMovements });
   const movementParams = { cashSessionId: id, page: movementPage, limit: 20 };
   const movements = useQuery({ queryKey: queryKeys.cashMovements(movementParams), queryFn: () => cashApi.movements(movementParams), enabled: canReadMovements });
-  const close = useMutation({ mutationFn: () => cashApi.closeSession(id, { countedAmount: closeForm.countedAmount, notes: closeForm.notes || undefined }), onSuccess: async () => { setCloseConfirm(false); await Promise.all([client.invalidateQueries({ queryKey: queryKeys.cashSessionSummary(id) }), client.invalidateQueries({ queryKey: queryKeys.cashSession(id) }), client.invalidateQueries({ queryKey: queryKeys.cashSessionsRoot }), client.invalidateQueries({ queryKey: queryKeys.currentCashSession(summary.data?.cashRegisterId ?? basic.data?.cashRegisterId ?? "") })]); } });
+  const close = useMutation({ mutationFn: () => cashApi.closeSession(id, { countedAmount: closeForm.countedAmount, notes: closeForm.notes || undefined }), onSuccess: async () => { setCloseConfirm(false); await Promise.all([client.invalidateQueries({ queryKey: queryKeys.cashSessionSummary(id) }), client.invalidateQueries({ queryKey: queryKeys.cashSession(id) }), client.invalidateQueries({ queryKey: queryKeys.cashSessionsRoot }), client.invalidateQueries({ queryKey: queryKeys.currentCashSession(summary.data?.cashRegisterId ?? basic.data?.cashRegisterId ?? "") }), invalidateCommercialSummary(client)]); } });
   const loading = canReadMovements ? summary.isLoading : basic.isLoading;
   const error = canReadMovements ? summary.error : basic.error;
   const row = canReadMovements ? summary.data : basic.data;
@@ -202,7 +206,7 @@ export function CashSessionDetailPage() {
   const expectedCash = canReadMovements
     ? summary.data?.expectedCash
     : basic.data?.expectedAmount;
-  const refresh = async () => { await Promise.all([client.invalidateQueries({ queryKey: queryKeys.cashSessionSummary(id) }), client.invalidateQueries({ queryKey: queryKeys.cashMovementsRoot })]); };
+  const refresh = async () => { await invalidateCashIntegration(client); };
   return <div className="page-stack"><PageHeader eyebrow="Caja" title={`Sesión · ${row.cashRegister.code}`} description={`Abierta ${formatDateTime(row.openedAt)}`} actions={<SessionBadge status={row.status} />} />
     <section className="commercial-summary-grid panel"><span>Efectivo inicial<strong>{formatMoney(row.openingAmount)}</strong></span><span>Efectivo esperado<strong>{expectedCash != null ? formatMoney(expectedCash) : "Requiere permiso de movimientos"}</strong></span>{row.status === "CLOSED" ? <><span>Efectivo contado<strong>{formatMoney(row.countedAmount ?? "0")}</strong></span><span>Diferencia<strong>{formatMoney(row.differenceAmount ?? "0")}</strong></span></> : null}</section>
     <section className="panel detail-grid"><div className="detail-card"><h2>Apertura</h2><dl><div><dt>Caja</dt><dd><Link className="table-link" to={`/app/cash/registers/${row.cashRegisterId}`}>{row.cashRegister.code} · {row.cashRegister.name}</Link></dd></div><div><dt>Actor</dt><dd>{row.openedByActorId}</dd></div><div><dt>Notas</dt><dd>{row.openingNotes || "—"}</dd></div></dl></div>{row.status === "CLOSED" ? <div className="detail-card"><h2>Cierre</h2><dl><div><dt>Fecha</dt><dd>{formatDateTime(row.closedAt!)}</dd></div><div><dt>Actor</dt><dd>{row.closedByActorId}</dd></div><div><dt>Notas</dt><dd>{row.closingNotes || "—"}</dd></div></dl></div> : null}</section>

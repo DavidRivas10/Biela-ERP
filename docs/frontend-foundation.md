@@ -171,5 +171,11 @@ They do not renumber the official roadmap.
 
 Frontend Phase 10.E — Cash Registers, Cash Sessions, Cash Movements and
 Remaining Frontend Completion — is implemented. Official Phase 10 is complete.
-Next comes official Phase 11 — Complete Frontend ↔ Backend Integration. This
-guide records the roadmap name only; Phase 11 is not implemented here.
+Official Phase 11 — Complete Frontend ↔ Backend Integration — is complete. Its
+Gateway-only contract matrix, live flow evidence, cache corrections, error and
+pagination audit, and responsive verification are recorded in
+`phase-11-frontend-backend-integration.md` and
+`phase-11-integration-matrix.md`.
+
+The next official phase is Phase 12 — Functional end-to-end ERP testing and
+corrections. It is not implemented by this guide or by Phase 11.

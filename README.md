@@ -74,11 +74,14 @@ migrations. The API Gateway owns no database and has no ORM dependency.
 Frontend Phases 10.A through 10.E are implementation subphases of the official
 Phase 10, not replacements for the official roadmap numbers. Phase 10.E — Cash
 Registers, Cash Sessions, Cash Movements and Remaining Frontend Completion — is
-implemented. After 10.E comes official Phase 11 — Complete
-Frontend ↔ Backend Integration, followed by official Phase 12 — Functional
-end-to-end ERP testing and corrections, and official Phase 13 — Traditional ERP
-closure, documentation, Jira, demo, and stable release. AI comes only after the
-traditional ERP.
+implemented and official Phase 10 is complete. Official Phase 11 — Complete
+Frontend ↔ Backend Integration — is also complete: every approved frontend
+domain is mapped through the thin Gateway, cross-domain cache invalidation is
+covered, and targeted live purchasing, sales, Cash, RBAC, pagination, error,
+network-boundary, and responsive checks pass. The next roadmap block is official
+Phase 12 — Functional end-to-end ERP testing and corrections. Official Phase 13
+remains Traditional ERP closure, documentation, Jira, demo, and stable release.
+AI comes only after the traditional ERP.
 
 No Product contains stock quantity or a physical-location string. See
 [the Phase 3 model](docs/phase-3-data-model.md) for the actual ER diagram,
@@ -104,6 +107,10 @@ for purchasing routes, permissions, settlement, cache behavior, and scope. See
 corresponding sales, return, settlement, and receivables workflows.
 See [the Frontend Phase 10.E cash and administration guide](docs/frontend-phase-10e-cash-admin.md)
 for Cash and User/Role workflows and the official Phase 10 completion audit.
+See [the official Phase 11 integration report](docs/phase-11-frontend-backend-integration.md)
+and [integration matrix](docs/phase-11-integration-matrix.md) for the verified
+module contracts, permissions, cross-domain flows, cache rules, live evidence,
+and Phase 12 handoff.
 
 ## Setup
 
@@ -412,10 +419,11 @@ prisma:deploy` if migration status is behind.
 
 ## Scope boundary
 
-Cash, Payments, Supplier settlement, operational receivables/payables, and
-Frontend Phase 10.A–10.E workflows are implemented. Official Phase 11 integration, official
+Cash, Payments, Supplier settlement, operational receivables/payables, Frontend
+Phase 10.A–10.E, and official Phase 11 integration are implemented. Official
 Phase 12 end-to-end correction, official Phase 13 traditional ERP closure,
 general accounting, Inventory valuation/COGS, fiscal invoicing, external
-financial/payment-provider integrations, workshop workflows unless separately
-approved, advanced multisite operations, and AI remain intentionally
-unimplemented. Do not begin a later phase without separate approval.
+financial/payment-provider integrations, offline operation, workshop workflows
+unless separately approved, advanced multisite operations, and AI remain
+intentionally unimplemented. Do not begin a later phase without separate
+approval.

@@ -11,16 +11,16 @@ import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
 import { PageHeader } from "../components/PageHeader";
 import { queryKeys } from "../query/query-keys";
+import {
+  invalidateCommercialSummary,
+  invalidateInventoryIntegration,
+} from "../query/invalidation";
 import type { PurchaseItem } from "../types/purchasing";
 import { apiErrorMessage } from "../utils/api-error";
 import { formatDateTime } from "../utils/formatters";
 
 async function invalidateInventory(client: ReturnType<typeof useQueryClient>) {
-  await Promise.all([
-    client.invalidateQueries({ queryKey: queryKeys.inventoryRoot }),
-    client.invalidateQueries({ queryKey: queryKeys.movementsRoot }),
-    client.invalidateQueries({ queryKey: queryKeys.searchRoot }),
-  ]);
+  await invalidateInventoryIntegration(client);
 }
 
 export function PurchaseReceiptCreatePage() {
@@ -152,6 +152,9 @@ export function PurchaseReceiptDetailPage() {
           queryKey: queryKeys.purchase(receipt.purchaseId),
         }),
         client.invalidateQueries({ queryKey: queryKeys.purchasesRoot }),
+        client.invalidateQueries({ queryKey: queryKeys.payablesRoot }),
+        client.invalidateQueries({ queryKey: queryKeys.supplierAccountsRoot }),
+        invalidateCommercialSummary(client),
         invalidateInventory(client),
       ]);
       setConfirm(false);

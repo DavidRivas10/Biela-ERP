@@ -13,6 +13,7 @@ import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { OpenCashSessionSelector, PaymentMethodSelector } from "../components/PurchasingSelectors";
 import { queryKeys } from "../query/query-keys";
+import { invalidateCashIntegration } from "../query/invalidation";
 import type { PaymentMethod } from "../types/purchasing";
 import type { SalePayment } from "../types/sales";
 import { apiErrorMessage } from "../utils/api-error";
@@ -62,6 +63,7 @@ function FinancialOperations({ kind, ownerId, saleId, ownerNumber, status, maxim
     client.invalidateQueries({ queryKey: queryKeys.receivablesRoot }),
     client.invalidateQueries({ queryKey: queryKeys.customerAccountsRoot }),
     client.invalidateQueries({ queryKey: queryKeys.sale(saleId) }),
+    invalidateCashIntegration(client),
     ...(kind === "refund" ? [client.invalidateQueries({ queryKey: queryKeys.saleReturn(ownerId) })] : []),
   ]);
   const create = useMutation({ mutationFn: (body: SaleFinancialOperationInput) => kind === "payment" ? salesFinanceApi.createPayment(ownerId, body) : salesFinanceApi.createRefund(ownerId, body), onSuccess: async (row) => { await invalidate(); setAmount(""); setTenderedAmount(""); setExternalReference(""); setNotes(""); setSuccess(row.changeAmount ? `Operación registrada. Cambio confirmado por el servidor: ${formatMoney(row.changeAmount)}.` : "Operación registrada correctamente."); } });

@@ -45,14 +45,33 @@ Payable; 10.D provides Customers, registered and walk-in Sales, Sale Returns,
 sales-side Payments/Refunds, Customer accounts, and operational Accounts
 Receivable; 10.E completes Cash Registers, Cash Sessions, paginated Cash
 Movements, Users, Roles, and the remaining approved frontend routes. Official
-Phase 10 is complete after 10.E.
+Phase 10 is complete after 10.E. Official Phase 11 completes and verifies the
+Frontend ↔ Backend integration across every approved module without adding a
+business domain or migration.
 
-After 10.E, the official roadmap continues with Phase 11 — Complete Frontend ↔
-Backend Integration, Phase 12 — Functional end-to-end ERP testing and
-corrections, and Phase 13 — Traditional ERP closure, documentation, Jira, demo,
-and stable release. AI comes only after the traditional ERP. No subsequent
-roadmap block is approved here.
+Official Phases 10 and 11 are complete. The roadmap continues with Phase 12 —
+Functional end-to-end ERP testing and corrections — and Phase 13 — Traditional
+ERP closure, documentation, Jira, demo, and stable release. AI comes only after
+the traditional ERP. No subsequent roadmap block is approved here.
 Never implement a future phase without explicit instruction.
+
+## Official Phase 11 integration rules
+
+- Browser business traffic remains Gateway-only. The Gateway forwards transport
+  and authentication context and owns no database or business calculation.
+- React Query invalidation must cover every affected cross-domain view:
+  Inventory and Search after stock effects; AR/AP, account, document, Dashboard,
+  Cash Session summary, and Cash Movement ledger after financial effects.
+- Inventory, settlement, expected Cash, change, overdue state, and exact money
+  remain backend-authoritative; frontend commands are explicit and non-optimistic.
+- Operational lists and selectors use server pagination/search. Records after
+  the initial page, including Cash Movement records after 100, remain reachable.
+- Session-summary screens request `includeMovements=false` and obtain movement
+  history separately from the paginated ledger contract.
+- A 401 clears authentication; a 403 preserves the valid session. Temporary
+  502/503 or network failure during `/auth/me` preserves the stored token and
+  offers retry/logout rather than masquerading as invalid credentials.
+- Official Phase 12 is not part of Phase 11 and requires separate instruction.
 
 ## Frontend Phase 10.C rules
 

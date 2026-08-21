@@ -899,13 +899,15 @@ h2 {
   padding: 0.35rem 0.55rem;
   font-size: 0.75rem;
 }
-.table-scroll {
+.table-scroll,
+.table-wrap {
   max-width: 100%;
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
 }
-.table-scroll:focus-visible {
+.table-scroll:focus-visible,
+.table-wrap:focus-visible {
   outline: 3px solid rgb(24 116 92 / 25%);
   outline-offset: 2px;
 }

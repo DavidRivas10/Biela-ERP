@@ -323,10 +323,10 @@ describe("Frontend Phase 10.C purchasing screens", () => {
       await screen.findByText("Recepción registrada correctamente."),
     ).toBeVisible();
     expect(invalidate).toHaveBeenCalledWith({
-      queryKey: ["inventory", "balances"],
+      queryKey: ["inventory"],
     });
     expect(invalidate).toHaveBeenCalledWith({
-      queryKey: ["inventory", "movements"],
+      queryKey: ["search", "products"],
     });
   });
 

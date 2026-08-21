@@ -11,6 +11,10 @@ import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
 import { PageHeader } from "../components/PageHeader";
 import { queryKeys } from "../query/query-keys";
+import {
+  invalidateCommercialSummary,
+  invalidateInventoryIntegration,
+} from "../query/invalidation";
 import type { SaleItem } from "../types/sales";
 import { apiErrorMessage } from "../utils/api-error";
 import { formatMoney } from "../utils/formatters";
@@ -44,7 +48,7 @@ export function SaleReturnDetailPage() {
   const client = useQueryClient();
   const [confirm, setConfirm] = useState(false);
   const detail = useQuery({ queryKey: queryKeys.saleReturn(id), queryFn: () => salesApi.returnDetail(id) });
-  const post = useMutation({ mutationFn: () => salesApi.postReturn(id), onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: queryKeys.saleReturn(id) }), client.invalidateQueries({ queryKey: queryKeys.saleReturnsRoot }), client.invalidateQueries({ queryKey: queryKeys.salesRoot }), client.invalidateQueries({ queryKey: queryKeys.inventoryRoot }), client.invalidateQueries({ queryKey: queryKeys.movementsRoot }), client.invalidateQueries({ queryKey: queryKeys.receivablesRoot }), client.invalidateQueries({ queryKey: queryKeys.customerAccountsRoot })]); setConfirm(false); } });
+  const post = useMutation({ mutationFn: () => salesApi.postReturn(id), onSuccess: async (row) => { await Promise.all([client.invalidateQueries({ queryKey: queryKeys.saleReturn(id) }), client.invalidateQueries({ queryKey: queryKeys.sale(row.saleId) }), client.invalidateQueries({ queryKey: queryKeys.saleReturnsRoot }), client.invalidateQueries({ queryKey: queryKeys.salesRoot }), client.invalidateQueries({ queryKey: queryKeys.receivablesRoot }), client.invalidateQueries({ queryKey: queryKeys.customerAccountsRoot }), invalidateInventoryIntegration(client), invalidateCommercialSummary(client)]); setConfirm(false); } });
   if (detail.isLoading) return <div className="panel">Cargando devolución…</div>;
   if (!detail.data || detail.error) return <FormFeedback error={apiErrorMessage(detail.error)} />;
   const row = detail.data;

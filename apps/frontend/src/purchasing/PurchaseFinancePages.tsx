@@ -20,6 +20,7 @@ import {
   PaymentMethodSelector,
 } from "../components/PurchasingSelectors";
 import { queryKeys } from "../query/query-keys";
+import { invalidateCashIntegration } from "../query/invalidation";
 import type {
   Payment,
   PaymentMethod,
@@ -55,7 +56,7 @@ async function invalidateSettlement(
     }),
     client.invalidateQueries({ queryKey: queryKeys.payablesRoot }),
     client.invalidateQueries({ queryKey: queryKeys.supplierAccountsRoot }),
-    client.invalidateQueries({ queryKey: ["commercial", "summary"] }),
+    invalidateCashIntegration(client),
   ]);
 }
 

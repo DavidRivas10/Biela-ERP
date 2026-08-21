@@ -15,6 +15,7 @@ import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
+import { invalidateSupplierReferenceIntegration } from "../query/invalidation";
 import type { PayableDocument, Supplier } from "../types/purchasing";
 import { apiErrorMessage } from "../utils/api-error";
 import { formatCalendarDate, formatMoney } from "../utils/formatters";
@@ -196,7 +197,7 @@ function SupplierFormEditor({
       id ? suppliersApi.update(id, body) : suppliersApi.create(body),
     onSuccess: async (row) => {
       client.setQueryData(queryKeys.supplier(row.id), row);
-      await client.invalidateQueries({ queryKey: queryKeys.suppliersRoot });
+      await invalidateSupplierReferenceIntegration(client);
       void navigate(`/app/purchasing/suppliers/${row.id}`, {
         replace: true,
         state: {
@@ -349,10 +350,7 @@ export function SupplierDetailPage() {
   const lifecycle = useMutation({
     mutationFn: () => suppliersApi.setActive(id, !detail.data?.active),
     onSuccess: async () => {
-      await Promise.all([
-        client.invalidateQueries({ queryKey: queryKeys.supplier(id) }),
-        client.invalidateQueries({ queryKey: queryKeys.suppliersRoot }),
-      ]);
+      await invalidateSupplierReferenceIntegration(client);
       setConfirm(false);
     },
   });

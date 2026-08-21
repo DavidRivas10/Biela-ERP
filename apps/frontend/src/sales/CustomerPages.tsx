@@ -14,6 +14,7 @@ import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
+import { invalidateCustomerReferenceIntegration } from "../query/invalidation";
 import type { Customer, ReceivableDocument } from "../types/sales";
 import { apiErrorMessage } from "../utils/api-error";
 import { formatCalendarDate, formatMoney } from "../utils/formatters";
@@ -60,7 +61,7 @@ function CustomerEditor({ id, initial }: { id?: string; initial?: Customer }) {
   } : empty);
   const mutation = useMutation({
     mutationFn: (body: CustomerInput) => id ? customersApi.update(id, body) : customersApi.create(body),
-    onSuccess: async (row) => { client.setQueryData(queryKeys.customer(row.id), row); await client.invalidateQueries({ queryKey: queryKeys.customersRoot }); void navigate(`/app/sales/customers/${row.id}`, { replace: true }); },
+    onSuccess: async (row) => { client.setQueryData(queryKeys.customer(row.id), row); await invalidateCustomerReferenceIntegration(client); void navigate(`/app/sales/customers/${row.id}`, { replace: true }); },
   });
   const change = (field: keyof CustomerInput, value: string | boolean) => setForm((current) => ({ ...current, [field]: value }));
   function submit(event: FormEvent) {
@@ -92,7 +93,7 @@ export function CustomerDetailPage() {
   const detail = useQuery({ queryKey: queryKeys.customer(id), queryFn: () => customersApi.detail(id) });
   const params = { page, limit: 20 };
   const account = useQuery({ queryKey: queryKeys.customerAccount(id, params), queryFn: () => customersApi.account(id, params), enabled: hasPermission("commercial-receivables.read") });
-  const lifecycle = useMutation({ mutationFn: () => customersApi.setActive(id, !detail.data?.active), onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: queryKeys.customer(id) }), client.invalidateQueries({ queryKey: queryKeys.customersRoot })]); setConfirm(false); } });
+  const lifecycle = useMutation({ mutationFn: () => customersApi.setActive(id, !detail.data?.active), onSuccess: async () => { await invalidateCustomerReferenceIntegration(client); setConfirm(false); } });
   if (detail.isLoading) return <div className="panel">Cargando cliente…</div>;
   if (!detail.data || detail.error) return <FormFeedback error={apiErrorMessage(detail.error)} />;
   const customer = detail.data;

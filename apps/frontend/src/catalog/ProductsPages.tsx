@@ -15,6 +15,7 @@ import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
+import { invalidateProductReferenceIntegration } from "../query/invalidation";
 import type {
   InventoryBalance,
   NestedCompatibility,
@@ -281,11 +282,7 @@ export function ProductFormPage() {
         ? catalogApi.updateProduct(id!, body)
         : catalogApi.createProduct(body),
     onSuccess: async (saved) => {
-      await Promise.all([
-        client.invalidateQueries({ queryKey: queryKeys.productsRoot }),
-        client.invalidateQueries({ queryKey: queryKeys.searchRoot }),
-        client.invalidateQueries({ queryKey: queryKeys.product(saved.id) }),
-      ]);
+      await invalidateProductReferenceIntegration(client);
       void navigate(`/app/catalog/products/${saved.id}`, { replace: true });
     },
   });
@@ -530,11 +527,7 @@ export function ProductDetailPage() {
   const lifecycle = useMutation({
     mutationFn: () => catalogApi.setProductActive(id, !product.data?.active),
     onSuccess: async () => {
-      await Promise.all([
-        client.invalidateQueries({ queryKey: queryKeys.product(id) }),
-        client.invalidateQueries({ queryKey: queryKeys.productsRoot }),
-        client.invalidateQueries({ queryKey: queryKeys.searchRoot }),
-      ]);
+      await invalidateProductReferenceIntegration(client);
       setConfirm(false);
     },
   });

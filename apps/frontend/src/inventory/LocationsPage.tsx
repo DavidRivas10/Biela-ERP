@@ -13,6 +13,7 @@ import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
+import { invalidateLocationReferenceIntegration } from "../query/invalidation";
 import type { Location } from "../types/erp";
 import { apiErrorMessage } from "../utils/api-error";
 
@@ -47,8 +48,7 @@ export function LocationsPage() {
     queryKey: queryKeys.locations(params),
     queryFn: () => inventoryApi.locations(params),
   });
-  const invalidate = () =>
-    client.invalidateQueries({ queryKey: queryKeys.locationsRoot });
+  const invalidate = () => invalidateLocationReferenceIntegration(client);
   const save = useMutation({
     mutationFn: (value: LocationEditor) => {
       const body = Object.fromEntries(

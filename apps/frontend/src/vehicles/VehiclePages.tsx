@@ -14,6 +14,7 @@ import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
+import { invalidateVehicleReferenceIntegration } from "../query/invalidation";
 import type {
   NestedCompatibility,
   Product,
@@ -39,7 +40,10 @@ export function VehicleBrandsPage() {
         ? vehiclesApi.updateBrand(value.id, value)
         : vehiclesApi.createBrand(value),
     onSuccess: async (_, value) => {
-      await client.invalidateQueries({ queryKey: queryKeys.vehicleBrands });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.vehicleBrands }),
+        invalidateVehicleReferenceIntegration(client),
+      ]);
       setSuccess(`Marca ${value.id ? "actualizada" : "creada"}.`);
       setEditor(null);
     },
@@ -189,7 +193,10 @@ export function VehicleModelsPage() {
         ? vehiclesApi.updateModel(value.id, value)
         : vehiclesApi.createModel(value),
     onSuccess: async (_, value) => {
-      await client.invalidateQueries({ queryKey: queryKeys.vehicleModelsRoot });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.vehicleModelsRoot }),
+        invalidateVehicleReferenceIntegration(client),
+      ]);
       setSuccess(`Modelo ${value.id ? "actualizado" : "creado"}.`);
       setEditor(null);
     },
@@ -574,11 +581,7 @@ export function VehicleFormPage() {
         ? vehiclesApi.updateVehicle(id!, body)
         : vehiclesApi.createVehicle(body),
     onSuccess: async (saved) => {
-      await Promise.all([
-        client.invalidateQueries({ queryKey: queryKeys.vehiclesRoot }),
-        client.invalidateQueries({ queryKey: queryKeys.vehicle(saved.id) }),
-        client.invalidateQueries({ queryKey: queryKeys.searchRoot }),
-      ]);
+      await invalidateVehicleReferenceIntegration(client);
       void navigate(`/app/vehicles/${saved.id}`, { replace: true });
     },
   });
@@ -729,11 +732,7 @@ export function VehicleDetailPage() {
   const lifecycle = useMutation({
     mutationFn: () => vehiclesApi.setVehicleActive(id, !vehicle.data?.active),
     onSuccess: async () => {
-      await Promise.all([
-        client.invalidateQueries({ queryKey: queryKeys.vehicle(id) }),
-        client.invalidateQueries({ queryKey: queryKeys.vehiclesRoot }),
-        client.invalidateQueries({ queryKey: queryKeys.searchRoot }),
-      ]);
+      await invalidateVehicleReferenceIntegration(client);
       setConfirm(false);
     },
   });

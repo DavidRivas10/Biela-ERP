@@ -15,6 +15,7 @@ import { ProductSelector } from "../components/EntitySelectors";
 import { SupplierSelector } from "../components/PurchasingSelectors";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
+import { invalidateCommercialSummary } from "../query/invalidation";
 import type {
   Purchase,
   PurchaseReceipt,
@@ -509,6 +510,8 @@ export function PurchaseDetailPage() {
         client.invalidateQueries({ queryKey: queryKeys.purchase(id) }),
         client.invalidateQueries({ queryKey: queryKeys.purchasesRoot }),
         client.invalidateQueries({ queryKey: queryKeys.payablesRoot }),
+        client.invalidateQueries({ queryKey: queryKeys.supplierAccountsRoot }),
+        invalidateCommercialSummary(client),
       ]);
       setAction(null);
     },

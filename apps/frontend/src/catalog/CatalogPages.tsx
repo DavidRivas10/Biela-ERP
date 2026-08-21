@@ -13,6 +13,7 @@ import { FormFeedback } from "../components/FormFeedback";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { queryKeys } from "../query/query-keys";
+import { invalidateProductReferenceIntegration } from "../query/invalidation";
 import type {
   CatalogRecord,
   ProductAttributeDefinition,
@@ -77,7 +78,10 @@ function CatalogPage<T extends CatalogRecord>({
       return value.id ? updateFn(value.id, input) : createFn(input);
     },
     onSuccess: async (_, value) => {
-      await queryClient.invalidateQueries({ queryKey });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey }),
+        invalidateProductReferenceIntegration(queryClient),
+      ]);
       setSuccess(
         `${kind} ${value.id ? (kind === "Categoría" ? "actualizada" : "actualizado") : kind === "Categoría" ? "creada" : "creado"} correctamente.`,
       );
@@ -287,9 +291,12 @@ export function ProductAttributesPage() {
         ? catalogApi.updateAttribute(value.id, value)
         : catalogApi.createAttribute(value),
     onSuccess: async (_, value) => {
-      await client.invalidateQueries({
-        queryKey: ["catalog", "product-attributes"],
-      });
+      await Promise.all([
+        client.invalidateQueries({
+          queryKey: ["catalog", "product-attributes"],
+        }),
+        invalidateProductReferenceIntegration(client),
+      ]);
       setSuccess(
         `Atributo ${value.id ? "actualizado" : "creado"} correctamente.`,
       );

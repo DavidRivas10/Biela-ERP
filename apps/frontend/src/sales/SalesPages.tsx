@@ -15,6 +15,10 @@ import { Pagination } from "../components/Pagination";
 import { CustomerSelector } from "../components/SalesSelectors";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
+import {
+  invalidateCommercialSummary,
+  invalidateInventoryIntegration,
+} from "../query/invalidation";
 import type { Product } from "../types/erp";
 import type { Sale, SaleReturn, SaleStatus } from "../types/sales";
 import { apiErrorMessage } from "../utils/api-error";
@@ -102,7 +106,7 @@ export function SaleDetailPage() {
   const detail = useQuery({ queryKey: queryKeys.sale(id), queryFn: () => salesApi.detail(id) });
   const returnParams = { page: returnPage, limit: 20 };
   const returns = useQuery({ queryKey: queryKeys.saleReturns(id, returnParams), queryFn: () => salesApi.returns(id, returnParams), enabled: hasPermission("sales.read") });
-  const mutation = useMutation({ mutationFn: () => action === "post" ? salesApi.post(id) : salesApi.cancel(id), onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: queryKeys.sale(id) }), client.invalidateQueries({ queryKey: queryKeys.salesRoot }), client.invalidateQueries({ queryKey: queryKeys.inventoryRoot }), client.invalidateQueries({ queryKey: queryKeys.movementsRoot }), client.invalidateQueries({ queryKey: queryKeys.receivablesRoot }), client.invalidateQueries({ queryKey: queryKeys.customerAccountsRoot })]); setAction(null); } });
+  const mutation = useMutation({ mutationFn: () => action === "post" ? salesApi.post(id) : salesApi.cancel(id), onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: queryKeys.sale(id) }), client.invalidateQueries({ queryKey: queryKeys.salesRoot }), client.invalidateQueries({ queryKey: queryKeys.receivablesRoot }), client.invalidateQueries({ queryKey: queryKeys.customerAccountsRoot }), invalidateInventoryIntegration(client), invalidateCommercialSummary(client)]); setAction(null); } });
   if (detail.isLoading) return <div className="panel">Cargando venta…</div>;
   if (!detail.data || detail.error) return <FormFeedback error={apiErrorMessage(detail.error)} />;
   const sale = detail.data;

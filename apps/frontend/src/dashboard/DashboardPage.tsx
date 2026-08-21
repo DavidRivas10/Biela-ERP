@@ -9,6 +9,7 @@ import { Badge } from "../components/Badge";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { visibleNavigation } from "../layout/navigation";
+import { queryKeys } from "../query/query-keys";
 import { formatBusinessDate, formatMoney } from "../utils/formatters";
 
 function Metric({
@@ -43,7 +44,7 @@ export function DashboardPage() {
     refetchInterval: 60_000,
   });
   const summary = useQuery({
-    queryKey: ["commercial-summary"],
+    queryKey: queryKeys.commercialSummary,
     queryFn: getCommercialSummary,
     enabled: canReadSummary,
     retry: false,
