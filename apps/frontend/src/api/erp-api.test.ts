@@ -25,7 +25,7 @@ function jsonBody(init: RequestInit): Record<string, unknown> {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("Phase 11 typed API modules", () => {
+describe("Frontend Phase 10.B typed API modules", () => {
   it("uses the Gateway product contract and preserves decimal strings", async () => {
     const fetchMock = mockJson({ id: "product-1" });
     await catalogApi.createProduct({

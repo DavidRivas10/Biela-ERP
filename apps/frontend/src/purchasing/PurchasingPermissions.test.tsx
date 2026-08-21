@@ -208,7 +208,7 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("Phase 12 purchasing permission contract", () => {
+describe("Frontend Phase 10.C purchasing permission contract", () => {
   it("uses purchases.pay, not payments.create, for Purchase Payment controls", async () => {
     permissions = new Set(["purchases.pay", "payment-methods.read"]);
     const fetchMock = installFetch();

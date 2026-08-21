@@ -22,7 +22,7 @@ function bodyOf(init: RequestInit) {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("Phase 12 Gateway API modules", () => {
+describe("Frontend Phase 10.C Gateway API modules", () => {
   it("lists Suppliers with server pagination, search and lifecycle filters", async () => {
     const fetchMock = mockJson({ data: [], meta: {} });
     await suppliersApi.list({

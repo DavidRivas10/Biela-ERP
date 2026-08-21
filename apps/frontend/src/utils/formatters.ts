@@ -27,6 +27,12 @@ export function isPositiveMoneyAtMost(
   );
 }
 
+export function isMoneyAtLeast(value: string, minimum: string): boolean {
+  const amount = moneyMinorUnits(value);
+  const floor = moneyMinorUnits(minimum);
+  return amount !== null && floor !== null && amount >= floor;
+}
+
 function moneyMinorUnits(value: string): bigint | null {
   const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value);
   if (!match) return null;

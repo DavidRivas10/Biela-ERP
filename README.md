@@ -55,15 +55,27 @@ migrations. The API Gateway owns no database and has no ORM dependency.
 - Phase 9 release readiness: full Phase 1–8 regression, fresh migration proof,
   live health/degraded-health and Swagger verification, consolidated Gateway-only
   ERP Newman coverage, frontend contract documentation, and security review.
-- Phase 10 frontend foundation: Vite + React + strict TypeScript workspace,
+- Frontend Phase 10.A foundation: Vite + React + strict TypeScript workspace,
   Gateway-only API client, session authentication, permission guards, responsive
   ERP shell, and real health/commercial dashboard.
-- Phase 11 operational frontend: Product and Vehicle catalogs, explicit
+- Frontend Phase 10.B: Product and Vehicle catalogs, explicit
   Compatibility, Locations, Inventory balances and movements, atomic Transfer
   workflow, and deterministic Product Search with permission-aware actions.
-- Phase 12 purchasing frontend: Suppliers, multi-line Purchases, partial
+- Frontend Phase 10.C: Suppliers, multi-line Purchases, partial
   Receipts, Purchase Returns, purchase-side Payments and Supplier Refunds,
   Supplier accounts, and paginated operational Accounts Payable.
+- Frontend Phase 10.D: Customers, registered and walk-in Sales, atomic Sale
+  posting, Sale Returns, partial/split Payments, Customer Refunds, Customer
+  accounts, and paginated operational Accounts Receivable.
+
+Frontend Phases 10.A through 10.E are implementation subphases of the official
+Phase 10, not replacements for the official roadmap numbers. Phase 10.E — Cash
+Registers, Cash Sessions, Cash Movements and Remaining Frontend Completion — is
+the next planned subphase. After 10.E comes official Phase 11 — Complete
+Frontend ↔ Backend Integration, followed by official Phase 12 — Functional
+end-to-end ERP testing and corrections, and official Phase 13 — Traditional ERP
+closure, documentation, Jira, demo, and stable release. AI comes only after the
+traditional ERP.
 
 No Product contains stock quantity or a physical-location string. See
 [the Phase 3 model](docs/phase-3-data-model.md) for the actual ER diagram,
@@ -82,9 +94,11 @@ and [the release-readiness guide](docs/backend-release-readiness.md) for fronten
 integration and the complete operational release gate. See
 [the frontend foundation guide](docs/frontend-foundation.md) for browser setup,
 auth lifecycle, CORS, and architecture, and
-[the Phase 11 frontend guide](docs/frontend-phase-11-catalog-inventory.md) for catalog and
-inventory workflows, and [the Phase 12 purchasing guide](docs/frontend-phase-12-purchasing.md)
-for purchasing routes, permissions, settlement, cache behavior, and scope.
+[the Frontend Phase 10.B guide](docs/frontend-phase-10b-catalog-inventory.md) for catalog and
+inventory workflows, and [the Frontend Phase 10.C purchasing guide](docs/frontend-phase-10c-purchasing.md)
+for purchasing routes, permissions, settlement, cache behavior, and scope. See
+[the Frontend Phase 10.D sales guide](docs/frontend-phase-10d-sales-receivables.md) for the
+corresponding sales, return, settlement, and receivables workflows.
 
 ## Setup
 
@@ -393,10 +407,11 @@ prisma:deploy` if migration status is behind.
 
 ## Scope boundary
 
-Cash, Payments, Supplier settlement, operational receivables/payables, the
-Phase 10 frontend foundation, and Phase 11 Catalog/Vehicle/Inventory/Search
-workflows are implemented. Purchasing, Sales/POS, Cash, settlement, and
-administration frontend workflows, general accounting, Inventory valuation/COGS, fiscal invoicing,
-external financial/payment-provider integrations, workshop workflows unless
-separately approved, advanced multisite operations, and AI remain intentionally
+Cash, Payments, Supplier settlement, operational receivables/payables, and
+Frontend Phase 10.A–10.D workflows are implemented. Frontend Phase 10.E Cash
+management and remaining completion, official Phase 11 integration, official
+Phase 12 end-to-end correction, official Phase 13 traditional ERP closure,
+general accounting, Inventory valuation/COGS, fiscal invoicing, external
+financial/payment-provider integrations, workshop workflows unless separately
+approved, advanced multisite operations, and AI remain intentionally
 unimplemented. Do not begin a later phase without separate approval.

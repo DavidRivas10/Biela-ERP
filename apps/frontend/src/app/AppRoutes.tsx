@@ -25,6 +25,25 @@ import { LoginPage } from "../pages/LoginPage";
 import { ModulePlaceholderPage } from "../pages/ModulePlaceholderPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { SearchPage } from "../search/SearchPage";
+import {
+  CustomerDetailPage,
+  CustomerFormPage,
+  CustomersPage,
+} from "../sales/CustomerPages";
+import { ReceivablesPage } from "../sales/ReceivablesPage";
+import {
+  SaleReturnCreatePage,
+  SaleReturnDetailPage,
+} from "../sales/SaleReturnPages";
+import {
+  SalePaymentsPage,
+  SaleRefundsPage,
+} from "../sales/SalesFinancePages";
+import {
+  SaleDetailPage,
+  SaleFormPage,
+  SalesPage,
+} from "../sales/SalesPages";
 import { PayablesPage } from "../purchasing/PayablesPage";
 import {
   PurchaseDetailPage,
@@ -54,9 +73,6 @@ import {
 } from "../vehicles/VehiclePages";
 
 const modules = [
-  ["sales", "Ventas", "sales.read"],
-  ["customers", "Clientes", "customers.read"],
-  ["receivables", "Cuentas por cobrar", "commercial-receivables.read"],
   ["cash", "Caja", "cash-sessions.read"],
   ["users", "Usuarios", "users.read"],
   ["roles", "Roles", "roles.read"],
@@ -335,6 +351,21 @@ export function AppRoutes() {
               </RequirePermission>
             }
           />
+          <Route path="sales" element={<RequirePermission permission="sales.read"><SalesPage /></RequirePermission>} />
+          <Route path="sales/new" element={<RequirePermission permission="sales.create"><SaleFormPage /></RequirePermission>} />
+          <Route path="sales/:id" element={<RequirePermission permission="sales.read"><SaleDetailPage /></RequirePermission>} />
+          <Route path="sales/:id/edit" element={<RequirePermission permission="sales.update"><SaleFormPage /></RequirePermission>} />
+          <Route path="sales/:id/returns" element={<RequirePermission permission="sales.return"><SaleReturnCreatePage /></RequirePermission>} />
+          <Route path="sales/:id/payments" element={<RequirePermission permission="sales.read"><SalePaymentsPage /></RequirePermission>} />
+          <Route path="sales/returns/:id" element={<RequirePermission permission="sales.read"><SaleReturnDetailPage /></RequirePermission>} />
+          <Route path="sales/returns/:id/refunds" element={<RequirePermission permission="sales.read"><SaleRefundsPage /></RequirePermission>} />
+          <Route path="sales/customers" element={<RequirePermission permission="customers.read"><CustomersPage /></RequirePermission>} />
+          <Route path="sales/customers/new" element={<RequirePermission permission="customers.create"><CustomerFormPage /></RequirePermission>} />
+          <Route path="sales/customers/:id" element={<RequirePermission permission="customers.read"><CustomerDetailPage /></RequirePermission>} />
+          <Route path="sales/customers/:id/edit" element={<RequirePermission permission="customers.update"><CustomerFormPage /></RequirePermission>} />
+          <Route path="commercial/receivables" element={<RequirePermission permission="commercial-receivables.read"><ReceivablesPage /></RequirePermission>} />
+          <Route path="customers/*" element={<Navigate to="/app/sales/customers" replace />} />
+          <Route path="receivables/*" element={<Navigate to="/app/commercial/receivables" replace />} />
           <Route
             path="purchases/*"
             element={<Navigate to="/app/purchasing/purchases" replace />}

@@ -1,6 +1,6 @@
-# BIELA Frontend Phase 12
+# BIELA — FRONTEND PHASE 10.C
 
-Phase 12 replaces the purchasing placeholders with the operational Suppliers,
+Frontend Phase 10.C replaces the purchasing placeholders with the operational Suppliers,
 Purchases, Receiving, Purchase Returns, purchase-side settlement, Supplier
 account, and Accounts Payable workflows. It consumes the released Phase 5–8
 contracts without changing backend semantics, migrations, or ownership.
@@ -115,7 +115,7 @@ operational views, not a general ledger or accounting statement.
 Supplier and Product selectors perform bounded server search and pagination;
 Location selectors do the same. Payment Method and OPEN Cash Session selectors
 render 20 records per page and expose subsequent server pages. The selected
-record is fetched by ID when it is not on the current page. Thus no Phase 12
+record is fetched by ID when it is not on the current page. Thus no Frontend Phase 10.C
 selector searches only a truncated first page and no unbounded catalog is
 loaded.
 
@@ -162,8 +162,10 @@ browser/network checks.
 
 ## Known boundaries
 
-Phase 12 does not add Sales/POS, Customer/Sale Return, full Cash management,
+Frontend Phase 10.C does not add Sales/POS, Customer/Sale Return, full Cash management,
 Accounts Receivable, accounting, fiscal invoicing, external payment providers,
 AI, or workshop UI. It does not calculate stock, settlement, Supplier credit,
-or authoritative money in the browser. Phase 13 is only the next roadmap label
-and is not implemented.
+or authoritative money in the browser. Frontend Phase 10.D — Customers, Sales,
+Sale Returns, Payments, Refunds and Accounts Receivable Frontend — is the next
+implementation subphase of official Phase 10 and is not implemented by this
+guide.

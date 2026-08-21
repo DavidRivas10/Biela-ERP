@@ -24,7 +24,7 @@ describe("permission-aware navigation", () => {
     expect(labels).not.toContain("Cuentas por pagar");
   });
 
-  it("shows Phase 12 purchasing links only with their exact read permissions", () => {
+  it("shows Frontend Phase 10.C purchasing links only with their exact read permissions", () => {
     const purchaser = {
       ...testUser,
       roles: [

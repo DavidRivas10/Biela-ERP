@@ -1,6 +1,8 @@
-# BIELA Frontend Foundation
+# BIELA — FRONTEND PHASE 10.A
 
-Phase 10 adds the first browser application to the existing monorepo. It is a
+## Frontend Foundation, Authentication, Dashboard and Application Shell
+
+Frontend Phase 10.A adds the first browser application to the existing monorepo. It is a
 React + TypeScript + Vite workspace at `apps/frontend`, named
 `@biela/frontend`. It consumes the released backend contract without changing
 business semantics or database ownership.
@@ -76,7 +78,7 @@ flattened and deduplicated. Sidebar items are omitted when their read permission
 is absent, and every restricted route independently applies the corresponding
 permission guard.
 
-| Route                                                    | Access                   | Phase 10 behavior                     |
+| Route                                                    | Access                   | Phase 10.A behavior                   |
 | -------------------------------------------------------- | ------------------------ | ------------------------------------- |
 | `/login`                                                 | public                   | real Gateway login                    |
 | `/app`, `/app/dashboard`                                 | authenticated            | responsive shell and real dashboard   |
@@ -84,12 +86,14 @@ permission guard.
 | `/forbidden`                                             | authenticated            | permission denial explanation         |
 | `/not-found`                                             | public                   | unknown-route recovery                |
 
-The Phase 10 placeholders established the permission boundaries. Phase 11 now
+The Phase 10.A placeholders established the permission boundaries. Frontend Phase 10.B now
 implements the approved Catalog, Vehicle, Compatibility, Location, Inventory,
 Movement, Transfer, and Search routes documented in
-`frontend-phase-11-catalog-inventory.md`. Phase 12 replaces the purchasing
+`frontend-phase-10b-catalog-inventory.md`. Frontend Phase 10.C replaces the purchasing
 placeholders with the operational routes documented in
-`frontend-phase-12-purchasing.md`.
+`frontend-phase-10c-purchasing.md`. Frontend Phase 10.D replaces the Customer, Sales and
+Accounts Receivable placeholders with the operational routes documented in
+`frontend-phase-10d-sales-receivables.md`.
 
 ## Dashboard contract
 
@@ -144,23 +148,27 @@ that API requests go only to the configured Gateway and never to ports 4001 or 4
 - If the Dashboard omits commercial totals, confirm the user actually has
   `commercial-summary.read`. The frontend intentionally makes no request
   without it.
-- If an unimplemented Sales, Customer, Cash-management, or administration
-  module shows a placeholder, it remains outside the Phase 12 operational scope.
+- If an unimplemented Cash-management or administration module shows a
+  placeholder, it remains outside the Frontend Phase 10.D operational scope.
 
 ## Scope boundary
 
-Phase 10 delivers the frontend foundation, authentication, authorization,
-application shell, and lightweight dashboard. Phase 11 adds Product, Vehicle,
+Frontend Phase 10.A delivers the frontend foundation, authentication,
+authorization, application shell, and lightweight dashboard. Frontend Phase 10.B adds Product, Vehicle,
 Compatibility, Location, Inventory, Movement, Transfer, and Search screens.
-Phase 12 adds purchasing, Supplier, Receiving, Purchase Return, purchase-side
-settlement, Supplier-account, and Accounts Payable screens. Sales/POS,
-Customers, full Cash management, Accounts Receivable, and administration
-screens remain future frontend work. Offline support, refresh
+Frontend Phase 10.C adds purchasing, Supplier, Receiving, Purchase Return, purchase-side
+settlement, Supplier-account, and Accounts Payable screens. Frontend Phase 10.D adds
+Customers, Sales/POS, Sale Returns, sales-side settlement, Customer accounts,
+and Accounts Receivable. Full Cash management and administration screens remain
+future frontend work. Offline support, refresh
 tokens, general accounting, fiscal invoicing, AI, and workshop workflows are
 not added here.
 
+Phases 10.A through 10.E are implementation subphases of the official Phase 10.
+They do not renumber the official roadmap.
+
 ## Next planned frontend phase
 
-Phase 13 — Customers, Sales, Sale Returns, Payments and Accounts Receivable
-Frontend. This guide records the roadmap name only; Phase 13 is not implemented
-here.
+Frontend Phase 10.E — Cash Registers, Cash Sessions, Cash Movements and
+Remaining Frontend Completion. After 10.E comes official Phase 11 — Complete
+Frontend ↔ Backend Integration. This guide records roadmap names only.

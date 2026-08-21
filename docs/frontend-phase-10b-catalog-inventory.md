@@ -1,6 +1,6 @@
-# BIELA Frontend Phase 11
+# BIELA — FRONTEND PHASE 10.B
 
-Phase 11 replaces the Catalog, Vehicle, Compatibility, Location, Inventory,
+Frontend Phase 10.B replaces the Catalog, Vehicle, Compatibility, Location, Inventory,
 Movement, Transfer, and Product Search placeholders with operational React
 workflows. The browser continues to use only the API Gateway at port 4000;
 server validation, RBAC, deterministic ordering, compatibility truth, and stock
@@ -54,7 +54,7 @@ checks improve UX; the Gateway and service guards make the authorization
 decision.
 
 Legacy `/app/products` and `/app/locations` links redirect to the canonical
-Phase 11 route families.
+Frontend Phase 10.B route families.
 
 ## Data and workflow behavior
 
@@ -116,8 +116,8 @@ a time while preserving the selected entity, so records outside the initial page
 remain discoverable. Product-detail Inventory and compatible-Vehicle tables, and
 the Vehicle-detail compatible-Product table, also expose their independent
 server pagination. Controlled Product Category/Brand and Vehicle Brand/Model
-catalogs retain their existing full-list backend contracts; Phase 11 does not
-alter those stable response shapes. Phase 11 does not add
+catalogs retain their existing full-list backend contracts; Frontend Phase 10.B does not
+alter those stable response shapes. Frontend Phase 10.B does not add
 Purchasing, Suppliers, Sales/POS, Customers, Cash, settlement, accounting,
 valuation/COGS, fiscal invoicing, provider integration, AI, or workshop UI.
 The current Product PATCH DTO accepts a decimal string but not `null`, so a
@@ -125,5 +125,6 @@ previously defined `defaultSalePrice` can be changed but not cleared by this UI.
 
 ## Next planned frontend phase
 
-Phase 12 — Purchasing, Suppliers, Receiving, Purchase Returns and Accounts
-Payable Frontend. This is a roadmap label only and is not implemented here.
+Frontend Phase 10.C — Suppliers, Purchasing, Receiving, Purchase Returns,
+Payments and Accounts Payable Frontend. This is the next implementation
+subphase of official Phase 10; it is not implemented by this guide.

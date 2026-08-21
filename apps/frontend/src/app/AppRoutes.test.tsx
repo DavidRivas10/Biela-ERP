@@ -112,7 +112,7 @@ describe("AppRoutes", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders an authorized Phase 12 Supplier route", async () => {
+  it("renders an authorized Frontend Phase 10.C Supplier route", async () => {
     auth = {
       ...auth,
       status: "authenticated",

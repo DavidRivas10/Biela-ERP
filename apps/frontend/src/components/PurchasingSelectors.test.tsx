@@ -31,7 +31,7 @@ function renderSelector(node: React.ReactNode) {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("Phase 12 bounded server selectors", () => {
+describe("Frontend Phase 10.C bounded server selectors", () => {
   it("discovers a Supplier outside the initial page using server search", async () => {
     const fetchMock = vi.fn((input: string | URL | Request) => {
       const url = new URL(

@@ -68,7 +68,7 @@ function vehicle(id: string, engine: string) {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("Phase 11 detail pagination", () => {
+describe("Frontend Phase 10.B detail pagination", () => {
   it("reaches inventory Locations and compatible Vehicles after the first Product detail page", async () => {
     const fetchMock = vi.fn((input: string | URL | Request) => {
       const url = new URL(

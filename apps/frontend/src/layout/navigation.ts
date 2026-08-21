@@ -29,7 +29,7 @@ export const NAVIGATION: NavigationGroup[] = [
       },
       {
         label: "Clientes",
-        path: "/app/customers",
+        path: "/app/sales/customers",
         short: "CL",
         permission: "customers.read",
       },
@@ -47,7 +47,7 @@ export const NAVIGATION: NavigationGroup[] = [
       },
       {
         label: "Cuentas por cobrar",
-        path: "/app/receivables",
+        path: "/app/commercial/receivables",
         short: "CC",
         permission: "commercial-receivables.read",
       },

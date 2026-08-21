@@ -60,4 +60,25 @@ export const queryKeys = {
   payablesRoot: ["commercial", "payables"] as const,
   payables: (filters: object) => ["commercial", "payables", filters] as const,
   supplierAccountsRoot: ["commercial", "supplier-account"] as const,
+  customersRoot: ["sales", "customers"] as const,
+  customers: (filters: object) => ["sales", "customers", filters] as const,
+  customer: (id: string) => ["sales", "customer", id] as const,
+  customerAccount: (id: string, filters: object) =>
+    ["commercial", "customer-account", id, filters] as const,
+  salesRoot: ["sales", "documents"] as const,
+  sales: (filters: object) => ["sales", "documents", filters] as const,
+  sale: (id: string) => ["sales", "document", id] as const,
+  saleReturnsRoot: ["sales", "returns"] as const,
+  saleReturns: (saleId: string, filters: object) =>
+    ["sales", "returns", saleId, filters] as const,
+  saleReturn: (id: string) => ["sales", "return", id] as const,
+  salePaymentsRoot: ["finance", "sale-payments"] as const,
+  salePayments: (saleId: string, filters: object) =>
+    ["finance", "sale-payments", saleId, filters] as const,
+  saleRefundsRoot: ["finance", "sale-refunds"] as const,
+  saleRefunds: (returnId: string, filters: object) =>
+    ["finance", "sale-refunds", returnId, filters] as const,
+  receivablesRoot: ["commercial", "receivables"] as const,
+  receivables: (filters: object) => ["commercial", "receivables", filters] as const,
+  customerAccountsRoot: ["commercial", "customer-account"] as const,
 };

@@ -114,7 +114,7 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("Phase 12 purchasing screens", () => {
+describe("Frontend Phase 10.C purchasing screens", () => {
   it("preserves Supplier form input and exposes a duplicate 409", async () => {
     vi.stubGlobal(
       "fetch",

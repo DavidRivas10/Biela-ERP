@@ -34,16 +34,26 @@ commercial summary. Workshop, general accounting, fiscal
 invoicing, external payment integrations, inventory valuation/COGS, and AI
 remain unimplemented. Phase 9 verifies and documents release readiness across
 the complete Phase 1–8 backend without adding a business module or migration.
-Phase 10 implements only the frontend foundation, authentication, permission
-guards, responsive ERP shell, and real health/commercial dashboard. Phase 11
-implements the Product and Vehicle catalogs, Compatibility, Locations,
-Inventory/Movement/Transfer, and deterministic Search frontend workflows. Phase
-12 implements Suppliers, Purchases, partial Receiving, Purchase Returns,
+Official Phase 10 is the complete frontend phase. Its implementation is split
+for delivery convenience into subphases: 10.A provides the frontend foundation,
+authentication, permission guards, responsive ERP shell, and real
+health/commercial dashboard; 10.B provides Product and Vehicle catalogs,
+Compatibility, Locations, Inventory/Movement/Transfer, and deterministic
+Search; 10.C provides Suppliers, Purchases, partial Receiving, Purchase Returns,
 purchase-side Payments/Refunds, Supplier accounts, and operational Accounts
-Payable frontend workflows. No subsequent roadmap block is approved here.
+Payable; 10.D provides Customers, registered and walk-in Sales, Sale Returns,
+sales-side Payments/Refunds, Customer accounts, and operational Accounts
+Receivable. Phase 10.E — Cash Registers, Cash Sessions, Cash Movements and
+Remaining Frontend Completion — is planned but not implemented here.
+
+After 10.E, the official roadmap continues with Phase 11 — Complete Frontend ↔
+Backend Integration, Phase 12 — Functional end-to-end ERP testing and
+corrections, and Phase 13 — Traditional ERP closure, documentation, Jira, demo,
+and stable release. AI comes only after the traditional ERP. No subsequent
+roadmap block is approved here.
 Never implement a future phase without explicit instruction.
 
-## Phase 12 frontend rules
+## Frontend Phase 10.C rules
 
 - The browser uses only Gateway `/api/...` contracts; it never calls internal
   services or a database.
@@ -59,6 +69,24 @@ Never implement a future phase without explicit instruction.
   unbounded catalog or search only a truncated first page.
 - Financial and Inventory mutations are not optimistic. Invalidate Purchase,
   history, Inventory, Payables, and Supplier-account caches as appropriate.
+
+## Frontend Phase 10.D rules
+
+- Preserve registered and walk-in Sales. An absent Customer is explicit and
+  must not be replaced with a fabricated Customer record.
+- Sale and Sale Return drafts never mutate Inventory. Only their confirmed POST
+  actions use the backend's atomic Inventory movements.
+- Money remains an exact backend decimal string. Never derive authoritative
+  totals, outstanding balances, refunds, change, or settlement state in React.
+- Customer, Product, Location, Payment Method, and Cash Session selectors are
+  bounded and use server search and/or pagination; records beyond the initial
+  page must remain discoverable.
+- Sales Payments and Customer Refunds require `payments.create`; history and
+  reversal controls require `payments.read` and `payments.reverse`
+  respectively. CASH operations additionally select an existing OPEN session.
+- Financial and Inventory mutations are not optimistic. Invalidate Sale,
+  Return, history, Inventory, Receivables, and Customer-account caches as
+  appropriate.
 
 ## Migration and credential safety
 
@@ -187,7 +215,7 @@ Never implement a future phase without explicit instruction.
   invoicing, provider integrations, frontend business modules, AI, workshop, and advanced
   multisite work remain outside the approved backend scope.
 
-## Phase 10 frontend rules
+## Frontend Phase 10.A rules
 
 - Keep the browser API base URL centralized in `VITE_API_BASE_URL`; never call
   `ms-users :4001`, `ms-autorepuesto :4002`, or either database from frontend code.
@@ -200,11 +228,11 @@ Never implement a future phase without explicit instruction.
   UX only. Backend RBAC remains mandatory and authoritative.
 - The dashboard may request commercial summary only with
   `commercial-summary.read`. Never invent KPIs or client-side business totals.
-- Phase 11 replaces only Product, Vehicle, Compatibility, Location, Inventory,
+- Frontend Phase 10.B replaces only Product, Vehicle, Compatibility, Location, Inventory,
   Movement, Transfer, and Search placeholders. Purchasing, Sales, Cash,
   settlement, and administration workflows remain unapproved here.
 
-## Phase 11 frontend rules
+## Frontend Phase 10.B rules
 
 - Preserve server pagination and deterministic ordering; never retrieve an
   operational dataset only to sort or paginate it in the browser.
@@ -217,8 +245,9 @@ Never implement a future phase without explicit instruction.
   active-state PATCH operations and surface duplicate `409` responses.
 - Keep exact Product price input as a decimal string. Backend validation and
   business invariants remain authoritative.
-- Phase 12 is not implemented. Its roadmap name is Purchasing, Suppliers,
-  Receiving, Purchase Returns and Accounts Payable Frontend.
+- Frontend Phase 10.B remains limited to its catalog and Inventory workflows;
+  purchasing and sales behavior belongs to the separately approved 10.C and
+  10.D rules.
 
 ## Engineering expectations
 

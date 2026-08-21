@@ -190,6 +190,11 @@ export interface Payment {
   reversalReason?: string | null;
   purchaseId?: string | null;
   purchaseReturnId?: string | null;
+  saleId?: string | null;
+  saleReturnId?: string | null;
+  tenderedAmount?: string | null;
+  changeAmount?: string | null;
+  reversalCashSession?: CashSession | null;
 }
 
 export interface CommercialSummaryTotals {
