@@ -37,9 +37,28 @@ the complete Phase 1–8 backend without adding a business module or migration.
 Phase 10 implements only the frontend foundation, authentication, permission
 guards, responsive ERP shell, and real health/commercial dashboard. Phase 11
 implements the Product and Vehicle catalogs, Compatibility, Locations,
-Inventory/Movement/Transfer, and deterministic Search frontend workflows. No
-subsequent roadmap block is approved here. Never implement a future phase
-without explicit instruction.
+Inventory/Movement/Transfer, and deterministic Search frontend workflows. Phase
+12 implements Suppliers, Purchases, partial Receiving, Purchase Returns,
+purchase-side Payments/Refunds, Supplier accounts, and operational Accounts
+Payable frontend workflows. No subsequent roadmap block is approved here.
+Never implement a future phase without explicit instruction.
+
+## Phase 12 frontend rules
+
+- The browser uses only Gateway `/api/...` contracts; it never calls internal
+  services or a database.
+- Money remains an exact backend decimal string. The frontend formats returned
+  values but does not calculate authoritative totals, balances, credits, or
+  settlement state.
+- Receipt and Return drafts do not mutate stock. Only their explicit POST
+  actions trigger the backend's atomic Inventory integration.
+- CASH Payment/Refund/reversal forms require an existing OPEN Cash Session;
+  non-cash methods omit it. The backend remains authoritative for eligibility.
+- Supplier, Product, Location, Payment Method, and Cash Session selectors stay
+  bounded and use server search and/or server pagination. Never load an
+  unbounded catalog or search only a truncated first page.
+- Financial and Inventory mutations are not optimistic. Invalidate Purchase,
+  history, Inventory, Payables, and Supplier-account caches as appropriate.
 
 ## Migration and credential safety
 

@@ -61,6 +61,9 @@ migrations. The API Gateway owns no database and has no ORM dependency.
 - Phase 11 operational frontend: Product and Vehicle catalogs, explicit
   Compatibility, Locations, Inventory balances and movements, atomic Transfer
   workflow, and deterministic Product Search with permission-aware actions.
+- Phase 12 purchasing frontend: Suppliers, multi-line Purchases, partial
+  Receipts, Purchase Returns, purchase-side Payments and Supplier Refunds,
+  Supplier accounts, and paginated operational Accounts Payable.
 
 No Product contains stock quantity or a physical-location string. See
 [the Phase 3 model](docs/phase-3-data-model.md) for the actual ER diagram,
@@ -79,8 +82,9 @@ and [the release-readiness guide](docs/backend-release-readiness.md) for fronten
 integration and the complete operational release gate. See
 [the frontend foundation guide](docs/frontend-foundation.md) for browser setup,
 auth lifecycle, CORS, and architecture, and
-[the Phase 11 frontend guide](docs/frontend-phase-11-catalog-inventory.md) for operational routes,
-permissions, workflows, cache behavior, and scope.
+[the Phase 11 frontend guide](docs/frontend-phase-11-catalog-inventory.md) for catalog and
+inventory workflows, and [the Phase 12 purchasing guide](docs/frontend-phase-12-purchasing.md)
+for purchasing routes, permissions, settlement, cache behavior, and scope.
 
 ## Setup
 

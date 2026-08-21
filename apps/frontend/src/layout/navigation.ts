@@ -35,13 +35,13 @@ export const NAVIGATION: NavigationGroup[] = [
       },
       {
         label: "Compras",
-        path: "/app/purchases",
+        path: "/app/purchasing/purchases",
         short: "CO",
         permission: "purchases.read",
       },
       {
         label: "Proveedores",
-        path: "/app/suppliers",
+        path: "/app/purchasing/suppliers",
         short: "PR",
         permission: "suppliers.read",
       },
@@ -53,7 +53,7 @@ export const NAVIGATION: NavigationGroup[] = [
       },
       {
         label: "Cuentas por pagar",
-        path: "/app/payables",
+        path: "/app/commercial/payables",
         short: "CP",
         permission: "commercial-payables.read",
       },

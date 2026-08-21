@@ -57,13 +57,44 @@ describe("AppRoutes", () => {
               meta: { page: 1, limit: 20, total: 0, pages: 0 },
             }),
           );
+        if (path === "/api/suppliers")
+          return Promise.resolve(
+            jsonResponse({
+              data: [],
+              meta: { page: 1, limit: 20, total: 0, pages: 0 },
+            }),
+          );
+        if (path === "/api/commercial/payables")
+          return Promise.resolve(
+            jsonResponse({
+              data: [],
+              meta: { page: 1, limit: 20, total: 0, pages: 0 },
+              summary: {
+                documentCount: 0,
+                grossAmount: "0.00",
+                returnAmount: "0.00",
+                netAmount: "0.00",
+                paidAmount: "0.00",
+                refundedAmount: "0.00",
+                outstandingAmount: "0.00",
+                creditAmount: "0.00",
+                unpaidCount: 0,
+                partiallyPaidCount: 0,
+                paidCount: 0,
+                overdueCount: 0,
+                overdueAmount: "0.00",
+                oldestDueDate: null,
+              },
+              businessDate: "2026-08-20",
+            }),
+          );
         return Promise.resolve(jsonResponse(systemHealth));
       }),
     );
   });
 
   it("redirects an unauthenticated protected route to login", async () => {
-    renderRoute("/app/products");
+    renderRoute("/app/purchasing/suppliers");
     expect(
       await screen.findByRole("heading", { name: "Iniciar sesión" }),
     ).toBeInTheDocument();
@@ -75,9 +106,54 @@ describe("AppRoutes", () => {
       status: "authenticated",
       user: { ...testUser, roles: [] },
     };
-    renderRoute("/app/products");
+    renderRoute("/app/purchasing/purchases");
     expect(
       await screen.findByText("No tienes permiso para ver esta sección"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders an authorized Phase 12 Supplier route", async () => {
+    auth = {
+      ...auth,
+      status: "authenticated",
+      user: {
+        ...testUser,
+        roles: [
+          {
+            id: "purchasing-role",
+            name: "purchasing",
+            permissions: ["suppliers.read"],
+          },
+        ],
+      },
+    };
+    renderRoute("/app/purchasing/suppliers");
+    expect(
+      await screen.findByRole("heading", { name: "Proveedores" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("No se encontraron proveedores"),
+    ).toBeInTheDocument();
+  });
+
+  it("protects global Payables with commercial-payables.read", async () => {
+    auth = {
+      ...auth,
+      status: "authenticated",
+      user: {
+        ...testUser,
+        roles: [
+          {
+            id: "payables-role",
+            name: "payables-reader",
+            permissions: ["commercial-payables.read"],
+          },
+        ],
+      },
+    };
+    renderRoute("/app/commercial/payables");
+    expect(
+      await screen.findByRole("heading", { name: "Cuentas por pagar" }),
     ).toBeInTheDocument();
   });
 

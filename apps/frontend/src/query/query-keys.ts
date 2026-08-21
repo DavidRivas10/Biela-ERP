@@ -30,4 +30,34 @@ export const queryKeys = {
   movements: (filters: object) => ["inventory", "movements", filters] as const,
   searchRoot: ["search", "products"] as const,
   search: (filters: object) => ["search", "products", filters] as const,
+  suppliersRoot: ["purchasing", "suppliers"] as const,
+  suppliers: (filters: object) => ["purchasing", "suppliers", filters] as const,
+  supplier: (id: string) => ["purchasing", "supplier", id] as const,
+  supplierAccount: (id: string, filters: object) =>
+    ["commercial", "supplier-account", id, filters] as const,
+  purchasesRoot: ["purchasing", "purchases"] as const,
+  purchases: (filters: object) => ["purchasing", "purchases", filters] as const,
+  purchase: (id: string) => ["purchasing", "purchase", id] as const,
+  receiptsRoot: ["purchasing", "receipts"] as const,
+  receipts: (purchaseId: string, filters: object) =>
+    ["purchasing", "receipts", purchaseId, filters] as const,
+  receipt: (id: string) => ["purchasing", "receipt", id] as const,
+  returnsRoot: ["purchasing", "returns"] as const,
+  returns: (purchaseId: string, filters: object) =>
+    ["purchasing", "returns", purchaseId, filters] as const,
+  purchaseReturnDetailsRoot: ["purchasing", "return"] as const,
+  purchaseReturn: (id: string) => ["purchasing", "return", id] as const,
+  paymentMethods: (filters: object) => ["finance", "methods", filters] as const,
+  paymentMethod: (id: string) => ["finance", "method", id] as const,
+  cashSessions: (filters: object) => ["finance", "sessions", filters] as const,
+  cashSession: (id: string) => ["finance", "session", id] as const,
+  purchasePaymentsRoot: ["finance", "purchase-payments"] as const,
+  purchasePayments: (purchaseId: string, filters: object) =>
+    ["finance", "purchase-payments", purchaseId, filters] as const,
+  supplierRefundsRoot: ["finance", "supplier-refunds"] as const,
+  supplierRefunds: (returnId: string, filters: object) =>
+    ["finance", "supplier-refunds", returnId, filters] as const,
+  payablesRoot: ["commercial", "payables"] as const,
+  payables: (filters: object) => ["commercial", "payables", filters] as const,
+  supplierAccountsRoot: ["commercial", "supplier-account"] as const,
 };

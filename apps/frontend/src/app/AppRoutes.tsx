@@ -25,6 +25,26 @@ import { LoginPage } from "../pages/LoginPage";
 import { ModulePlaceholderPage } from "../pages/ModulePlaceholderPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { SearchPage } from "../search/SearchPage";
+import { PayablesPage } from "../purchasing/PayablesPage";
+import {
+  PurchaseDetailPage,
+  PurchaseFormPage,
+  PurchasesPage,
+} from "../purchasing/PurchasePages";
+import {
+  PurchasePaymentsPage,
+  PurchaseReturnDetailPage,
+} from "../purchasing/PurchaseFinancePages";
+import {
+  PurchaseReceiptCreatePage,
+  PurchaseReceiptDetailPage,
+  PurchaseReturnCreatePage,
+} from "../purchasing/ReceiptReturnPages";
+import {
+  SupplierDetailPage,
+  SupplierFormPage,
+  SuppliersPage,
+} from "../purchasing/SupplierPages";
 import {
   VehicleBrandsPage,
   VehicleDetailPage,
@@ -36,10 +56,7 @@ import {
 const modules = [
   ["sales", "Ventas", "sales.read"],
   ["customers", "Clientes", "customers.read"],
-  ["purchases", "Compras", "purchases.read"],
-  ["suppliers", "Proveedores", "suppliers.read"],
   ["receivables", "Cuentas por cobrar", "commercial-receivables.read"],
-  ["payables", "Cuentas por pagar", "commercial-payables.read"],
   ["cash", "Caja", "cash-sessions.read"],
   ["users", "Usuarios", "users.read"],
   ["roles", "Roles", "roles.read"],
@@ -205,6 +222,130 @@ export function AppRoutes() {
                 <SearchPage />
               </RequirePermission>
             }
+          />
+          <Route
+            path="purchasing/suppliers"
+            element={
+              <RequirePermission permission="suppliers.read">
+                <SuppliersPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchasing/suppliers/new"
+            element={
+              <RequirePermission permission="suppliers.create">
+                <SupplierFormPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchasing/suppliers/:id"
+            element={
+              <RequirePermission permission="suppliers.read">
+                <SupplierDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchasing/suppliers/:id/edit"
+            element={
+              <RequirePermission permission="suppliers.update">
+                <SupplierFormPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchasing/purchases"
+            element={
+              <RequirePermission permission="purchases.read">
+                <PurchasesPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchasing/purchases/new"
+            element={
+              <RequirePermission permission="purchases.create">
+                <PurchaseFormPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchasing/purchases/:id"
+            element={
+              <RequirePermission permission="purchases.read">
+                <PurchaseDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchasing/purchases/:id/edit"
+            element={
+              <RequirePermission permission="purchases.update">
+                <PurchaseFormPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchasing/purchases/:id/receipts"
+            element={
+              <RequirePermission permission="purchases.receive">
+                <PurchaseReceiptCreatePage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchasing/purchases/:id/returns"
+            element={
+              <RequirePermission permission="purchases.return">
+                <PurchaseReturnCreatePage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchasing/purchases/:id/payments"
+            element={
+              <RequirePermission permission="purchases.read">
+                <PurchasePaymentsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchasing/receipts/:id"
+            element={
+              <RequirePermission permission="purchases.read">
+                <PurchaseReceiptDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchasing/returns/:id"
+            element={
+              <RequirePermission permission="purchases.read">
+                <PurchaseReturnDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="commercial/payables"
+            element={
+              <RequirePermission permission="commercial-payables.read">
+                <PayablesPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchases/*"
+            element={<Navigate to="/app/purchasing/purchases" replace />}
+          />
+          <Route
+            path="suppliers/*"
+            element={<Navigate to="/app/purchasing/suppliers" replace />}
+          />
+          <Route
+            path="payables/*"
+            element={<Navigate to="/app/commercial/payables" replace />}
           />
           <Route
             path="products/*"

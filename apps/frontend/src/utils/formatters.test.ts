@@ -4,6 +4,7 @@ import {
   formatCalendarDate,
   formatDateTime,
   formatMoney,
+  isPositiveMoneyAtMost,
 } from "./formatters";
 
 describe("display formatters", () => {
@@ -12,6 +13,13 @@ describe("display formatters", () => {
       "L 12,345,678,901,234,567,890.50",
     );
     expect(formatMoney("-2.00")).toBe("-L 2.00");
+  });
+
+  it("compares two-decimal money exactly without floating point", () => {
+    expect(isPositiveMoneyAtMost("0.10", "0.30")).toBe(true);
+    expect(isPositiveMoneyAtMost("0.31", "0.30")).toBe(false);
+    expect(isPositiveMoneyAtMost("0", "10.00")).toBe(false);
+    expect(isPositiveMoneyAtMost("1.001", "10.00")).toBe(false);
   });
 
   it("formats the backend business date in Tegucigalpa", () => {

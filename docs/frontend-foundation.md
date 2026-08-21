@@ -87,7 +87,9 @@ permission guard.
 The Phase 10 placeholders established the permission boundaries. Phase 11 now
 implements the approved Catalog, Vehicle, Compatibility, Location, Inventory,
 Movement, Transfer, and Search routes documented in
-`frontend-phase-11-catalog-inventory.md`.
+`frontend-phase-11-catalog-inventory.md`. Phase 12 replaces the purchasing
+placeholders with the operational routes documented in
+`frontend-phase-12-purchasing.md`.
 
 ## Dashboard contract
 
@@ -142,21 +144,23 @@ that API requests go only to the configured Gateway and never to ports 4001 or 4
 - If the Dashboard omits commercial totals, confirm the user actually has
   `commercial-summary.read`. The frontend intentionally makes no request
   without it.
-- If an unimplemented commercial or administration module shows a placeholder,
-  it remains outside the Phase 11 operational scope.
+- If an unimplemented Sales, Customer, Cash-management, or administration
+  module shows a placeholder, it remains outside the Phase 12 operational scope.
 
 ## Scope boundary
 
 Phase 10 delivers the frontend foundation, authentication, authorization,
 application shell, and lightweight dashboard. Phase 11 adds Product, Vehicle,
 Compatibility, Location, Inventory, Movement, Transfer, and Search screens.
-Purchasing, Sales, Cash, settlement, and administration screens remain future
-frontend work. Offline support, refresh
+Phase 12 adds purchasing, Supplier, Receiving, Purchase Return, purchase-side
+settlement, Supplier-account, and Accounts Payable screens. Sales/POS,
+Customers, full Cash management, Accounts Receivable, and administration
+screens remain future frontend work. Offline support, refresh
 tokens, general accounting, fiscal invoicing, AI, and workshop workflows are
 not added here.
 
 ## Next planned frontend phase
 
-Phase 12 — Purchasing, Suppliers, Receiving, Purchase Returns and Accounts
-Payable Frontend. This guide records the roadmap name only; Phase 12 is not
-implemented here.
+Phase 13 — Customers, Sales, Sale Returns, Payments and Accounts Receivable
+Frontend. This guide records the roadmap name only; Phase 13 is not implemented
+here.

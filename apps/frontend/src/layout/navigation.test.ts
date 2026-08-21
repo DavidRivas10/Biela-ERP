@@ -19,6 +19,36 @@ describe("permission-aware navigation", () => {
     expect(labels).not.toContain("Ventas");
     expect(labels).not.toContain("Usuarios");
     expect(labels).not.toContain("Cuentas por cobrar");
+    expect(labels).not.toContain("Compras");
+    expect(labels).not.toContain("Proveedores");
+    expect(labels).not.toContain("Cuentas por pagar");
+  });
+
+  it("shows Phase 12 purchasing links only with their exact read permissions", () => {
+    const purchaser = {
+      ...testUser,
+      roles: [
+        {
+          id: "purchasing-role",
+          name: "purchasing",
+          permissions: [
+            "purchases.read",
+            "suppliers.read",
+            "commercial-payables.read",
+          ],
+        },
+      ],
+    };
+    const entries = visibleNavigation(purchaser).flatMap((group) =>
+      group.items.map((item) => [item.label, item.path]),
+    );
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        ["Compras", "/app/purchasing/purchases"],
+        ["Proveedores", "/app/purchasing/suppliers"],
+        ["Cuentas por pagar", "/app/commercial/payables"],
+      ]),
+    );
   });
 
   it("shows administrator modules from the actual backend permission strings", () => {
