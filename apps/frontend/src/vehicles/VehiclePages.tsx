@@ -369,6 +369,8 @@ export function VehiclesPage() {
     modelId: filters.values.modelId,
     year: filters.values.year,
     engine: filters.values.engine,
+    vin: filters.values.vin,
+    engineNumber: filters.values.engineNumber,
     active: filters.values.active,
   };
   const vehicles = useQuery({
@@ -447,7 +449,9 @@ export function VehiclesPage() {
           Compatibilidad
         </Link>
         , y es la que permite que en el mostrador busques un repuesto por el
-        carro del cliente (marca, modelo, año y motor).
+        carro del cliente (marca, modelo, año y motor). El VIN y el número de
+        motor son opcionales y sirven para identificar el vehículo con certeza
+        cuando esos datos no alcanzan.
       </HelpNote>
       <section className="panel filter-bar">
         <Field label="Marca" htmlFor="vehicle-brand-filter">
@@ -497,6 +501,20 @@ export function VehiclesPage() {
             onChange={(e) => filters.update({ engine: e.target.value })}
           />
         </Field>
+        <Field label="VIN" htmlFor="vehicle-vin-filter">
+          <input
+            id="vehicle-vin-filter"
+            value={filters.values.vin ?? ""}
+            onChange={(e) => filters.update({ vin: e.target.value })}
+          />
+        </Field>
+        <Field label="N.º de motor" htmlFor="vehicle-engine-number-filter">
+          <input
+            id="vehicle-engine-number-filter"
+            value={filters.values.engineNumber ?? ""}
+            onChange={(e) => filters.update({ engineNumber: e.target.value })}
+          />
+        </Field>
         <Field label="Estado" htmlFor="vehicle-active-filter">
           <select
             id="vehicle-active-filter"
@@ -540,6 +558,8 @@ type VehicleFormState = {
   engine: string;
   generation: string;
   trim: string;
+  vin: string;
+  engineNumber: string;
   active: boolean;
 };
 const blankVehicle: VehicleFormState = {
@@ -549,6 +569,8 @@ const blankVehicle: VehicleFormState = {
   engine: "",
   generation: "",
   trim: "",
+  vin: "",
+  engineNumber: "",
   active: true,
 };
 export function VehicleFormPage() {
@@ -582,6 +604,8 @@ export function VehicleFormPage() {
       engine: vehicle.data.engine,
       generation: vehicle.data.generation ?? "",
       trim: vehicle.data.trim ?? "",
+      vin: vehicle.data.vin ?? "",
+      engineNumber: vehicle.data.engineNumber ?? "",
       active: vehicle.data.active,
     });
   }, [vehicle.data]);
@@ -603,6 +627,10 @@ export function VehicleFormPage() {
       engine: form.engine,
       ...(form.generation || editing ? { generation: form.generation } : {}),
       ...(form.trim || editing ? { trim: form.trim } : {}),
+      ...(form.vin || editing ? { vin: form.vin } : {}),
+      ...(form.engineNumber || editing
+        ? { engineNumber: form.engineNumber }
+        : {}),
       active: form.active,
     });
   }
@@ -695,6 +723,34 @@ export function VehicleFormPage() {
               maxLength={80}
               value={form.trim}
               onChange={(e) => setForm({ ...form, trim: e.target.value })}
+            />
+          </Field>
+          <Field
+            label="VIN (opcional)"
+            htmlFor="vehicle-vin"
+            hint="Número de chasis. Sirve para identificar el vehículo con certeza cuando marca, modelo y año no alcanzan."
+          >
+            <input
+              id="vehicle-vin"
+              maxLength={64}
+              placeholder="9BWZZZ377VT004251"
+              value={form.vin}
+              onChange={(e) => setForm({ ...form, vin: e.target.value })}
+            />
+          </Field>
+          <Field
+            label="Número de motor (opcional)"
+            htmlFor="vehicle-engine-number"
+            hint="El número grabado en el bloque del motor. Es distinto del tipo de motor de arriba."
+          >
+            <input
+              id="vehicle-engine-number"
+              maxLength={64}
+              placeholder="2ZR-1234567"
+              value={form.engineNumber}
+              onChange={(e) =>
+                setForm({ ...form, engineNumber: e.target.value })
+              }
             />
           </Field>
           <label className="check-field">
@@ -836,6 +892,14 @@ export function VehicleDetailPage() {
           <div>
             <dt>Versión</dt>
             <dd>{row.trim || "—"}</dd>
+          </div>
+          <div>
+            <dt>VIN</dt>
+            <dd>{row.vin || "—"}</dd>
+          </div>
+          <div>
+            <dt>Número de motor</dt>
+            <dd>{row.engineNumber || "—"}</dd>
           </div>
         </dl>
       </section>

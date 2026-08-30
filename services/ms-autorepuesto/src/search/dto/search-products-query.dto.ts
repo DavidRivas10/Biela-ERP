@@ -84,4 +84,18 @@ export class SearchProductsQueryDto extends PaginationQueryDto {
   @IsString()
   @MaxLength(80)
   trim?: string;
+
+  @ApiPropertyOptional({ description: "Partial chassis VIN of a compatible vehicle" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  vin?: string;
+
+  @ApiPropertyOptional({
+    description: "Partial engine (serial) number of a compatible vehicle",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  engineNumber?: string;
 }

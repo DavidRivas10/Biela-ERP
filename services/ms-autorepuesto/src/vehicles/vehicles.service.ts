@@ -25,6 +25,8 @@ export class VehiclesService {
         engine: dto.engine.trim(),
         generation: dto.generation?.trim(),
         trim: dto.trim?.trim(),
+        vin: dto.vin?.trim() || null,
+        engineNumber: dto.engineNumber?.trim() || null,
         active: dto.active,
       },
       include: vehicleInclude,
@@ -38,6 +40,12 @@ export class VehiclesService {
       year: query.year,
       engine: query.engine
         ? { contains: query.engine.trim(), mode: "insensitive" }
+        : undefined,
+      vin: query.vin
+        ? { contains: query.vin.trim(), mode: "insensitive" }
+        : undefined,
+      engineNumber: query.engineNumber
+        ? { contains: query.engineNumber.trim(), mode: "insensitive" }
         : undefined,
       model: query.brandId ? { brandId: query.brandId } : undefined,
     };
@@ -84,6 +92,11 @@ export class VehiclesService {
       engine: dto.engine?.trim(),
       generation: dto.generation?.trim(),
       trim: dto.trim?.trim(),
+      vin: dto.vin === undefined ? undefined : dto.vin.trim() || null,
+      engineNumber:
+        dto.engineNumber === undefined
+          ? undefined
+          : dto.engineNumber.trim() || null,
       active: dto.active,
     };
     await this.prisma.vehicle.update({ where: { id }, data });

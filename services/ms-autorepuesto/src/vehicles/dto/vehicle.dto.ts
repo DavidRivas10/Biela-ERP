@@ -40,6 +40,27 @@ export class CreateVehicleDto {
   @MaxLength(80)
   trim?: string;
 
+  @ApiPropertyOptional({
+    example: "9BWZZZ377VT004251",
+    maxLength: 64,
+    description:
+      "Optional chassis VIN; complementary identifier, does not replace model + year + engine",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  vin?: string;
+
+  @ApiPropertyOptional({
+    example: "2ZR-1234567",
+    maxLength: 64,
+    description: "Optional stamped engine (serial) number; distinct from `engine`",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  engineNumber?: string;
+
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()

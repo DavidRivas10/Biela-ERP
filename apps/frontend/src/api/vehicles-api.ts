@@ -21,6 +21,8 @@ export interface VehicleInput {
   engine: string;
   generation?: string;
   trim?: string;
+  vin?: string;
+  engineNumber?: string;
   active?: boolean;
 }
 

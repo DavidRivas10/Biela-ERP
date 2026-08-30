@@ -216,6 +216,8 @@ model Vehicle {
   engine          String                 @db.VarChar(80)
   generation      String?                @db.VarChar(80)
   trim            String?                @db.VarChar(80)
+  vin             String?                @db.VarChar(64)
+  engineNumber    String?                @db.VarChar(64)
   active          Boolean                @default(true)
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
@@ -225,6 +227,8 @@ model Vehicle {
   @@index([modelId])
   @@index([year])
   @@index([active])
+  @@index([vin])
+  @@index([engineNumber])
 }
 
 model ProductCompatibility {

@@ -81,6 +81,8 @@ export interface Vehicle {
   engine: string;
   generation?: string | null;
   trim?: string | null;
+  vin?: string | null;
+  engineNumber?: string | null;
   active: boolean;
   createdAt: string;
   updatedAt: string;

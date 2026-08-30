@@ -110,6 +110,8 @@ describe("Deterministic product search with PostgreSQL", () => {
           engine: "1.8L",
           generation: "E170",
           trim: "LE",
+          vin: `VIN-${suffix}`,
+          engineNumber: `ENG-${suffix}`,
         },
       })
     ).id;
@@ -221,6 +223,24 @@ describe("Deterministic product search with PostgreSQL", () => {
       .expect((response) =>
         expect(response.body.data[0].id).toBe(firstProductId),
       ));
+
+  it("resolves compatible products by a compatible vehicle's VIN or engine number", async () => {
+    await request(app.getHttpServer())
+      .get("/search/products")
+      .query({ vin: suffix })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.data[0].id).toBe(firstProductId);
+        expect(response.body.data[0].matchingVehicles[0].id).toBe(vehicleId);
+      });
+    await request(app.getHttpServer())
+      .get("/search/products")
+      .query({ engineNumber: `ENG-${suffix}` })
+      .expect(200)
+      .expect((response) =>
+        expect(response.body.data[0].id).toBe(firstProductId),
+      );
+  });
 
   it("filters by stock, category, and product brand", () =>
     request(app.getHttpServer())

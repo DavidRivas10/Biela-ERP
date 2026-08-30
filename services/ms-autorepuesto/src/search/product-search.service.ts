@@ -145,7 +145,9 @@ export class ProductSearchService {
       query.year !== undefined ||
       query.engine !== undefined ||
       query.generation !== undefined ||
-      query.trim !== undefined;
+      query.trim !== undefined ||
+      query.vin !== undefined ||
+      query.engineNumber !== undefined;
     if (!hasFilter) return undefined;
     return {
       id: query.vehicleId,
@@ -160,6 +162,12 @@ export class ProductSearchService {
         : undefined,
       trim: query.trim
         ? { contains: query.trim.trim(), mode: "insensitive" }
+        : undefined,
+      vin: query.vin
+        ? { contains: query.vin.trim(), mode: "insensitive" }
+        : undefined,
+      engineNumber: query.engineNumber
+        ? { contains: query.engineNumber.trim(), mode: "insensitive" }
         : undefined,
       model: query.vehicleBrandId
         ? { is: { brandId: query.vehicleBrandId } }

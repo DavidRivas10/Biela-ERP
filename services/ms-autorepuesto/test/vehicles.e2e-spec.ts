@@ -127,4 +127,50 @@ describe("Vehicles HTTP with PostgreSQL", () => {
       .expect(200)
       .expect((response) => expect(response.body.active).toBe(true));
   });
+
+  it("stores optional VIN and engine number and filters vehicles by them", async () => {
+    const created = await request(app.getHttpServer())
+      .post("/vehicles")
+      .send({
+        modelId,
+        year: 2016,
+        engine: "1.8L",
+        vin: "  9BWZZZ377VT004251  ",
+        engineNumber: "2ZR-7788991",
+      })
+      .expect(201);
+    const withIdsId = created.body.id as string;
+    expect(created.body.vin).toBe("9BWZZZ377VT004251");
+    expect(created.body.engineNumber).toBe("2ZR-7788991");
+
+    await request(app.getHttpServer())
+      .get("/vehicles")
+      .query({ vin: "377VT0042", page: 1, limit: 20 })
+      .expect(200)
+      .expect((response) => {
+        const ids = response.body.data.map((row: { id: string }) => row.id);
+        expect(ids).toContain(withIdsId);
+        expect(ids).not.toContain(vehicleId);
+      });
+    await request(app.getHttpServer())
+      .get("/vehicles")
+      .query({ engineNumber: "7788991", page: 1, limit: 20 })
+      .expect(200)
+      .expect((response) =>
+        expect(
+          response.body.data.some(
+            (row: { id: string }) => row.id === withIdsId,
+          ),
+        ).toBe(true),
+      );
+
+    // clearing works on update
+    await request(app.getHttpServer())
+      .patch(`/vehicles/${withIdsId}`)
+      .send({ vin: "" })
+      .expect(200)
+      .expect((response) => expect(response.body.vin).toBeNull());
+
+    await prisma.vehicle.deleteMany({ where: { id: withIdsId } });
+  });
 });

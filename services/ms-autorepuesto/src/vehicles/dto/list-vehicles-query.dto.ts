@@ -38,6 +38,18 @@ export class ListVehiclesQueryDto extends PaginationQueryDto {
   @MaxLength(80)
   engine?: string;
 
+  @ApiPropertyOptional({ description: "Partial chassis VIN match" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  vin?: string;
+
+  @ApiPropertyOptional({ description: "Partial engine (serial) number match" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  engineNumber?: string;
+
   @ApiPropertyOptional({ type: Boolean })
   @IsOptional()
   @Transform(booleanQueryTransform)

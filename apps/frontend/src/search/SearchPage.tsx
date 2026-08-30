@@ -24,6 +24,8 @@ export function SearchPage() {
     engine: filters.values.engine ?? "",
     generation: filters.values.generation ?? "",
     trim: filters.values.trim ?? "",
+    vin: filters.values.vin ?? "",
+    engineNumber: filters.values.engineNumber ?? "",
   });
   const debouncedQuery = useDebouncedValue(draft.q.trim(), 350);
   useEffect(() => {
@@ -45,6 +47,8 @@ export function SearchPage() {
     engine: filters.values.engine,
     generation: filters.values.generation,
     trim: filters.values.trim,
+    vin: filters.values.vin,
+    engineNumber: filters.values.engineNumber,
   };
   const hasCriteria = Object.values(params).some(
     (value, index) => index > 1 && value !== undefined && value !== "",
@@ -318,6 +322,22 @@ export function SearchPage() {
                 onChange={(e) => setDraft({ ...draft, trim: e.target.value })}
               />
             </Field>
+            <Field label="VIN contiene" htmlFor="search-vin">
+              <input
+                id="search-vin"
+                value={draft.vin}
+                onChange={(e) => setDraft({ ...draft, vin: e.target.value })}
+              />
+            </Field>
+            <Field label="N.º de motor contiene" htmlFor="search-engine-number">
+              <input
+                id="search-engine-number"
+                value={draft.engineNumber}
+                onChange={(e) =>
+                  setDraft({ ...draft, engineNumber: e.target.value })
+                }
+              />
+            </Field>
           </div>
           <div className="form-actions">
             <Button type="submit">Aplicar filtros</Button>
@@ -325,7 +345,14 @@ export function SearchPage() {
               type="button"
               variant="ghost"
               onClick={() => {
-                setDraft({ q: "", engine: "", generation: "", trim: "" });
+                setDraft({
+                  q: "",
+                  engine: "",
+                  generation: "",
+                  trim: "",
+                  vin: "",
+                  engineNumber: "",
+                });
                 filters.clear();
               }}
             >
