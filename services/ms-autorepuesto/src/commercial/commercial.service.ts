@@ -134,7 +134,8 @@ export class CommercialService {
 
   async summary() {
     const broad = { page: 1, limit: 1 };
-    const [receivables, payables, cash] = await Promise.all([
+    const businessDate = this.businessDate();
+    const [receivables, payables, cash, salesToday] = await Promise.all([
       this.receivables(broad),
       this.payables(broad),
       this.prisma.$queryRaw<
@@ -163,14 +164,29 @@ export class CommercialService {
           GROUP BY cs."id", cs."openingAmount"
         ) session_totals
       `),
+      this.prisma.$queryRaw<
+        Array<{ count: bigint; total: Prisma.Decimal }>
+      >(Prisma.sql`
+        SELECT
+          COUNT(*)::bigint AS "count",
+          COALESCE(SUM("total"), 0)::numeric AS "total"
+        FROM "Sale"
+        WHERE "status" = 'POSTED' AND "documentDate" = ${businessDate}::date
+      `),
     ]);
     return {
-      businessDate: this.businessDate(),
+      businessDate,
       receivables: receivables.summary,
       payables: payables.summary,
       cash: this.serialize({
         openSessionCount: cash[0].openSessionCount,
         expectedCash: cash[0].expectedCash,
+      }),
+      sales: this.serialize({
+        today: {
+          count: salesToday[0].count,
+          total: salesToday[0].total,
+        },
       }),
     };
   }

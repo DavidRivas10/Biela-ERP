@@ -575,6 +575,9 @@ describe("Phase 8 commercial settlement HTTP", () => {
         expect(body.receivables.outstandingAmount).toBeDefined();
         expect(body.payables.outstandingAmount).toBeDefined();
         expect(body.cash.openSessionCount).toBeGreaterThanOrEqual(1);
+        expect(typeof body.sales.today.count).toBe("number");
+        expect(typeof body.sales.today.total).toBe("string");
+        expect(body.sales.today.count).toBeGreaterThanOrEqual(0);
       });
   });
 

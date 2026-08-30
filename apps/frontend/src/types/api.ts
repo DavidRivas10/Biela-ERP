@@ -60,4 +60,10 @@ export interface CommercialSummary {
     openSessionCount: number;
     expectedCash: string;
   };
+  sales: {
+    today: {
+      count: number;
+      total: string;
+    };
+  };
 }

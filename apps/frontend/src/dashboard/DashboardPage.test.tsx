@@ -114,9 +114,13 @@ describe("DashboardPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     renderDashboard();
 
-    await screen.findByText("L 800.00");
-    expect(screen.getByText("L 475.50")).toBeInTheDocument();
-    expect(screen.getByText("L 250.25")).toBeInTheDocument();
+    // The day's numbers come straight from the backend summary.
+    await screen.findByText("L 1,360.00"); // venta de hoy
+    expect(screen.getByText("L 800.00")).toBeInTheDocument(); // cuentas por cobrar
+    expect(screen.getByText("L 475.50")).toBeInTheDocument(); // cuentas por pagar
+    expect(
+      screen.getByText(/Efectivo esperado L 250\.25/),
+    ).toBeInTheDocument();
     expect(
       fetchMock.mock.calls.some(([url]) =>
         String(url).includes("/api/commercial/summary"),

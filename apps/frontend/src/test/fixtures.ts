@@ -54,6 +54,7 @@ export const commercialSummary: CommercialSummary = {
   receivables: totals,
   payables: { ...totals, outstandingAmount: "475.50" },
   cash: { openSessionCount: 1, expectedCash: "250.25" },
+  sales: { today: { count: 3, total: "1360.00" } },
 };
 
 export function jsonResponse(payload: unknown, status = 200): Response {
