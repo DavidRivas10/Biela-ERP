@@ -47,6 +47,7 @@ export interface Product {
   name: string;
   description?: string | null;
   defaultSalePrice?: string | null;
+  referenceCost?: string | null;
   categoryId: string;
   brandId: string;
   category: ProductCategory;
@@ -145,7 +146,7 @@ export interface InventoryMovement {
 
 export interface SearchProduct extends Omit<
   Product,
-  "brandId" | "categoryId" | "defaultSalePrice"
+  "brandId" | "categoryId" | "defaultSalePrice" | "referenceCost"
 > {
   inventories: Array<{ quantity: number; location: Location }>;
   totalStock: number;

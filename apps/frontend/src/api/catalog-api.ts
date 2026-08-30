@@ -31,6 +31,7 @@ export interface ProductInput {
   name: string;
   description?: string;
   defaultSalePrice?: string;
+  referenceCost?: string;
   categoryId: string;
   brandId: string;
   active?: boolean;

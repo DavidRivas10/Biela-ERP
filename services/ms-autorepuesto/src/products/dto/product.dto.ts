@@ -59,6 +59,17 @@ export class CreateProductDto {
   @Matches(/^\d+(?:\.\d{1,4})?$/)
   defaultSalePrice?: string;
 
+  @ApiPropertyOptional({
+    type: String,
+    example: "82.0000",
+    description:
+      "Optional reference cost for margin estimation only; not authoritative and unrelated to PurchaseItem.unitCost",
+  })
+  @IsOptional()
+  @IsDecimal({ decimal_digits: "0,4", force_decimal: false })
+  @Matches(/^\d+(?:\.\d{1,4})?$/)
+  referenceCost?: string;
+
   @ApiProperty({ format: "uuid" })
   @IsUUID()
   categoryId!: string;

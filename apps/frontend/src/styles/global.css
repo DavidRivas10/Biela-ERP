@@ -1290,6 +1290,15 @@ h2 {
 .scan-row__feedback {
   font-weight: 700;
 }
+.margin-estimate {
+  align-self: center;
+  margin: 0;
+  border-radius: var(--radius-sm);
+  background: var(--green-100);
+  padding: 0.6rem 0.85rem;
+  color: var(--green-900);
+  font-size: 0.85rem;
+}
 .scan-row__feedback--ok {
   color: var(--success);
 }

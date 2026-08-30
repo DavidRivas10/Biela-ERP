@@ -170,4 +170,24 @@ describe("Products HTTP with PostgreSQL", () => {
       .expect(200)
       .expect((response) => expect(response.body.active).toBe(true));
   });
+
+  it("stores and returns an optional reference cost and rejects a bad one", async () => {
+    await request(app.getHttpServer())
+      .patch(`/products/${productId}`)
+      .send({ referenceCost: "82.5000" })
+      .expect(200)
+      .expect((response) =>
+        expect(Number(response.body.referenceCost)).toBe(82.5),
+      );
+    await request(app.getHttpServer())
+      .get(`/products/${productId}`)
+      .expect(200)
+      .expect((response) =>
+        expect(Number(response.body.referenceCost)).toBe(82.5),
+      );
+    await request(app.getHttpServer())
+      .patch(`/products/${productId}`)
+      .send({ referenceCost: "not-a-number" })
+      .expect(400);
+  });
 });

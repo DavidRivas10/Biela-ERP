@@ -53,11 +53,36 @@ Official Phases 10, 11, and 12 are complete. Phase 12 exercised realistic
 end-to-end ERP operation, failure/recovery, concurrency, RBAC, pagination,
 responsive UI, accessibility, and cross-domain reconciliation without a schema
 change. Phase 13 — Traditional ERP closure, documentation, Jira, demo, and
-stable release — is the current engineering closure preparation. It adds no
-business domain or migration. Final commit, push, Jira synchronization, stable
-tag and demo are human/external actions. AI comes only after the traditional
-ERP. No subsequent roadmap block is approved here.
+stable release — prepared the engineering closure. Final commit, push, Jira
+synchronization, stable tag and demo remain human/external actions.
+
+Phase 14 — Product/UX redesign — is the current approved work (see below). It
+supersedes the Phase 13 closure freeze: the Phase 13 closure documents describe
+the pre-redesign baseline and are no longer the live contract. AI still comes
+only after the traditional ERP. No block beyond Phase 14 is approved here.
 Never implement a future phase without explicit instruction.
+
+## Phase 14 — Product/UX redesign rules
+
+- Scope is product design and flow: sales/counter UX, catalog, inventory, cash,
+  dashboards, visual system. The engine is confirmed sound — do not rebuild RBAC,
+  the three-service architecture, or the persistence layer.
+- Permissions stay permission-based. Business roles (Administrador, Vendedor/
+  Cajero, Almacén) are named sets of existing permission strings, never new
+  authorization logic. No `role === "..."` checks.
+- Schema evolution uses new additive migrations only (Phase 14 migrations are
+  prefixed `phase_14_`). Never squash, rewrite applied migrations, or reset a
+  shared database. Prisma stays on 6.19.3. If `prisma migrate dev` reports drift
+  on a historical migration, hand-write the migration SQL and apply it with
+  `prisma migrate deploy`; do not reset.
+- Uploaded files (product photos, supplier invoice attachments) are stored on
+  local disk in `ms-autorepuesto` and served through the Gateway. The upload
+  directory, dumps and generated data stay untracked.
+- Browser business traffic stays Gateway-only; the Gateway still owns no database
+  or business calculation, including for multipart and binary passthrough.
+- Taller/workshop and multi-branch remain out of scope. AI infrastructure (e.g.
+  product photos) may be prepared but no AI feature is implemented.
+- Verify each module by exercising its real flow, not only lint/test/build.
 
 ## Official Phase 13 closure rules
 

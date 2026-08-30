@@ -218,6 +218,7 @@ interface ProductFormState {
   name: string;
   description: string;
   defaultSalePrice: string;
+  referenceCost: string;
   categoryId: string;
   brandId: string;
   active: boolean;
@@ -228,11 +229,28 @@ const emptyProduct: ProductFormState = {
   name: "",
   description: "",
   defaultSalePrice: "",
+  referenceCost: "",
   categoryId: "",
   brandId: "",
   active: true,
   attributes: {},
 };
+
+/**
+ * Estimated gross margin from the suggested sale price and the reference cost,
+ * both plain decimal strings. Returns null when either value is missing or not a
+ * positive number. This is a display aid only; the backend stores no margin.
+ */
+function marginEstimate(
+  salePrice: string,
+  cost: string,
+): { amount: number; percent: number } | null {
+  const price = Number(salePrice);
+  const unitCost = Number(cost);
+  if (!Number.isFinite(price) || !Number.isFinite(unitCost)) return null;
+  if (price <= 0 || unitCost <= 0) return null;
+  return { amount: price - unitCost, percent: ((price - unitCost) / price) * 100 };
+}
 
 export function ProductFormPage() {
   const { id } = useParams();
@@ -267,6 +285,7 @@ export function ProductFormPage() {
       name: product.data.name,
       description: product.data.description ?? "",
       defaultSalePrice: product.data.defaultSalePrice ?? "",
+      referenceCost: product.data.referenceCost ?? "",
       categoryId: product.data.categoryId,
       brandId: product.data.brandId,
       active: product.data.active,
@@ -289,6 +308,7 @@ export function ProductFormPage() {
     },
   });
   useKeyboardWedge((code) => setForm((current) => ({ ...current, code })));
+  const margin = marginEstimate(form.defaultSalePrice, form.referenceCost);
   const visibleDefinitions =
     definitions.data?.filter(
       (definition) =>
@@ -306,6 +326,7 @@ export function ProductFormPage() {
       ...(form.defaultSalePrice || editing
         ? { defaultSalePrice: form.defaultSalePrice }
         : {}),
+      ...(form.referenceCost ? { referenceCost: form.referenceCost } : {}),
       attributes: visibleDefinitions
         .filter((definition) => form.attributes[definition.id]?.trim())
         .map((definition) => ({
@@ -407,7 +428,7 @@ export function ProductFormPage() {
           <Field
             label="Precio de venta sugerido"
             htmlFor="product-price"
-            hint="Hasta 4 decimales. El contrato actual no acepta null para borrar un precio ya definido."
+            hint="Precio final al cliente sugerido, con hasta 4 decimales. En cada venta se puede ajustar; el contrato actual no acepta borrar un precio ya definido."
           >
             <input
               id="product-price"
@@ -419,6 +440,28 @@ export function ProductFormPage() {
               }
             />
           </Field>
+          <Field
+            label="Costo de referencia"
+            htmlFor="product-cost"
+            hint="Opcional. Solo sirve para estimar el margen frente al precio de venta. No es el costo real de cada compra, que se guarda aparte en cada compra."
+          >
+            <input
+              id="product-cost"
+              inputMode="decimal"
+              pattern="\d+(\.\d{1,4})?"
+              value={form.referenceCost}
+              onChange={(e) =>
+                setForm({ ...form, referenceCost: e.target.value })
+              }
+            />
+          </Field>
+          {margin ? (
+            <p className="margin-estimate">
+              Margen estimado:{" "}
+              <strong>{formatMoney(margin.amount.toFixed(2))}</strong> (
+              {margin.percent.toFixed(1)}% del precio de venta)
+            </p>
+          ) : null}
           <Field label="Descripción" htmlFor="product-description">
             <textarea
               id="product-description"
@@ -560,6 +603,10 @@ export function ProductDetailPage() {
       </div>
     );
   const row = product.data;
+  const detailMargin = marginEstimate(
+    row.defaultSalePrice ?? "",
+    row.referenceCost ?? "",
+  );
   const inventoryColumns: ErpColumn<InventoryBalance>[] = [
     {
       key: "location",
@@ -642,6 +689,23 @@ export function ProductDetailPage() {
                   : "Sin definir"}
               </dd>
             </div>
+            <div>
+              <dt>Costo de referencia</dt>
+              <dd>
+                {row.referenceCost
+                  ? formatMoney(row.referenceCost)
+                  : "Sin definir"}
+              </dd>
+            </div>
+            {detailMargin ? (
+              <div>
+                <dt>Margen estimado</dt>
+                <dd>
+                  {formatMoney(detailMargin.amount.toFixed(2))} ·{" "}
+                  {detailMargin.percent.toFixed(1)}%
+                </dd>
+              </div>
+            ) : null}
             <div>
               <dt>Actualizado</dt>
               <dd>{formatDateTime(row.updatedAt)}</dd>
