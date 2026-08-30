@@ -9,6 +9,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
+import { HelpNote } from "../components/HelpNote";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
@@ -439,6 +440,15 @@ export function VehiclesPage() {
           ) : undefined
         }
       />
+      <HelpNote title="Para qué sirve esta pantalla">
+        Los vehículos que registras aquí se usan para marcar qué productos
+        aplican a cada uno. Esa relación se administra en{" "}
+        <Link className="table-link" to="/app/compatibility">
+          Compatibilidad
+        </Link>
+        , y es la que permite que en el mostrador busques un repuesto por el
+        carro del cliente (marca, modelo, año y motor).
+      </HelpNote>
       <section className="panel filter-bar">
         <Field label="Marca" htmlFor="vehicle-brand-filter">
           <select

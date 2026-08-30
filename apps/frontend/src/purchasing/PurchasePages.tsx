@@ -325,10 +325,15 @@ function PurchaseFormEditor({
             value={supplierId}
             onChange={setSupplierId}
           />
-          <Field label="Documento del proveedor" htmlFor="purchase-document">
+          <Field
+            label="Documento del proveedor"
+            htmlFor="purchase-document"
+            hint="Solo el número de la factura o remisión del proveedor, como referencia. No se sube ningún archivo aquí."
+          >
             <input
               id="purchase-document"
               maxLength={80}
+              placeholder="Ej. FAC-004521"
               value={supplierDocumentNumber}
               onChange={(e) => setSupplierDocumentNumber(e.target.value)}
             />

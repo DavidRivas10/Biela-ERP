@@ -10,6 +10,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
+import { HelpNote } from "../components/HelpNote";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
@@ -95,6 +96,12 @@ export function SuppliersPage() {
           ) : undefined
         }
       />
+      <HelpNote>
+        Los proveedores que registras aquí son a quienes les compras mercadería.
+        Se seleccionan al crear una compra y su historial se conserva aunque
+        luego los desactives. Un proveedor desactivado no puede usarse en compras
+        nuevas.
+      </HelpNote>
       <form
         className="panel filter-bar"
         onSubmit={(event) => {

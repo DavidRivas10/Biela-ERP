@@ -3,7 +3,13 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { rolesApi, usersApi, type RoleInput, type UserInput } from "../api/admin-api";
 import { useAuth } from "../auth/AuthContext";
-import { PERMISSION_CATALOG, permissionsByDomain } from "../auth/permission-catalog";
+import {
+  PERMISSION_CATALOG,
+  domainLabel,
+  permissionDescription,
+  permissionLabel,
+  permissionsByDomain,
+} from "../auth/permission-catalog";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
 import { RoleSelector } from "../components/CashAdminSelectors";
@@ -22,6 +28,36 @@ import { apiErrorMessage } from "../utils/api-error";
 
 function RoleBadges({ roles }: { roles: User["roles"] }) {
   return roles.length ? <div className="badge-row">{roles.map((role) => <Badge key={role.id}>{role.name}</Badge>)}</div> : <span>Sin roles</span>;
+}
+
+/**
+ * Read-only permission list grouped by business area. Shows the Spanish name and
+ * a short explanation for each permission while still printing the exact
+ * technical code, which is what the backend receives unchanged.
+ */
+function PermissionSummary({ permissions }: { permissions: string[] }) {
+  const groups = Object.entries(permissionsByDomain([...permissions].sort()));
+  if (!groups.length) return <p className="muted">Este rol no incluye permisos todavía.</p>;
+  return (
+    <div className="permission-groups">
+      {groups.map(([domain, codes]) => (
+        <div key={domain}>
+          <strong>{domainLabel(domain)}</strong>
+          <ul className="permission-readout">
+            {codes.map((code) => (
+              <li key={code}>
+                <span className="permission-readout__name">{permissionLabel(code)}</span>
+                <code className="permission-readout__code">{code}</code>
+                {permissionDescription(code) ? (
+                  <span className="permission-readout__hint">{permissionDescription(code)}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function UsersPage() {
@@ -74,7 +110,7 @@ export function UserDetailPage() {
   const effective = [...new Set(row.roles.flatMap((role) => role.permissions))].sort();
   const canLifecycle = row.active ? hasPermission("users.deactivate") : hasPermission("users.activate");
   return <div className="page-stack"><PageHeader eyebrow="Administración" title={`${row.firstName} ${row.lastName}`} description={row.email} actions={<>{hasPermission("users.update") ? <Link className="button button--secondary" to={`/app/admin/users/${id}/edit`}>Editar</Link> : null}{canLifecycle ? <Button variant={row.active ? "danger" : "primary"} onClick={() => setConfirm(true)}>{row.active ? "Desactivar" : "Activar"}</Button> : null}</>} />
-    <section className="panel detail-grid"><div className="detail-card"><h2>Identidad</h2><dl><div><dt>Correo</dt><dd>{row.email}</dd></div><div><dt>Estado</dt><dd><StatusBadge active={row.active} /></dd></div><div><dt>Roles</dt><dd><RoleBadges roles={row.roles} /></dd></div></dl></div><div className="detail-card"><h2>Permisos efectivos</h2><div className="permission-groups">{Object.entries(permissionsByDomain(effective)).map(([domain, permissions]) => <div key={domain}><strong>{domain}</strong><div className="badge-row">{permissions.map((permission) => <Badge key={permission}>{permission}</Badge>)}</div></div>)}</div></div></section>
+    <section className="panel detail-grid"><div className="detail-card"><h2>Identidad</h2><dl><div><dt>Correo</dt><dd>{row.email}</dd></div><div><dt>Estado</dt><dd><StatusBadge active={row.active} /></dd></div><div><dt>Roles</dt><dd><RoleBadges roles={row.roles} /></dd></div></dl></div><div className="detail-card"><h2>Permisos efectivos</h2><p className="muted">Suma de los permisos de todos los roles asignados a este usuario.</p><PermissionSummary permissions={effective} /></div></section>
     <ConfirmDialog open={confirm} title={`${row.active ? "Desactivar" : "Activar"} usuario`} description="El backend aplicará el cambio de acceso. No se elimina identidad ni historial." dangerous={row.active} loading={lifecycle.isPending} onCancel={() => setConfirm(false)} onConfirm={() => lifecycle.mutate(!row.active)} />
   </div>;
 }
@@ -97,7 +133,7 @@ export function RoleDetailPage() {
   if (detail.isLoading) return <div className="panel">Cargando rol…</div>;
   if (detail.error || !detail.data) return <FormFeedback error={apiErrorMessage(detail.error)} />;
   const row = detail.data;
-  return <div className="page-stack"><PageHeader eyebrow="Administración" title={row.name} description={row.description} actions={hasPermission("roles.manage") ? <Link className="button button--secondary" to={`/app/admin/roles/${id}/edit`}>Editar</Link> : undefined} /><section className="panel"><div className="section-heading"><div><h2>Permisos exactos</h2><p>Los códigos se envían sin traducción al servicio de usuarios.</p></div><StatusBadge active={row.active} /></div><div className="permission-groups">{Object.entries(permissionsByDomain(row.permissions)).map(([domain, permissions]) => <div key={domain}><strong>{domain}</strong><div className="badge-row">{permissions.map((permission) => <Badge key={permission}>{permission}</Badge>)}</div></div>)}</div></section></div>;
+  return <div className="page-stack"><PageHeader eyebrow="Administración" title={row.name} description={row.description} actions={hasPermission("roles.manage") ? <Link className="button button--secondary" to={`/app/admin/roles/${id}/edit`}>Editar</Link> : undefined} /><section className="panel"><div className="section-heading"><div><h2>Permisos incluidos</h2><p>Cada permiso se muestra con su nombre en español y su código técnico. El código es lo que recibe el backend, sin traducción.</p></div><StatusBadge active={row.active} /></div><PermissionSummary permissions={row.permissions} /></section></div>;
 }
 
 export function RoleFormPage() {
@@ -113,5 +149,5 @@ function RoleEditor({ id, initial }: { id?: string; initial?: Role }) {
   const client = useQueryClient();
   const [form, setForm] = useState<RoleInput>(() => initial ? { name: initial.name, description: initial.description, permissions: initial.permissions, active: initial.active } : { name: "", description: "", permissions: [], active: true });
   const mutation = useMutation({ mutationFn: (body: RoleInput) => id ? rolesApi.update(id, body) : rolesApi.create(body), onSuccess: async (row) => { client.setQueryData(queryKeys.role(row.id), row); await Promise.all([client.invalidateQueries({ queryKey: queryKeys.rolesRoot }), invalidateUserRoleIntegration(client)]); void navigate(`/app/admin/roles/${row.id}`, { replace: true }); } });
-  return <div className="page-stack"><PageHeader eyebrow="Administración" title={id ? "Editar rol" : "Nuevo rol"} description="Solo se aceptan los códigos de permiso existentes en el backend." /><form className="panel erp-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate(form); }}><FormFeedback error={mutation.error ? apiErrorMessage(mutation.error) : null} /><div className="form-grid"><Field label="Nombre" htmlFor="role-name" required hint="Minúsculas, números y guiones."><input id="role-name" required minLength={2} maxLength={60} pattern="[a-z0-9-]+" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field><Field label="Descripción" htmlFor="role-description" required><textarea id="role-description" required minLength={1} maxLength={200} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field><label className="check-field"><input type="checkbox" checked={form.active} onChange={(event) => setForm({ ...form, active: event.target.checked })} />Rol activo</label></div><fieldset className="form-section"><legend>Permisos</legend><div className="permission-groups">{Object.entries(permissionsByDomain(PERMISSION_CATALOG)).map(([domain, permissions]) => <div key={domain}><strong>{domain}</strong><div className="permission-grid">{permissions.map((permission) => <label className="check-field" key={permission}><input type="checkbox" checked={form.permissions.includes(permission)} onChange={(event) => setForm({ ...form, permissions: event.target.checked ? [...form.permissions, permission] : form.permissions.filter((item) => item !== permission) })} />{permission}</label>)}</div></div>)}</div></fieldset><div className="form-actions"><Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancelar</Button><Button type="submit" loading={mutation.isPending}>Guardar rol</Button></div></form></div>;
+  return <div className="page-stack"><PageHeader eyebrow="Administración" title={id ? "Editar rol" : "Nuevo rol"} description="Solo se aceptan los códigos de permiso existentes en el backend." /><form className="panel erp-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate(form); }}><FormFeedback error={mutation.error ? apiErrorMessage(mutation.error) : null} /><div className="form-grid"><Field label="Nombre" htmlFor="role-name" required hint="Minúsculas, números y guiones."><input id="role-name" required minLength={2} maxLength={60} pattern="[a-z0-9-]+" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field><Field label="Descripción" htmlFor="role-description" required><textarea id="role-description" required minLength={1} maxLength={200} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field><label className="check-field"><input type="checkbox" checked={form.active} onChange={(event) => setForm({ ...form, active: event.target.checked })} />Rol activo</label></div><fieldset className="form-section"><legend>Permisos</legend><p className="muted">Marca lo que este rol puede hacer. Los roles son conjuntos de permisos con nombre; el código entre paréntesis es lo que recibe el backend y no cambia.</p><div className="permission-groups">{Object.entries(permissionsByDomain(PERMISSION_CATALOG)).map(([domain, permissions]) => { const allChecked = permissions.every((permission) => form.permissions.includes(permission)); return <div key={domain}><div className="permission-group__head"><strong>{domainLabel(domain)}</strong><button type="button" className="link-button" onClick={() => setForm({ ...form, permissions: allChecked ? form.permissions.filter((item) => !permissions.includes(item)) : [...new Set([...form.permissions, ...permissions])] })}>{allChecked ? "Quitar todos" : "Marcar todos"}</button></div><div className="permission-options">{permissions.map((permission) => <label className="permission-option" key={permission}><input type="checkbox" checked={form.permissions.includes(permission)} onChange={(event) => setForm({ ...form, permissions: event.target.checked ? [...form.permissions, permission] : form.permissions.filter((item) => item !== permission) })} /><span className="permission-option__text"><span className="permission-option__name">{permissionLabel(permission)} <code>{permission}</code></span>{permissionDescription(permission) ? <span className="permission-option__hint">{permissionDescription(permission)}</span> : null}</span></label>)}</div></div>; })}</div></fieldset><div className="form-actions"><Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancelar</Button><Button type="submit" loading={mutation.isPending}>Guardar rol</Button></div></form></div>;
 }

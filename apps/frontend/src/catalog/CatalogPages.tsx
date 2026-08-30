@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import {
   catalogApi,
   type AttributeDefinitionInput,
@@ -10,6 +10,7 @@ import { Button } from "../components/Button";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
+import { HelpNote } from "../components/HelpNote";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { queryKeys } from "../query/query-keys";
@@ -40,6 +41,7 @@ function CatalogPage<T extends CatalogRecord>({
   kind,
   title,
   description,
+  help,
   queryKey,
   queryFn,
   createFn,
@@ -49,6 +51,7 @@ function CatalogPage<T extends CatalogRecord>({
   kind: string;
   title: string;
   description: string;
+  help?: ReactNode;
   queryKey: readonly unknown[];
   queryFn: () => Promise<T[]>;
   createFn: (input: CatalogInput) => Promise<T>;
@@ -155,6 +158,7 @@ function CatalogPage<T extends CatalogRecord>({
           ) : undefined
         }
       />
+      {help ? <HelpNote>{help}</HelpNote> : null}
       <FormFeedback success={success} />
       {editor ? (
         <form className="panel erp-form" onSubmit={submit}>
@@ -248,6 +252,7 @@ export function ProductCategoriesPage() {
       kind="Categoría"
       title="Categorías de producto"
       description="Clasificación controlada para catálogo y atributos."
+      help="Estas categorías aparecen en la lista desplegable al crear o editar un producto. También agrupan los atributos técnicos. Crea aquí las categorías con las que trabajas (por ejemplo Filtros, Frenos, Lubricantes) antes de dar de alta productos."
       queryKey={queryKeys.productCategories}
       queryFn={catalogApi.categories}
       createFn={catalogApi.createCategory}
@@ -263,6 +268,7 @@ export function ProductBrandsPage() {
       kind="Marca"
       title="Marcas de producto"
       description="Fabricantes y marcas comerciales del catálogo."
+      help="Estas marcas aparecen en la lista desplegable al crear o editar un producto. Son los fabricantes o marcas comerciales de la pieza (por ejemplo Bosch, NGK, Monroe), no las marcas de vehículo."
       queryKey={queryKeys.productBrands}
       queryFn={catalogApi.brands}
       createFn={catalogApi.createBrand}
@@ -382,6 +388,12 @@ export function ProductAttributesPage() {
           ) : undefined
         }
       />
+      <HelpNote>
+        Los atributos son las características técnicas de una pieza (por ejemplo
+        &quot;diámetro&quot;, &quot;rosca&quot;, &quot;viscosidad&quot;). Se
+        definen por categoría y aparecen como campos para llenar al crear un
+        producto de esa categoría.
+      </HelpNote>
       <FormFeedback success={success} />
       {editor ? (
         <form className="panel erp-form" onSubmit={submit}>

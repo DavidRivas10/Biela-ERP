@@ -6,6 +6,7 @@ import { Button } from "../components/Button";
 import { CommercialStatusBadge } from "../components/CommercialStatusBadge";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { Field } from "../components/Field";
+import { HelpNote } from "../components/HelpNote";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { SupplierSelector } from "../components/PurchasingSelectors";
@@ -104,6 +105,15 @@ export function PayablesPage() {
         title="Cuentas por pagar"
         description="Obligaciones y créditos operacionales derivados; no es contabilidad."
       />
+      <HelpNote title="Qué es esto">
+        Es lo que <strong>tú le debes a tus proveedores</strong>. Aparecen aquí
+        las compras que todavía no has pagado por completo. La obligación es el
+        valor de la compra menos las devoluciones que le hiciste al proveedor, y
+        el &quot;pendiente&quot; descuenta además lo que ya le pagaste. Una
+        compra se marca <strong>vencida</strong> cuando pasó su fecha de pago y
+        aún se debe dinero. Los pagos a proveedores se registran desde el
+        detalle de cada compra.
+      </HelpNote>
       {summary ? (
         <section className="commercial-summary-grid panel">
           <span>
