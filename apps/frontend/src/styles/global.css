@@ -1262,6 +1262,76 @@ h2 {
   gap: 0.15rem;
 }
 
+/* Barcode scanning */
+.input-with-action {
+  display: flex;
+  gap: 0.5rem;
+}
+.input-with-action input {
+  flex: 1;
+  min-width: 0;
+}
+.input-with-action .button {
+  flex: none;
+  white-space: nowrap;
+}
+.scan-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+.scan-row__feedback {
+  font-weight: 700;
+}
+.scan-row__feedback--ok {
+  color: var(--success);
+}
+.scan-row__feedback--error {
+  color: var(--danger);
+}
+.scanner-dialog {
+  width: min(30rem, 100%);
+}
+.scanner-dialog__error {
+  color: var(--danger);
+  line-height: 1.55;
+}
+.scanner-dialog__viewport {
+  position: relative;
+  margin-top: 0.5rem;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 4 / 3;
+}
+.scanner-dialog__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.scanner-dialog__reticle {
+  position: absolute;
+  inset: 18% 12%;
+  border: 2px solid rgb(255 255 255 / 85%);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 100vmax rgb(0 0 0 / 25%);
+}
+.scanner-dialog__hint {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0.6rem;
+  text-align: center;
+  color: white;
+  font-size: 0.82rem;
+}
+
 /* Plain-language help note */
 .help-note {
   display: flex;

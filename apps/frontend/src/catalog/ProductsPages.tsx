@@ -5,6 +5,7 @@ import { catalogApi, type ProductInput } from "../api/catalog-api";
 import { compatibilityApi } from "../api/compatibility-api";
 import { inventoryApi } from "../api/inventory-api";
 import { useAuth } from "../auth/AuthContext";
+import { BarcodeScanButton } from "../components/BarcodeScanButton";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
@@ -13,6 +14,7 @@ import { FormFeedback } from "../components/FormFeedback";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
+import { useKeyboardWedge } from "../hooks/use-keyboard-wedge";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
 import { invalidateProductReferenceIntegration } from "../query/invalidation";
@@ -286,6 +288,7 @@ export function ProductFormPage() {
       void navigate(`/app/catalog/products/${saved.id}`, { replace: true });
     },
   });
+  useKeyboardWedge((code) => setForm((current) => ({ ...current, code })));
   const visibleDefinitions =
     definitions.data?.filter(
       (definition) =>
@@ -332,16 +335,28 @@ export function ProductFormPage() {
           error={mutation.error ? apiErrorMessage(mutation.error) : null}
         />
         <div className="form-grid">
-          <Field label="Código" htmlFor="product-code" required>
-            <input
-              id="product-code"
-              required
-              minLength={2}
-              maxLength={80}
-              pattern="[A-Za-z0-9][A-Za-z0-9._/-]*"
-              value={form.code}
-              onChange={(e) => setForm({ ...form, code: e.target.value })}
-            />
+          <Field
+            label="Código"
+            htmlFor="product-code"
+            required
+            hint="Escríbelo, escanéalo con la cámara, o dispara un lector físico USB/Bluetooth con el cursor en cualquier parte del formulario."
+          >
+            <div className="input-with-action">
+              <input
+                id="product-code"
+                required
+                minLength={2}
+                maxLength={80}
+                pattern="[A-Za-z0-9][A-Za-z0-9._/-]*"
+                value={form.code}
+                onChange={(e) => setForm({ ...form, code: e.target.value })}
+              />
+              <BarcodeScanButton
+                label="Cámara"
+                title="Escanear código del producto"
+                onScan={(code) => setForm((current) => ({ ...current, code }))}
+              />
+            </div>
           </Field>
           <Field label="Nombre" htmlFor="product-name" required>
             <input

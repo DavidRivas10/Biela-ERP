@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState, type FormEvent } from "react";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { purchasingApi, type PurchaseInput } from "../api/purchasing-api";
 import { useAuth } from "../auth/AuthContext";
+import { BarcodeScanButton } from "../components/BarcodeScanButton";
 import { Button } from "../components/Button";
 import { CommercialStatusBadge } from "../components/CommercialStatusBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -13,9 +14,12 @@ import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { ProductSelector } from "../components/EntitySelectors";
 import { SupplierSelector } from "../components/PurchasingSelectors";
+import { useKeyboardWedge } from "../hooks/use-keyboard-wedge";
+import { useScanToProduct } from "../hooks/use-scan-to-product";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
 import { invalidateCommercialSummary } from "../query/invalidation";
+import type { Product } from "../types/erp";
 import type {
   Purchase,
   PurchaseReceipt,
@@ -281,6 +285,22 @@ function PurchaseFormEditor({
       ),
     );
   }
+  const addScannedProduct = useCallback((product: Product) => {
+    setLines((current) => {
+      if (current.some((line) => line.productId === product.id)) return current;
+      const emptyIndex = current.findIndex((line) => !line.productId);
+      if (emptyIndex >= 0) {
+        return current.map((line, index) =>
+          index === emptyIndex ? { ...line, productId: product.id } : line,
+        );
+      }
+      const nextKey = Math.max(...current.map((line) => line.key)) + 1;
+      return [...current, { ...newLine(nextKey), productId: product.id }];
+    });
+  }, []);
+  const { handleScan, feedback: scanFeedback } =
+    useScanToProduct(addScannedProduct);
+  useKeyboardWedge(handleScan);
   function submit(event: FormEvent) {
     event.preventDefault();
     if (duplicateProducts) {
@@ -370,6 +390,24 @@ function PurchaseFormEditor({
             La vista no suma importes como fuente de verdad; el total exacto
             aparecerá después de guardar.
           </p>
+          <div className="scan-row">
+            <BarcodeScanButton
+              label="Escanear producto"
+              title="Escanear producto para la compra"
+              onScan={handleScan}
+            />
+            <span className="muted">
+              o dispara un lector físico USB/Bluetooth: se agrega el producto a
+              la compra.
+            </span>
+            {scanFeedback ? (
+              <span
+                className={`scan-row__feedback scan-row__feedback--${scanFeedback.tone}`}
+              >
+                {scanFeedback.text}
+              </span>
+            ) : null}
+          </div>
           {lines.map((line, index) => (
             <div className="purchase-line" key={line.key}>
               <ProductSelector

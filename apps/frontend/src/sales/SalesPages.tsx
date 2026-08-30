@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState, type FormEvent } from "react";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { salesApi, type SaleInput } from "../api/sales-api";
 import { useAuth } from "../auth/AuthContext";
+import { BarcodeScanButton } from "../components/BarcodeScanButton";
 import { Button } from "../components/Button";
 import { CommercialStatusBadge } from "../components/CommercialStatusBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -13,6 +14,8 @@ import { FormFeedback } from "../components/FormFeedback";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { CustomerSelector } from "../components/SalesSelectors";
+import { useKeyboardWedge } from "../hooks/use-keyboard-wedge";
+import { useScanToProduct } from "../hooks/use-scan-to-product";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
 import {
@@ -76,6 +79,19 @@ function SaleEditor({ id, initial }: { id?: string; initial?: Sale }) {
   const duplicate = useMemo(() => { const keys = lines.filter((line) => line.productId && line.sourceLocationId).map((line) => `${line.productId}:${line.sourceLocationId}`); return new Set(keys).size !== keys.length; }, [lines]);
   const mutation = useMutation({ mutationFn: (body: SaleInput) => id ? salesApi.update(id, body) : salesApi.create(body), onSuccess: async (sale) => { client.setQueryData(queryKeys.sale(sale.id), sale); await client.invalidateQueries({ queryKey: queryKeys.salesRoot }); void navigate(`/app/sales/${sale.id}`, { replace: true }); } });
   const updateLine = (key: number, changes: Partial<Line>) => setLines((current) => current.map((line) => line.key === key ? { ...line, ...changes } : line));
+  const addScannedProduct = useCallback((product: Product) => {
+    setLines((current) => {
+      const price = product.defaultSalePrice ?? "";
+      const emptyIndex = current.findIndex((line) => !line.productId);
+      if (emptyIndex >= 0) {
+        return current.map((line, index) => index === emptyIndex ? { ...line, productId: product.id, unitPrice: line.unitPrice || price } : line);
+      }
+      const nextKey = Math.max(...current.map((line) => line.key)) + 1;
+      return [...current, { ...newLine(nextKey), productId: product.id, unitPrice: price }];
+    });
+  }, []);
+  const { handleScan, feedback: scanFeedback } = useScanToProduct(addScannedProduct);
+  useKeyboardWedge(handleScan);
   function submit(event: FormEvent) {
     event.preventDefault();
     if (duplicate) { setFormError("Una combinación de producto y ubicación solo puede aparecer una vez."); return; }
@@ -84,7 +100,9 @@ function SaleEditor({ id, initial }: { id?: string; initial?: Sale }) {
   }
   return <div className="page-stack"><PageHeader eyebrow="Ventas" title={id ? "Editar venta" : "Nueva venta"} description="Guardar conserva el borrador sin tocar inventario; el servidor calcula todos los importes exactos." />
     <form className="panel erp-form" onSubmit={submit}><FormFeedback error={formError ?? (mutation.error ? apiErrorMessage(mutation.error) : null)} /><div className="form-grid"><CustomerSelector id="sale-customer" label="Cliente" value={customerId} onChange={setCustomerId} /><Field label="Fecha del documento" htmlFor="sale-date" required><input id="sale-date" type="date" required value={documentDate} onChange={(e) => setDocumentDate(e.target.value)} /></Field><Field label="Fecha de vencimiento" htmlFor="sale-due"><input id="sale-due" type="date" value={paymentDueDate} onChange={(e) => setPaymentDueDate(e.target.value)} /></Field><Field label="Notas" htmlFor="sale-notes"><textarea id="sale-notes" maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field></div>
-      <fieldset className="form-section purchase-lines"><legend>Productos</legend><p>El precio sugerido se toma del producto; el backend mantiene la verdad histórica en cada línea.</p>{lines.map((line, index) => <div className="purchase-line" key={line.key}>
+      <fieldset className="form-section purchase-lines"><legend>Productos</legend><p>El precio sugerido se toma del producto; el backend mantiene la verdad histórica en cada línea.</p>
+        <div className="scan-row"><BarcodeScanButton label="Escanear producto" title="Escanear producto para la venta" onScan={handleScan} /><span className="muted">o dispara un lector físico USB/Bluetooth: se agrega el producto a la venta.</span>{scanFeedback ? <span className={`scan-row__feedback scan-row__feedback--${scanFeedback.tone}`}>{scanFeedback.text}</span> : null}</div>
+        {lines.map((line, index) => <div className="purchase-line" key={line.key}>
         <ProductSelector id={`sale-product-${line.key}`} label={`Producto ${index + 1}`} required value={line.productId} onChange={(productId, item?: Product) => updateLine(line.key, { productId, unitPrice: item?.defaultSalePrice ?? line.unitPrice })} />
         <LocationSelector id={`sale-location-${line.key}`} label="Ubicación origen" required value={line.sourceLocationId} onChange={(sourceLocationId) => updateLine(line.key, { sourceLocationId })} />
         <Field label="Cantidad" htmlFor={`sale-qty-${line.key}`} required><input id={`sale-qty-${line.key}`} required type="number" min={1} step={1} value={line.quantity} onChange={(e) => updateLine(line.key, { quantity: e.target.value })} /></Field>

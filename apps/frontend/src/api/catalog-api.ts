@@ -77,6 +77,23 @@ export const catalogApi = {
   products: (query: Record<string, QueryValue>) =>
     apiRequest<Paginated<Product>>("/api/products", { query }),
   product: (id: string) => apiRequest<Product>(`/api/products/${id}`),
+  /**
+   * Resolve a scanned barcode to a single active product by exact code.
+   * Uses the server product search and then matches the code case-insensitively,
+   * so a partial-text hit never returns the wrong product.
+   */
+  findProductByCode: async (code: string): Promise<Product | null> => {
+    const term = code.trim();
+    if (!term) return null;
+    const result = await apiRequest<Paginated<Product>>("/api/products", {
+      query: { search: term, limit: 10, active: true },
+    });
+    const normalized = term.toLowerCase();
+    return (
+      result.data.find((product) => product.code.toLowerCase() === normalized) ??
+      null
+    );
+  },
   createProduct: (body: ProductInput) =>
     apiRequest<Product>("/api/products", { method: "POST", body }),
   updateProduct: (id: string, body: Partial<ProductInput>) =>
