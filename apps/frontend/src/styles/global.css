@@ -101,9 +101,16 @@ h2 {
   color: white;
   font-weight: 900;
 }
+.brand-mark svg {
+  width: 64%;
+  height: 64%;
+}
 .brand-lockup--light .brand-mark {
   background: white;
   color: var(--green-900);
+}
+.brand-lockup--centered {
+  justify-content: center;
 }
 .eyebrow {
   margin-bottom: 0.4rem;
@@ -242,6 +249,48 @@ h2 {
   min-height: 3rem;
   color: var(--muted);
 }
+
+.engine-loader {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--primary);
+}
+.engine-loader__label {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.engine-loader__piston {
+  animation: piston-stroke 900ms ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.engine-loader__piston--b {
+  animation-delay: -300ms;
+}
+.engine-loader__piston--c {
+  animation-delay: -600ms;
+}
+.engine-loader__crank {
+  animation: crank-spin 900ms linear infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes piston-stroke {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(15px);
+  }
+}
+@keyframes crank-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .centered-page {
   display: grid;
   min-height: 100vh;
@@ -286,15 +335,32 @@ h2 {
   background: var(--surface);
 }
 .login-intro {
+  position: relative;
   display: flex;
   align-items: flex-end;
+  overflow: hidden;
   padding: clamp(2rem, 6vw, 5.5rem);
   background:
     linear-gradient(145deg, rgb(11 48 39 / 94%), rgb(16 70 56 / 96%)),
     radial-gradient(circle at 70% 20%, #4aa98b, transparent 45%);
   color: white;
 }
+.login-intro__watermark {
+  position: absolute;
+  right: -9rem;
+  bottom: -9rem;
+  width: clamp(16rem, 26vw, 24rem);
+  color: rgb(255 255 255 / 5%);
+  transform: rotate(-18deg);
+  pointer-events: none;
+}
+.login-intro__watermark svg {
+  width: 100%;
+  height: auto;
+  stroke-width: 1;
+}
 .login-intro__content {
+  position: relative;
   max-width: 36rem;
 }
 .login-intro h1 {

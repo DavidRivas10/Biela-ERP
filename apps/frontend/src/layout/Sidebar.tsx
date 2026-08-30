@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { BielaMark } from "../components/BielaMark";
 import type { NavigationGroup } from "./navigation";
 
 export function Sidebar({
@@ -24,7 +25,9 @@ export function Sidebar({
         aria-label="Navegación principal"
       >
         <div className="brand-lockup sidebar__brand">
-          <span className="brand-mark">B</span>
+          <span className="brand-mark">
+            <BielaMark />
+          </span>
           <span>BIELA</span>
         </div>
         <nav className="sidebar__nav">

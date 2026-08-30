@@ -2,7 +2,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, isApiUnavailable } from "../api/api-client";
 import { Alert } from "../components/Alert";
+import { BielaMark } from "../components/BielaMark";
 import { Button } from "../components/Button";
+import { EngineLoader } from "../components/EngineLoader";
 import { useAuth } from "../auth/AuthContext";
 
 function safeDestination(value: unknown): string {
@@ -56,9 +58,14 @@ export function LoginPage() {
   return (
     <main className="login-page">
       <section className="login-intro" aria-label="Bienvenida a BIELA">
+        <span className="login-intro__watermark" aria-hidden="true">
+          <BielaMark />
+        </span>
         <div className="login-intro__content">
           <div className="brand-lockup brand-lockup--light">
-            <span className="brand-mark">B</span>
+            <span className="brand-mark">
+              <BielaMark />
+            </span>
             <span>BIELA</span>
           </div>
           <p className="eyebrow eyebrow--light">
@@ -83,6 +90,9 @@ export function LoginPage() {
           </div>
 
           {error ? <Alert title={error} /> : null}
+          {submitting ? (
+            <EngineLoader label="Verificando credenciales…" />
+          ) : null}
 
           <label className="field">
             <span>Correo electrónico</span>
