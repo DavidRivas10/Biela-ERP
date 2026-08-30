@@ -8,6 +8,8 @@ export const queryKeys = {
   productDetailsRoot: ["catalog", "product"] as const,
   products: (filters: object) => ["catalog", "products", filters] as const,
   product: (id: string) => ["catalog", "product", id] as const,
+  productPhotos: (id: string) =>
+    ["catalog", "product", id, "photos"] as const,
   vehicleBrands: ["vehicles", "brands"] as const,
   vehicleModelsRoot: ["vehicles", "models"] as const,
   vehicleModels: (brandId = "all") => ["vehicles", "models", brandId] as const,
@@ -43,6 +45,8 @@ export const queryKeys = {
   purchaseDetailsRoot: ["purchasing", "purchase"] as const,
   purchases: (filters: object) => ["purchasing", "purchases", filters] as const,
   purchase: (id: string) => ["purchasing", "purchase", id] as const,
+  purchaseAttachments: (id: string) =>
+    ["purchasing", "purchase", id, "attachments"] as const,
   receiptsRoot: ["purchasing", "receipts"] as const,
   receipts: (purchaseId: string, filters: object) =>
     ["purchasing", "receipts", purchaseId, filters] as const,

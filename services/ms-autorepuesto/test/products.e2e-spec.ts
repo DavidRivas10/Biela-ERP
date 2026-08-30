@@ -190,4 +190,77 @@ describe("Products HTTP with PostgreSQL", () => {
       .send({ referenceCost: "not-a-number" })
       .expect(400);
   });
+
+  it("uploads, lists, serves and deletes product photos, and enforces limits", async () => {
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64",
+    );
+
+    // rejects a non-image
+    await request(app.getHttpServer())
+      .post(`/products/${productId}/photos`)
+      .attach("file", Buffer.from("not an image"), {
+        filename: "note.txt",
+        contentType: "text/plain",
+      })
+      .expect(415);
+
+    const uploaded = await request(app.getHttpServer())
+      .post(`/products/${productId}/photos`)
+      .attach("file", png, { filename: "front.png", contentType: "image/png" })
+      .expect(201);
+    expect(Array.isArray(uploaded.body)).toBe(true);
+    expect(uploaded.body).toHaveLength(1);
+    const photo = uploaded.body[0];
+    expect(photo).toMatchObject({
+      productId,
+      mimeType: "image/png",
+      originalName: "front.png",
+      position: 0,
+    });
+    expect(typeof photo.id).toBe("string");
+    expect(photo.sizeBytes).toBe(png.length);
+
+    await request(app.getHttpServer())
+      .get(`/products/${productId}/photos`)
+      .expect(200)
+      .expect((response) => expect(response.body).toHaveLength(1));
+
+    await request(app.getHttpServer())
+      .get(`/products/${productId}/photos/${photo.id}`)
+      .expect(200)
+      .expect("Content-Type", /image\/png/)
+      .expect((response) => expect(response.body).toEqual(png));
+
+    // fill up to the max of 5 and reject the sixth
+    for (let index = 0; index < 4; index += 1) {
+      await request(app.getHttpServer())
+        .post(`/products/${productId}/photos`)
+        .attach("file", png, {
+          filename: `extra-${index}.png`,
+          contentType: "image/png",
+        })
+        .expect(201);
+    }
+    await request(app.getHttpServer())
+      .post(`/products/${productId}/photos`)
+      .attach("file", png, { filename: "sixth.png", contentType: "image/png" })
+      .expect(400);
+
+    const afterDelete = await request(app.getHttpServer())
+      .delete(`/products/${productId}/photos/${photo.id}`)
+      .expect(200);
+    expect(afterDelete.body).toHaveLength(4);
+    await request(app.getHttpServer())
+      .get(`/products/${productId}/photos/${photo.id}`)
+      .expect(404);
+
+    // clean the remaining photos so no files linger on disk
+    for (const remaining of afterDelete.body as Array<{ id: string }>) {
+      await request(app.getHttpServer())
+        .delete(`/products/${productId}/photos/${remaining.id}`)
+        .expect(200);
+    }
+  });
 });

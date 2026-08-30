@@ -11,6 +11,7 @@ coverage/
 .vscode/
 *.tsbuildinfo
 services/ms-autorepuesto/prisma/dev.db*
+services/ms-autorepuesto/uploads/
 backups/
 *.dump
 *.archive

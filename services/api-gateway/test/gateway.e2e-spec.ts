@@ -19,7 +19,11 @@ import { CommercialController } from "../src/commercial/commercial.controller";
 
 describe("API Gateway HTTP", () => {
   let app: INestApplication;
-  const upstream = { request: jest.fn() };
+  const upstream = {
+    request: jest.fn(),
+    upload: jest.fn(),
+    getBinary: jest.fn(),
+  };
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
@@ -46,7 +50,11 @@ describe("API Gateway HTTP", () => {
   });
 
   afterAll(async () => app.close());
-  beforeEach(() => upstream.request.mockReset());
+  beforeEach(() => {
+    upstream.request.mockReset();
+    upstream.upload.mockReset();
+    upstream.getBinary.mockReset();
+  });
 
   it("GET /health returns gateway health", () =>
     request(app.getHttpServer()).get("/health").expect(200, {
@@ -87,6 +95,61 @@ describe("API Gateway HTTP", () => {
       path: "products",
       authorization: "Bearer catalog-token",
       body: expect.objectContaining({ code: "BP-001" }),
+    });
+  });
+
+  it("forwards a product photo upload as multipart to ms-autorepuesto", async () => {
+    upstream.upload.mockResolvedValue([{ id: "photo-1", position: 0 }]);
+    await request(app.getHttpServer())
+      .post("/api/products/product-id/photos")
+      .set("Authorization", "Bearer catalog-token")
+      .attach("file", Buffer.from("PNGDATA"), {
+        filename: "front.png",
+        contentType: "image/png",
+      })
+      .expect(201);
+    expect(upstream.upload).toHaveBeenCalledWith(
+      "autorepuesto",
+      expect.objectContaining({
+        path: "products/product-id/photos",
+        authorization: "Bearer catalog-token",
+        file: expect.objectContaining({
+          originalname: "front.png",
+          mimetype: "image/png",
+        }),
+      }),
+    );
+  });
+
+  it("streams a product photo's bytes back with its content type", async () => {
+    upstream.getBinary.mockResolvedValue({
+      status: 200,
+      contentType: "image/png",
+      contentDisposition: 'inline; filename="front.png"',
+      body: Buffer.from("PNGBYTES"),
+    });
+    const response = await request(app.getHttpServer())
+      .get("/api/products/product-id/photos/photo-1")
+      .set("Authorization", "Bearer catalog-token")
+      .expect(200)
+      .expect("Content-Type", /image\/png/);
+    expect(response.body).toEqual(Buffer.from("PNGBYTES"));
+    expect(upstream.getBinary).toHaveBeenCalledWith("autorepuesto", {
+      path: "products/product-id/photos/photo-1",
+      authorization: "Bearer catalog-token",
+    });
+  });
+
+  it("forwards a product photo deletion as a thin DELETE", async () => {
+    upstream.request.mockResolvedValue([]);
+    await request(app.getHttpServer())
+      .delete("/api/products/product-id/photos/photo-1")
+      .set("Authorization", "Bearer catalog-token")
+      .expect(200);
+    expect(upstream.request).toHaveBeenCalledWith("autorepuesto", {
+      method: "DELETE",
+      path: "products/product-id/photos/photo-1",
+      authorization: "Bearer catalog-token",
     });
   });
 
@@ -232,6 +295,56 @@ describe("API Gateway HTTP", () => {
       path: "purchase-returns/return-id/post",
       authorization: "Bearer purchasing-token",
       body: undefined,
+    });
+  });
+
+  it("forwards purchase attachment upload, download and deletion", async () => {
+    upstream.upload.mockResolvedValue([{ id: "att-1" }]);
+    await request(app.getHttpServer())
+      .post("/api/purchases/purchase-id/attachments")
+      .set("Authorization", "Bearer purchasing-token")
+      .attach("file", Buffer.from("%PDF-1.4"), {
+        filename: "factura.pdf",
+        contentType: "application/pdf",
+      })
+      .expect(201);
+    expect(upstream.upload).toHaveBeenCalledWith(
+      "autorepuesto",
+      expect.objectContaining({
+        path: "purchases/purchase-id/attachments",
+        authorization: "Bearer purchasing-token",
+        file: expect.objectContaining({
+          originalname: "factura.pdf",
+          mimetype: "application/pdf",
+        }),
+      }),
+    );
+
+    upstream.getBinary.mockResolvedValue({
+      status: 200,
+      contentType: "application/pdf",
+      contentDisposition: undefined,
+      body: Buffer.from("%PDF-1.4"),
+    });
+    await request(app.getHttpServer())
+      .get("/api/purchases/purchase-id/attachments/att-1")
+      .set("Authorization", "Bearer purchasing-token")
+      .expect(200)
+      .expect("Content-Type", /application\/pdf/);
+    expect(upstream.getBinary).toHaveBeenCalledWith("autorepuesto", {
+      path: "purchases/purchase-id/attachments/att-1",
+      authorization: "Bearer purchasing-token",
+    });
+
+    upstream.request.mockResolvedValue([]);
+    await request(app.getHttpServer())
+      .delete("/api/purchases/purchase-id/attachments/att-1")
+      .set("Authorization", "Bearer purchasing-token")
+      .expect(200);
+    expect(upstream.request).toHaveBeenCalledWith("autorepuesto", {
+      method: "DELETE",
+      path: "purchases/purchase-id/attachments/att-1",
+      authorization: "Bearer purchasing-token",
     });
   });
 

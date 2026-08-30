@@ -131,10 +131,25 @@ model Product {
   inventoryMovements InventoryMovement[]
   purchaseItems      PurchaseItem[]
   saleItems          SaleItem[]
+  photos             ProductPhoto[]
 
   @@index([categoryId])
   @@index([brandId])
   @@index([active])
+}
+
+model ProductPhoto {
+  id           String   @id @default(uuid()) @db.Uuid
+  productId    String   @db.Uuid
+  storageKey   String   @unique @db.VarChar(200)
+  originalName String   @db.VarChar(255)
+  mimeType     String   @db.VarChar(100)
+  sizeBytes    Int
+  position     Int
+  createdAt    DateTime @default(now())
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, position])
 }
 
 model ProductAttributeDefinition {
@@ -341,12 +356,26 @@ model Purchase {
   receipts               PurchaseReceipt[]
   returns                PurchaseReturn[]
   payments               Payment[]
+  attachments            PurchaseAttachment[]
 
   @@index([supplierId, documentDate])
   @@index([status, documentDate])
   @@index([supplierId, paymentDueDate, status])
   @@index([paymentDueDate, status])
   @@index([supplierDocumentNumber])
+}
+
+model PurchaseAttachment {
+  id           String   @id @default(uuid()) @db.Uuid
+  purchaseId   String   @db.Uuid
+  storageKey   String   @unique @db.VarChar(200)
+  originalName String   @db.VarChar(255)
+  mimeType     String   @db.VarChar(100)
+  sizeBytes    Int
+  createdAt    DateTime @default(now())
+  purchase     Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId])
 }
 
 model PurchaseItem {

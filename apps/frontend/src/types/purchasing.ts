@@ -94,6 +94,15 @@ export interface Purchase {
   _count?: { items: number };
 }
 
+export interface PurchaseAttachment {
+  id: string;
+  purchaseId: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
 export interface PurchaseReceiptItem {
   id: string;
   purchaseItemId: string;

@@ -1,15 +1,29 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Param,
   Patch,
   Post,
   Query,
+  StreamableFile,
+  UploadedFile,
+  UseInterceptors,
 } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { FileInterceptor } from "@nestjs/platform-express";
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from "@nestjs/swagger";
 import { UpstreamService } from "../upstream/upstream.service";
+
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 type ProxyBody = Record<string, unknown>;
 type ProxyQuery = Record<string, string | string[] | undefined>;
@@ -87,6 +101,68 @@ export class ProductsController {
     @Headers("authorization") authorization?: string,
   ) {
     return this.request("PATCH", `products/${id}/deactivate`, authorization);
+  }
+
+  @Get("products/:id/photos")
+  @ApiOperation({ summary: "List a product's photos through ms-autorepuesto" })
+  listProductPhotos(
+    @Param("id") id: string,
+    @Headers("authorization") authorization?: string,
+  ) {
+    return this.upstream.request("autorepuesto", {
+      path: `products/${id}/photos`,
+      authorization,
+    });
+  }
+
+  @Post("products/:id/photos")
+  @UseInterceptors(
+    FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD_BYTES } }),
+  )
+  @ApiConsumes("multipart/form-data")
+  @ApiOperation({ summary: "Upload a product photo through ms-autorepuesto" })
+  uploadProductPhoto(
+    @Param("id") id: string,
+    @UploadedFile() file?: Express.Multer.File,
+    @Headers("authorization") authorization?: string,
+  ) {
+    if (!file) throw new BadRequestException("A file field is required");
+    return this.upstream.upload("autorepuesto", {
+      path: `products/${id}/photos`,
+      authorization,
+      file,
+    });
+  }
+
+  @Get("products/:id/photos/:photoId")
+  @ApiOperation({ summary: "Download a product photo through ms-autorepuesto" })
+  async getProductPhoto(
+    @Param("id") id: string,
+    @Param("photoId") photoId: string,
+    @Headers("authorization") authorization?: string,
+  ): Promise<StreamableFile> {
+    const file = await this.upstream.getBinary("autorepuesto", {
+      path: `products/${id}/photos/${photoId}`,
+      authorization,
+    });
+    return new StreamableFile(file.body, {
+      type: file.contentType,
+      disposition: file.contentDisposition,
+    });
+  }
+
+  @Delete("products/:id/photos/:photoId")
+  @ApiOperation({ summary: "Remove a product photo through ms-autorepuesto" })
+  deleteProductPhoto(
+    @Param("id") id: string,
+    @Param("photoId") photoId: string,
+    @Headers("authorization") authorization?: string,
+  ) {
+    return this.upstream.request("autorepuesto", {
+      method: "DELETE",
+      path: `products/${id}/photos/${photoId}`,
+      authorization,
+    });
   }
 
   @Get("products/:id/vehicles")

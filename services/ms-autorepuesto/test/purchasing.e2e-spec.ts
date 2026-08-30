@@ -610,4 +610,47 @@ describe("Purchasing lifecycle and Inventory integration", () => {
       .expect(200)
       .expect((response) => expect(response.body.status).toBe("DRAFT"));
   });
+
+  it("attaches, lists, serves and deletes purchase documents, and enforces limits", async () => {
+    const purchase = await createPurchase();
+    const pdf = Buffer.from("%PDF-1.4\n%mock invoice\n%%EOF");
+
+    const uploaded = await request(app.getHttpServer())
+      .post(`/purchases/${purchase.body.id}/attachments`)
+      .attach("file", pdf, {
+        filename: "factura.pdf",
+        contentType: "application/pdf",
+      })
+      .expect(201);
+    expect(uploaded.body).toHaveLength(1);
+    const attachment = uploaded.body[0];
+    expect(attachment).toMatchObject({
+      purchaseId: purchase.body.id,
+      mimeType: "application/pdf",
+      originalName: "factura.pdf",
+      sizeBytes: pdf.length,
+    });
+
+    await request(app.getHttpServer())
+      .post(`/purchases/${purchase.body.id}/attachments`)
+      .attach("file", Buffer.from("<svg/>"), {
+        filename: "bad.svg",
+        contentType: "image/svg+xml",
+      })
+      .expect(415);
+
+    await request(app.getHttpServer())
+      .get(`/purchases/${purchase.body.id}/attachments/${attachment.id}`)
+      .expect(200)
+      .expect("Content-Type", /application\/pdf/)
+      .expect((response) => expect(response.body).toEqual(pdf));
+
+    const afterDelete = await request(app.getHttpServer())
+      .delete(`/purchases/${purchase.body.id}/attachments/${attachment.id}`)
+      .expect(200);
+    expect(afterDelete.body).toHaveLength(0);
+    await request(app.getHttpServer())
+      .get(`/purchases/${purchase.body.id}/attachments/${attachment.id}`)
+      .expect(404);
+  });
 });

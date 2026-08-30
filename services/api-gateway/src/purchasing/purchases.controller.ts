@@ -1,21 +1,30 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Param,
   Patch,
   Post,
   Query,
+  StreamableFile,
+  UploadedFile,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiQuery,
   ApiTags,
 } from "@nestjs/swagger";
 import { UpstreamService } from "../upstream/upstream.service";
+
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 type ProxyBody = Record<string, unknown>;
 type ProxyQuery = Record<string, string | string[] | undefined>;
@@ -245,6 +254,65 @@ export class PurchasesController {
     @Headers("authorization") authorization?: string,
   ) {
     return this.request("POST", `purchase-returns/${id}/post`, authorization);
+  }
+
+  @Get("purchases/:id/attachments")
+  @ApiOperation({ summary: "List a purchase's attachments through ms-autorepuesto" })
+  listAttachments(
+    @Param("id") id: string,
+    @Headers("authorization") authorization?: string,
+  ) {
+    return this.get(`purchases/${id}/attachments`, authorization);
+  }
+
+  @Post("purchases/:id/attachments")
+  @UseInterceptors(
+    FileInterceptor("file", { limits: { fileSize: MAX_ATTACHMENT_BYTES } }),
+  )
+  @ApiConsumes("multipart/form-data")
+  @ApiOperation({ summary: "Upload a purchase attachment through ms-autorepuesto" })
+  uploadAttachment(
+    @Param("id") id: string,
+    @UploadedFile() file?: Express.Multer.File,
+    @Headers("authorization") authorization?: string,
+  ) {
+    if (!file) throw new BadRequestException("A file field is required");
+    return this.upstream.upload("autorepuesto", {
+      path: `purchases/${id}/attachments`,
+      authorization,
+      file,
+    });
+  }
+
+  @Get("purchases/:id/attachments/:attachmentId")
+  @ApiOperation({ summary: "Download a purchase attachment through ms-autorepuesto" })
+  async getAttachment(
+    @Param("id") id: string,
+    @Param("attachmentId") attachmentId: string,
+    @Headers("authorization") authorization?: string,
+  ): Promise<StreamableFile> {
+    const file = await this.upstream.getBinary("autorepuesto", {
+      path: `purchases/${id}/attachments/${attachmentId}`,
+      authorization,
+    });
+    return new StreamableFile(file.body, {
+      type: file.contentType,
+      disposition: file.contentDisposition,
+    });
+  }
+
+  @Delete("purchases/:id/attachments/:attachmentId")
+  @ApiOperation({ summary: "Remove a purchase attachment through ms-autorepuesto" })
+  deleteAttachment(
+    @Param("id") id: string,
+    @Param("attachmentId") attachmentId: string,
+    @Headers("authorization") authorization?: string,
+  ) {
+    return this.upstream.request("autorepuesto", {
+      method: "DELETE",
+      path: `purchases/${id}/attachments/${attachmentId}`,
+      authorization,
+    });
   }
 
   private get(path: string, authorization?: string) {

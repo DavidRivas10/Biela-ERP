@@ -58,6 +58,16 @@ export interface Product {
   updatedAt: string;
 }
 
+export interface ProductPhoto {
+  id: string;
+  productId: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  position: number;
+  createdAt: string;
+}
+
 export interface VehicleModel extends CatalogRecord {
   brandId: string;
   brand: VehicleBrand;

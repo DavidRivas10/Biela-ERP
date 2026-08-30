@@ -1,7 +1,8 @@
-import { apiRequest } from "./api-client";
+import { apiBlob, apiRequest, apiUpload } from "./api-client";
 import type { Paginated, QueryValue } from "../types/erp";
 import type {
   Purchase,
+  PurchaseAttachment,
   PurchaseReceipt,
   PurchaseReturn,
 } from "../types/purchasing";
@@ -80,4 +81,23 @@ export const purchasingApi = {
     apiRequest<PurchaseReturn>(`/api/purchase-returns/${id}/post`, {
       method: "POST",
     }),
+  attachments: (purchaseId: string) =>
+    apiRequest<PurchaseAttachment[]>(
+      `/api/purchases/${purchaseId}/attachments`,
+    ),
+  uploadAttachment: (purchaseId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiUpload<PurchaseAttachment[]>(
+      `/api/purchases/${purchaseId}/attachments`,
+      form,
+    );
+  },
+  deleteAttachment: (purchaseId: string, attachmentId: string) =>
+    apiRequest<PurchaseAttachment[]>(
+      `/api/purchases/${purchaseId}/attachments/${attachmentId}`,
+      { method: "DELETE" },
+    ),
+  attachmentBlob: (purchaseId: string, attachmentId: string) =>
+    apiBlob(`/api/purchases/${purchaseId}/attachments/${attachmentId}`),
 };

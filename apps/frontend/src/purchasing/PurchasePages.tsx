@@ -17,6 +17,7 @@ import { SupplierSelector } from "../components/PurchasingSelectors";
 import { useKeyboardWedge } from "../hooks/use-keyboard-wedge";
 import { useScanToProduct } from "../hooks/use-scan-to-product";
 import { useUrlFilters } from "../hooks/use-url-filters";
+import { PurchaseAttachmentManager } from "./PurchaseAttachmentManager";
 import { queryKeys } from "../query/query-keys";
 import { invalidateCommercialSummary } from "../query/invalidation";
 import type { Product } from "../types/erp";
@@ -348,7 +349,7 @@ function PurchaseFormEditor({
           <Field
             label="Documento del proveedor"
             htmlFor="purchase-document"
-            hint="Solo el número de la factura o remisión del proveedor, como referencia. No se sube ningún archivo aquí."
+            hint="Solo el número de la factura o remisión, como referencia. El archivo de la factura se adjunta desde la ficha de la compra, después de guardarla."
           >
             <input
               id="purchase-document"
@@ -740,6 +741,10 @@ export function PurchaseDetailPage() {
           </dl>
         </article>
       </section>
+      <PurchaseAttachmentManager
+        purchaseId={id}
+        canEdit={hasPermission("purchases.update")}
+      />
       {row.paymentSummary ? (
         <section className="panel">
           <div className="section-heading">

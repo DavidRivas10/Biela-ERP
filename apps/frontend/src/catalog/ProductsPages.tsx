@@ -16,6 +16,7 @@ import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
 import { useKeyboardWedge } from "../hooks/use-keyboard-wedge";
 import { useUrlFilters } from "../hooks/use-url-filters";
+import { ProductPhotoManager } from "./ProductPhotoManager";
 import { queryKeys } from "../query/query-keys";
 import { invalidateProductReferenceIntegration } from "../query/invalidation";
 import type {
@@ -542,6 +543,9 @@ export function ProductFormPage() {
             )}
           </fieldset>
         ) : null}
+        <p className="muted">
+          Las fotos del producto se agregan desde su ficha, después de guardarlo.
+        </p>
         <div className="form-actions">
           <Button
             type="button"
@@ -733,6 +737,10 @@ export function ProductDetailPage() {
           )}
         </article>
       </section>
+      <ProductPhotoManager
+        productId={id}
+        canEdit={hasPermission("products.update")}
+      />
       {hasPermission("inventory.read") ? (
         <section className="panel">
           <div className="section-heading">

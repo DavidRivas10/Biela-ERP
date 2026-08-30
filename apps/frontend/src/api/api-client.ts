@@ -139,6 +139,81 @@ export async function apiRequest<T>(
   return payload as T;
 }
 
+/**
+ * Upload multipart form data (e.g. a file) to a Gateway route. The browser sets
+ * the multipart boundary, so no Content-Type header is added here. Auth and
+ * error handling match `apiRequest`.
+ */
+export async function apiUpload<T>(
+  path: string,
+  formData: FormData,
+): Promise<T> {
+  const headers = new Headers({ Accept: "application/json" });
+  const token = tokenStorage.get();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const url = requestUrl(path, undefined);
+  let response: Response;
+  try {
+    response = await fetch(url, { method: "POST", headers, body: formData });
+  } catch (error) {
+    throw new ApiNetworkError(
+      error instanceof Error ? error.message : undefined,
+    );
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  const responseText = response.status === 204 ? "" : await response.text();
+  let payload: unknown;
+  if (!responseText) payload = undefined;
+  else if (contentType.includes("application/json")) {
+    try {
+      payload = JSON.parse(responseText) as unknown;
+    } catch {
+      payload = undefined;
+    }
+  } else payload = responseText;
+
+  if (!response.ok) {
+    if (response.status === 401) notifyUnauthorized();
+    throw new ApiError(
+      errorMessage(payload, response.status),
+      response.status,
+      payload,
+    );
+  }
+  return payload as T;
+}
+
+/**
+ * Fetch raw bytes from a Gateway route (e.g. an image) with the bearer token,
+ * since `<img src>` cannot send an Authorization header. Returns a Blob the
+ * caller turns into an object URL.
+ */
+export async function apiBlob(path: string): Promise<Blob> {
+  const headers = new Headers();
+  const token = tokenStorage.get();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const url = requestUrl(path, undefined);
+  let response: Response;
+  try {
+    response = await fetch(url, { headers });
+  } catch (error) {
+    throw new ApiNetworkError(
+      error instanceof Error ? error.message : undefined,
+    );
+  }
+  if (!response.ok) {
+    if (response.status === 401) notifyUnauthorized();
+    throw new ApiError(
+      `No se pudo cargar el archivo (HTTP ${response.status}).`,
+      response.status,
+    );
+  }
+  return response.blob();
+}
+
 export function isApiUnavailable(error: unknown): boolean {
   return (
     error instanceof ApiNetworkError ||

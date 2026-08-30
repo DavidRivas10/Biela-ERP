@@ -1,4 +1,4 @@
-import { apiRequest } from "./api-client";
+import { apiBlob, apiRequest, apiUpload } from "./api-client";
 import type {
   Paginated,
   Product,
@@ -6,6 +6,7 @@ import type {
   ProductAttributeValueType,
   ProductBrand,
   ProductCategory,
+  ProductPhoto,
   QueryValue,
 } from "../types/erp";
 
@@ -104,4 +105,17 @@ export const catalogApi = {
       `/api/products/${id}/${active ? "activate" : "deactivate"}`,
       { method: "PATCH" },
     ),
+  productPhotos: (id: string) =>
+    apiRequest<ProductPhoto[]>(`/api/products/${id}/photos`),
+  uploadProductPhoto: (id: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiUpload<ProductPhoto[]>(`/api/products/${id}/photos`, form);
+  },
+  deleteProductPhoto: (id: string, photoId: string) =>
+    apiRequest<ProductPhoto[]>(`/api/products/${id}/photos/${photoId}`, {
+      method: "DELETE",
+    }),
+  productPhotoBlob: (id: string, photoId: string) =>
+    apiBlob(`/api/products/${id}/photos/${photoId}`),
 };
