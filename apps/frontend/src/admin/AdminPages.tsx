@@ -102,16 +102,32 @@ export function UserDetailPage() {
   const { hasPermission } = useAuth();
   const client = useQueryClient();
   const [confirm, setConfirm] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const detail = useQuery({ queryKey: queryKeys.user(id), queryFn: () => usersApi.detail(id) });
   const lifecycle = useMutation({ mutationFn: (active: boolean) => usersApi.setActive(id, active), onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: queryKeys.user(id) }), client.invalidateQueries({ queryKey: queryKeys.usersRoot })]); setConfirm(false); } });
+  const reset = useMutation({ mutationFn: () => usersApi.resetPassword(id), onSuccess: (data) => { setResetConfirm(false); setCopied(false); setTempPassword(data.temporaryPassword); } });
   if (detail.isLoading) return <div className="panel">Cargando usuario…</div>;
   if (detail.error || !detail.data) return <FormFeedback error={apiErrorMessage(detail.error)} />;
   const row = detail.data;
+  const fullName = `${row.firstName} ${row.lastName}`;
   const effective = [...new Set(row.roles.flatMap((role) => role.permissions))].sort();
   const canLifecycle = row.active ? hasPermission("users.deactivate") : hasPermission("users.activate");
-  return <div className="page-stack"><PageHeader eyebrow="Administración" title={`${row.firstName} ${row.lastName}`} description={row.email} actions={<>{hasPermission("users.update") ? <Link className="button button--secondary" to={`/app/admin/users/${id}/edit`}>Editar</Link> : null}{canLifecycle ? <Button variant={row.active ? "danger" : "primary"} onClick={() => setConfirm(true)}>{row.active ? "Desactivar" : "Activar"}</Button> : null}</>} />
+  return <div className="page-stack"><PageHeader eyebrow="Administración" title={fullName} description={row.email} actions={<>{hasPermission("users.update") ? <Link className="button button--secondary" to={`/app/admin/users/${id}/edit`}>Editar</Link> : null}{hasPermission("users.update") ? <Button variant="secondary" onClick={() => setResetConfirm(true)}>Restablecer contraseña</Button> : null}{canLifecycle ? <Button variant={row.active ? "danger" : "primary"} onClick={() => setConfirm(true)}>{row.active ? "Desactivar" : "Activar"}</Button> : null}</>} />
+    {reset.error ? <FormFeedback error={apiErrorMessage(reset.error)} /> : null}
     <section className="panel detail-grid"><div className="detail-card"><h2>Identidad</h2><dl><div><dt>Correo</dt><dd>{row.email}</dd></div><div><dt>Estado</dt><dd><StatusBadge active={row.active} /></dd></div><div><dt>Roles</dt><dd><RoleBadges roles={row.roles} /></dd></div></dl></div><div className="detail-card"><h2>Permisos efectivos</h2><p className="muted">Suma de los permisos de todos los roles asignados a este usuario.</p><PermissionSummary permissions={effective} /></div></section>
     <ConfirmDialog open={confirm} title={`${row.active ? "Desactivar" : "Activar"} usuario`} description="El backend aplicará el cambio de acceso. No se elimina identidad ni historial." dangerous={row.active} loading={lifecycle.isPending} onCancel={() => setConfirm(false)} onConfirm={() => lifecycle.mutate(!row.active)} />
+    <ConfirmDialog open={resetConfirm} title="Restablecer contraseña" description={`Se generará una contraseña temporal nueva para ${fullName}. La contraseña actual dejará de funcionar y tendrás que entregarle la nueva a la persona.`} confirmLabel="Generar contraseña temporal" dangerous loading={reset.isPending} onCancel={() => setResetConfirm(false)} onConfirm={() => reset.mutate()} />
+    {tempPassword ? <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setTempPassword(null); setCopied(false); } }}>
+      <section className="confirm-dialog" role="alertdialog" aria-modal="true" aria-label="Contraseña temporal generada">
+        <h2>Contraseña temporal generada</h2>
+        <p>Para <strong>{fullName}</strong>. Cópiala ahora: <strong>no se vuelve a mostrar</strong>.</p>
+        <div className="temp-password"><code>{tempPassword}</code><Button type="button" variant="secondary" onClick={() => { void navigator.clipboard.writeText(tempPassword).then(() => setCopied(true)).catch(() => setCopied(false)); }}>{copied ? "Copiada ✓" : "Copiar"}</Button></div>
+        <p className="muted">Entrégasela en persona o por WhatsApp y pídele que la cambie al entrar (Editar usuario). Si esta persona ya no trabaja aquí, mejor desactiva su usuario.</p>
+        <div className="dialog-actions"><Button type="button" onClick={() => { setTempPassword(null); setCopied(false); }}>Listo</Button></div>
+      </section>
+    </div> : null}
   </div>;
 }
 

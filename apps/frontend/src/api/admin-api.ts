@@ -35,6 +35,15 @@ export const usersApi = {
     apiRequest<User>(`/api/users/${id}/${active ? "activate" : "deactivate"}`, {
       method: "PATCH",
     }),
+  /**
+   * Admin-driven reset. The response carries the new temporary password ONCE;
+   * show it to the administrator and never persist it (no query cache).
+   */
+  resetPassword: (id: string) =>
+    apiRequest<{ user: User; temporaryPassword: string }>(
+      `/api/users/${id}/reset-password`,
+      { method: "POST" },
+    ),
 };
 
 export const rolesApi = {

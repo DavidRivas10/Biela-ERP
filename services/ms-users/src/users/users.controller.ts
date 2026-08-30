@@ -53,6 +53,16 @@ export class UsersController {
     return this.usersService.update(id, dto);
   }
 
+  @Post(":id/reset-password")
+  @RequirePermissions(PERMISSIONS.USERS_UPDATE)
+  @ApiOperation({
+    summary:
+      "Generate a new temporary password for a user and return it once to the administrator",
+  })
+  resetPassword(@Param("id") id: string) {
+    return this.usersService.resetPassword(id);
+  }
+
   @Patch(":id/activate")
   @RequirePermissions(PERMISSIONS.USERS_ACTIVATE)
   @ApiOperation({ summary: "Activate a user" })

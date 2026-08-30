@@ -11,6 +11,7 @@ import { InventoryController } from "../src/operations/inventory.controller";
 import { SearchController } from "../src/operations/search.controller";
 import { PurchasesController } from "../src/purchasing/purchases.controller";
 import { SuppliersController } from "../src/purchasing/suppliers.controller";
+import { UsersController } from "../src/users/users.controller";
 import { UpstreamService } from "../src/upstream/upstream.service";
 import { CustomersController } from "../src/sales/customers.controller";
 import { SalesController } from "../src/sales/sales.controller";
@@ -42,6 +43,7 @@ describe("API Gateway HTTP", () => {
         SalesController,
         FinanceController,
         CommercialController,
+        UsersController,
       ],
       providers: [{ provide: UpstreamService, useValue: upstream }],
     }).compile();
@@ -200,6 +202,22 @@ describe("API Gateway HTTP", () => {
       path: "inventory/movements",
       authorization: "Bearer inventory-token",
       body,
+    });
+  });
+
+  it("forwards an admin password reset to ms-users without a body", async () => {
+    upstream.request.mockResolvedValue({
+      user: { id: "user-id" },
+      temporaryPassword: "Abcd2345Efgh6789",
+    });
+    await request(app.getHttpServer())
+      .post("/api/users/user-id/reset-password")
+      .set("Authorization", "Bearer admin-token")
+      .expect(201);
+    expect(upstream.request).toHaveBeenCalledWith("users", {
+      method: "POST",
+      path: "users/user-id/reset-password",
+      authorization: "Bearer admin-token",
     });
   });
 

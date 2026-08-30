@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AuthContextValue } from "../auth/AuthContext";
@@ -21,6 +22,43 @@ describe("Users and Roles screens", () => {
     expect(await screen.findByRole("heading", { name: "Carmen Díaz" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Desactivar" })).toBeVisible();
     expect(screen.queryByText(/passwordHash/i)).toBeNull();
+  });
+
+  it("reveals an admin-reset temporary password once, only after the action", async () => {
+    permissions = new Set(["users.update"]);
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString());
+      if (url.pathname === "/api/users/user-2/reset-password" && init?.method === "POST") {
+        return Promise.resolve(
+          jsonResponse({ user, temporaryPassword: "Kp7Rm2Ns8Vt4Wq9x" }),
+        );
+      }
+      return Promise.resolve(jsonResponse(user));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderRoute("/app/admin/users/user-2", "/app/admin/users/:id", <UserDetailPage />);
+    await screen.findByRole("heading", { name: "Carmen Díaz" });
+
+    // nothing sensitive is on screen before the admin acts
+    expect(screen.queryByText("Kp7Rm2Ns8Vt4Wq9x")).toBeNull();
+    expect(
+      fetchMock.mock.calls.some(([, init]) => init?.method === "POST"),
+    ).toBe(false);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Restablecer contraseña" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Generar contraseña temporal" }),
+    );
+
+    expect(await screen.findByText("Kp7Rm2Ns8Vt4Wq9x")).toBeVisible();
+    expect(
+      screen.getByRole("alertdialog", { name: /Contraseña temporal/i }),
+    ).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "Listo" }));
+    expect(screen.queryByText("Kp7Rm2Ns8Vt4Wq9x")).toBeNull();
   });
 
   it("displays exact permissions grouped without renaming codes", async () => {

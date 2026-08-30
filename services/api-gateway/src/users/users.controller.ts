@@ -76,6 +76,21 @@ export class UsersController {
     });
   }
 
+  @Post(":id/reset-password")
+  @ApiOperation({
+    summary: "Generate a temporary password for a user through ms-users",
+  })
+  resetPassword(
+    @Param("id") id: string,
+    @Headers("authorization") authorization?: string,
+  ) {
+    return this.upstream.request("users", {
+      method: "POST",
+      path: `users/${id}/reset-password`,
+      authorization,
+    });
+  }
+
   @Patch(":id/activate")
   @ApiOperation({ summary: "Activate a user through ms-users" })
   activate(

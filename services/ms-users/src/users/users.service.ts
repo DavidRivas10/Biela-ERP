@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import {
   BadRequestException,
   ConflictException,
@@ -7,6 +8,18 @@ import {
 import { InjectModel } from "@nestjs/mongoose";
 import * as argon2 from "argon2";
 import { FilterQuery, Model, Types } from "mongoose";
+
+// Unambiguous alphabet: no 0/O, 1/l/I to make a handed-over password easy to type.
+const TEMP_PASSWORD_ALPHABET =
+  "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+
+function generateTemporaryPassword(length = 16): string {
+  let value = "";
+  for (let index = 0; index < length; index += 1) {
+    value += TEMP_PASSWORD_ALPHABET[randomInt(TEMP_PASSWORD_ALPHABET.length)];
+  }
+  return value;
+}
 import { Role, RoleDocument } from "../roles/schemas/role.schema";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { ListUsersQueryDto } from "./dto/list-users-query.dto";
@@ -126,6 +139,27 @@ export class UsersService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Admin-driven password reset: there is no mail server, so the administrator
+   * generates a fresh temporary password here and hands it to the person
+   * directly. The plaintext is returned to the caller exactly once and is never
+   * stored or logged; only its argon2 hash is persisted, replacing the old one.
+   */
+  async resetPassword(
+    id: string,
+  ): Promise<{ user: AuthUser; temporaryPassword: string }> {
+    await this.findOne(id);
+    const temporaryPassword = generateTemporaryPassword();
+    await this.userModel
+      .findByIdAndUpdate(id, {
+        passwordHash: await argon2.hash(temporaryPassword, {
+          type: argon2.argon2id,
+        }),
+      })
+      .exec();
+    return { user: await this.findOne(id), temporaryPassword };
   }
 
   async setActive(id: string, active: boolean): Promise<AuthUser> {
