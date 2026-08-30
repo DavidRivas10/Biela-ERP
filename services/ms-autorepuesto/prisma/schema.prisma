@@ -495,6 +495,7 @@ model Sale {
   id                 String       @id @default(uuid()) @db.Uuid
   number             Int          @unique @default(autoincrement())
   customerId         String?      @db.Uuid
+  accountLabel       String?      @db.VarChar(120)
   documentDate       DateTime     @db.Date
   paymentDueDate     DateTime?    @db.Date
   status             SaleStatus   @default(DRAFT)

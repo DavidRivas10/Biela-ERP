@@ -395,6 +395,77 @@ describe("Customers, Sales, and Sales Returns HTTP", () => {
       .expect(({ body }) => expect(body.status).toBe("CANCELLED"));
   });
 
+  it("carries an optional open-account label and lets it be filtered", async () => {
+    await setStock(productId, locationId, 5);
+    // A plain Sale (no label) is unchanged: null label, still a walk-in.
+    const plain = await request(app.getHttpServer())
+      .post("/sales")
+      .send({
+        documentDate: "2026-08-19",
+        items: [
+          {
+            productId,
+            sourceLocationId: locationId,
+            quantity: 1,
+            unitPrice: "1",
+          },
+        ],
+      })
+      .expect(201);
+    expect(plain.body.accountLabel).toBeNull();
+    expect(plain.body.walkIn).toBe(true);
+
+    const account = await request(app.getHttpServer())
+      .post("/sales")
+      .send({
+        accountLabel: "  Corolla azul - Juan  ",
+        documentDate: "2026-08-19",
+        items: [
+          {
+            productId,
+            sourceLocationId: locationId,
+            quantity: 2,
+            unitPrice: "1",
+          },
+        ],
+      })
+      .expect(201);
+    expect(account.body.accountLabel).toBe("Corolla azul - Juan");
+
+    await request(app.getHttpServer())
+      .get(`/sales/${account.body.id}`)
+      .expect(200)
+      .expect(({ body }) =>
+        expect(body.accountLabel).toBe("Corolla azul - Juan"),
+      );
+
+    await request(app.getHttpServer())
+      .patch(`/sales/${account.body.id}`)
+      .send({ accountLabel: "Corolla azul - Juanita" })
+      .expect(200)
+      .expect(({ body }) =>
+        expect(body.accountLabel).toBe("Corolla azul - Juanita"),
+      );
+
+    const openOnly = await request(app.getHttpServer())
+      .get("/sales")
+      .query({ status: "DRAFT", hasAccountLabel: "true", page: 1, limit: 50 })
+      .expect(200);
+    const ids = openOnly.body.data.map((row: { id: string }) => row.id);
+    expect(ids).toContain(account.body.id);
+    expect(ids).not.toContain(plain.body.id);
+
+    const withoutLabel = await request(app.getHttpServer())
+      .get("/sales")
+      .query({ hasAccountLabel: "false", page: 1, limit: 50 })
+      .expect(200);
+    const withoutIds = withoutLabel.body.data.map(
+      (row: { id: string }) => row.id,
+    );
+    expect(withoutIds).toContain(plain.body.id);
+    expect(withoutIds).not.toContain(account.body.id);
+  });
+
   it("posts partial Returns as IN, derives net quantity, and rejects over-return", async () => {
     await setStock(productId, locationId, 10);
     const sale = await createSale([

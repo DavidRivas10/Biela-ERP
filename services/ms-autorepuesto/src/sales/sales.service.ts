@@ -64,6 +64,7 @@ export class SalesService {
         return transaction.sale.create({
           data: {
             customerId: dto.customerId ?? null,
+            accountLabel: dto.accountLabel?.trim() || null,
             documentDate: this.date(dto.documentDate),
             paymentDueDate: dto.paymentDueDate
               ? this.date(dto.paymentDueDate)
@@ -97,6 +98,12 @@ export class SalesService {
       number: query.number,
       customerId: query.customerId,
       status: query.status,
+      accountLabel:
+        query.hasAccountLabel === undefined
+          ? undefined
+          : query.hasAccountLabel
+            ? { not: null }
+            : null,
       documentDate: from || to ? { gte: from, lte: to } : undefined,
       items: query.productId
         ? { some: { productId: query.productId } }
@@ -175,6 +182,10 @@ export class SalesService {
           where: { id },
           data: {
             customerId,
+            accountLabel:
+              dto.accountLabel === undefined
+                ? undefined
+                : dto.accountLabel.trim() || null,
             documentDate: dto.documentDate
               ? this.date(dto.documentDate)
               : undefined,

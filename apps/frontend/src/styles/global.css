@@ -1373,6 +1373,58 @@ h2 {
   color: var(--muted);
   font-weight: 400;
 }
+
+/* Sales: mode selector and open accounts */
+.mode-select {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+.mode-select__option {
+  display: flex;
+  gap: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.85rem;
+  cursor: pointer;
+}
+.mode-select__option--active {
+  border-color: var(--green-700);
+  background: var(--green-100);
+}
+.mode-select__option input {
+  margin-top: 0.2rem;
+  accent-color: var(--green-700);
+}
+.mode-select__option span {
+  display: grid;
+  gap: 0.15rem;
+}
+.mode-select__option small {
+  color: var(--muted);
+}
+.open-accounts__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.6rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.open-accounts__list li {
+  border: 1px solid #b9d7cc;
+  border-radius: var(--radius-sm);
+  background: #f2f8f5;
+}
+.open-accounts__list .table-link {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem 0.85rem;
+}
+.open-accounts__list small {
+  color: var(--muted);
+}
 .scan-row__feedback--ok {
   color: var(--success);
 }

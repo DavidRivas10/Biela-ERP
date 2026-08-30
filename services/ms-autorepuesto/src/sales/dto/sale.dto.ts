@@ -65,6 +65,17 @@ export class CreateSaleDto {
   @IsUUID()
   customerId?: string | null;
 
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: 120,
+    description:
+      'Free-text label for an open counter account (cuenta abierta), e.g. "Corolla azul - Juan". Optional; a plain walk-in or registered Sale omits it.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  accountLabel?: string;
+
   @ApiProperty({ type: String, format: "date", example: "2026-08-19" })
   @IsDateString({ strict: true })
   documentDate!: string;

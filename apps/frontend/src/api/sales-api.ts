@@ -4,6 +4,7 @@ import type { Sale, SaleReturn } from "../types/sales";
 
 export interface SaleInput {
   customerId?: string | null;
+  accountLabel?: string;
   documentDate: string;
   paymentDueDate?: string;
   notes?: string;

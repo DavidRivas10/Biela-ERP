@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { salesApi, type SaleInput } from "../api/sales-api";
 import { useAuth } from "../auth/AuthContext";
 import { BarcodeScanButton } from "../components/BarcodeScanButton";
@@ -11,6 +16,7 @@ import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { LocationSelector, ProductSelector } from "../components/EntitySelectors";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
+import { HelpNote } from "../components/HelpNote";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { CustomerSelector } from "../components/SalesSelectors";
@@ -25,94 +31,658 @@ import {
 import type { Product } from "../types/erp";
 import type { Sale, SaleReturn, SaleStatus } from "../types/sales";
 import { apiErrorMessage } from "../utils/api-error";
-import { formatCalendarDate, formatDateTime, formatMoney } from "../utils/formatters";
+import {
+  formatCalendarDate,
+  formatDateTime,
+  formatMoney,
+} from "../utils/formatters";
 
 const statuses: SaleStatus[] = ["DRAFT", "POSTED", "CANCELLED"];
+const today = () => new Date().toISOString().slice(0, 10);
+
+/** How the counter identifies who a Sale is for. */
+type SaleMode = "mostrador" | "cuenta" | "cliente";
+
+function saleParty(sale: Pick<Sale, "accountLabel" | "customer">): string {
+  if (sale.accountLabel) return sale.accountLabel;
+  if (sale.customer) return `${sale.customer.code} · ${sale.customer.name}`;
+  return "Venta de mostrador";
+}
+
+function OpenAccountsPanel() {
+  const openAccounts = useQuery({
+    queryKey: queryKeys.sales({ openAccounts: true }),
+    queryFn: () =>
+      salesApi.list({
+        status: "DRAFT",
+        hasAccountLabel: true,
+        page: 1,
+        limit: 50,
+      }),
+  });
+  const rows = openAccounts.data?.data ?? [];
+  return (
+    <section className="panel open-accounts">
+      <div className="section-heading">
+        <div>
+          <h2>Cuentas abiertas</h2>
+          <p>
+            Ventas sin cerrar con una etiqueta. Se les van agregando productos
+            durante el día y se cierran después.
+          </p>
+        </div>
+      </div>
+      {openAccounts.isLoading ? <p className="muted">Cargando…</p> : null}
+      {!openAccounts.isLoading && rows.length === 0 ? (
+        <p className="muted">No hay cuentas abiertas en este momento.</p>
+      ) : null}
+      {rows.length > 0 ? (
+        <ul className="open-accounts__list">
+          {rows.map((sale) => (
+            <li key={sale.id}>
+              <Link className="table-link" to={`/app/sales/${sale.id}`}>
+                <strong>{sale.accountLabel}</strong>
+                <small>
+                  Cuenta #{sale.number} · {sale._count?.items ?? 0} líneas ·{" "}
+                  {formatMoney(sale.total)}
+                </small>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
 
 export function SalesPage() {
   const { hasPermission } = useAuth();
   const filters = useUrlFilters();
-  const params = { page: filters.page, limit: filters.limit, customerId: filters.values.customerId, productId: filters.values.productId, status: filters.values.status, number: filters.values.number, from: filters.values.from, to: filters.values.to };
-  const list = useQuery({ queryKey: queryKeys.sales(params), queryFn: () => salesApi.list(params) });
+  const params = {
+    page: filters.page,
+    limit: filters.limit,
+    customerId: filters.values.customerId,
+    productId: filters.values.productId,
+    status: filters.values.status,
+    number: filters.values.number,
+    from: filters.values.from,
+    to: filters.values.to,
+  };
+  const list = useQuery({
+    queryKey: queryKeys.sales(params),
+    queryFn: () => salesApi.list(params),
+  });
   const columns: ErpColumn<Sale>[] = [
-    { key: "number", header: "Venta", cell: (row) => <Link className="table-link" to={`/app/sales/${row.id}`}><strong>#{row.number}</strong><small>{row._count?.items ?? 0} líneas</small></Link> },
-    { key: "customer", header: "Cliente", cell: (row) => row.customer ? <><strong>{row.customer.code}</strong><small>{row.customer.name}</small></> : "Venta de mostrador" },
-    { key: "date", header: "Fecha", cell: (row) => formatCalendarDate(row.documentDate) },
-    { key: "due", header: "Vence", cell: (row) => row.paymentDueDate ? formatCalendarDate(row.paymentDueDate) : "—" },
+    {
+      key: "number",
+      header: "Venta",
+      cell: (row) => (
+        <Link className="table-link" to={`/app/sales/${row.id}`}>
+          <strong>#{row.number}</strong>
+          <small>{row._count?.items ?? 0} líneas</small>
+        </Link>
+      ),
+    },
+    {
+      key: "party",
+      header: "Para",
+      cell: (row) => saleParty(row),
+    },
+    {
+      key: "date",
+      header: "Fecha",
+      cell: (row) => formatCalendarDate(row.documentDate),
+    },
+    {
+      key: "due",
+      header: "Vence",
+      cell: (row) =>
+        row.paymentDueDate ? formatCalendarDate(row.paymentDueDate) : "—",
+    },
     { key: "total", header: "Total", cell: (row) => formatMoney(row.total) },
-    { key: "status", header: "Estado", cell: (row) => <CommercialStatusBadge status={row.status} /> },
+    {
+      key: "status",
+      header: "Estado",
+      cell: (row) => <CommercialStatusBadge status={row.status} />,
+    },
   ];
-  return <div className="page-stack"><PageHeader eyebrow="Ventas" title="Ventas" description="Ventas registradas y de mostrador con ciclo explícito DRAFT → POSTED." actions={hasPermission("sales.create") ? <Link className="button button--primary" to="/app/sales/new">Nueva venta</Link> : undefined} />
-    <section className="panel filter-bar">
-      <CustomerSelector id="sales-customer-filter" label="Cliente" value={filters.values.customerId ?? ""} emptyLabel="Todos" onChange={(customerId) => filters.update({ customerId })} />
-      <ProductSelector id="sales-product-filter" label="Producto" value={filters.values.productId ?? ""} emptyLabel="Todos" onChange={(productId) => filters.update({ productId })} />
-      <Field label="Estado" htmlFor="sale-status"><select id="sale-status" value={filters.values.status ?? ""} onChange={(e) => filters.update({ status: e.target.value })}><option value="">Todos</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select></Field>
-      <Field label="Número" htmlFor="sale-number"><input id="sale-number" type="number" min={1} value={filters.values.number ?? ""} onChange={(e) => filters.update({ number: e.target.value })} /></Field>
-      <Field label="Desde" htmlFor="sale-from"><input id="sale-from" type="date" value={filters.values.from ?? ""} onChange={(e) => filters.update({ from: e.target.value })} /></Field>
-      <Field label="Hasta" htmlFor="sale-to"><input id="sale-to" type="date" value={filters.values.to ?? ""} onChange={(e) => filters.update({ to: e.target.value })} /></Field>
-      <div className="filter-actions"><Button variant="ghost" onClick={filters.clear}>Limpiar</Button></div>
-    </section><section className="panel"><ErpTable columns={columns} rows={list.data?.data} rowKey={(row) => row.id} loading={list.isLoading} error={list.error ? apiErrorMessage(list.error) : undefined} onRetry={() => void list.refetch()} emptyTitle="No se encontraron ventas" /><Pagination meta={list.data?.meta} onPageChange={(page) => filters.update({ page }, false)} /></section>
-  </div>;
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="Ventas"
+        title="Ventas"
+        description="Venta de mostrador rápida, cuentas abiertas y ventas a clientes registrados."
+        actions={
+          hasPermission("sales.create") ? (
+            <>
+              <Link className="button button--primary" to="/app/sales/new">
+                Venta de mostrador
+              </Link>
+              <Link
+                className="button button--secondary"
+                to="/app/sales/new?mode=cuenta"
+              >
+                Abrir cuenta
+              </Link>
+            </>
+          ) : undefined
+        }
+      />
+      <OpenAccountsPanel />
+      <section className="panel filter-bar">
+        <CustomerSelector
+          id="sales-customer-filter"
+          label="Cliente"
+          value={filters.values.customerId ?? ""}
+          emptyLabel="Todos"
+          onChange={(customerId) => filters.update({ customerId })}
+        />
+        <ProductSelector
+          id="sales-product-filter"
+          label="Producto"
+          value={filters.values.productId ?? ""}
+          emptyLabel="Todos"
+          onChange={(productId) => filters.update({ productId })}
+        />
+        <Field label="Estado" htmlFor="sale-status">
+          <select
+            id="sale-status"
+            value={filters.values.status ?? ""}
+            onChange={(e) => filters.update({ status: e.target.value })}
+          >
+            <option value="">Todos</option>
+            {statuses.map((status) => (
+              <option key={status}>{status}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Número" htmlFor="sale-number">
+          <input
+            id="sale-number"
+            type="number"
+            min={1}
+            value={filters.values.number ?? ""}
+            onChange={(e) => filters.update({ number: e.target.value })}
+          />
+        </Field>
+        <Field label="Desde" htmlFor="sale-from">
+          <input
+            id="sale-from"
+            type="date"
+            value={filters.values.from ?? ""}
+            onChange={(e) => filters.update({ from: e.target.value })}
+          />
+        </Field>
+        <Field label="Hasta" htmlFor="sale-to">
+          <input
+            id="sale-to"
+            type="date"
+            value={filters.values.to ?? ""}
+            onChange={(e) => filters.update({ to: e.target.value })}
+          />
+        </Field>
+        <div className="filter-actions">
+          <Button variant="ghost" onClick={filters.clear}>
+            Limpiar
+          </Button>
+        </div>
+      </section>
+      <section className="panel">
+        <ErpTable
+          columns={columns}
+          rows={list.data?.data}
+          rowKey={(row) => row.id}
+          loading={list.isLoading}
+          error={list.error ? apiErrorMessage(list.error) : undefined}
+          onRetry={() => void list.refetch()}
+          emptyTitle="No se encontraron ventas"
+        />
+        <Pagination
+          meta={list.data?.meta}
+          onPageChange={(page) => filters.update({ page }, false)}
+        />
+      </section>
+    </div>
+  );
 }
 
-type Line = { key: number; productId: string; sourceLocationId: string; quantity: string; unitPrice: string; discountAmount: string; taxAmount: string };
-const newLine = (key: number): Line => ({ key, productId: "", sourceLocationId: "", quantity: "1", unitPrice: "", discountAmount: "0.00", taxAmount: "0.00" });
+type Line = {
+  key: number;
+  productId: string;
+  sourceLocationId: string;
+  quantity: string;
+  unitPrice: string;
+  discountAmount: string;
+  taxAmount: string;
+};
+const newLine = (key: number): Line => ({
+  key,
+  productId: "",
+  sourceLocationId: "",
+  quantity: "1",
+  unitPrice: "",
+  discountAmount: "0.00",
+  taxAmount: "0.00",
+});
 
 export function SaleFormPage() {
   const { id } = useParams();
-  const detail = useQuery({ queryKey: queryKeys.sale(id ?? "new"), queryFn: () => salesApi.detail(id!), enabled: Boolean(id) });
-  if (id && detail.isLoading) return <div className="panel">Cargando venta…</div>;
-  if (id && detail.error) return <FormFeedback error={apiErrorMessage(detail.error)} />;
-  if (id && detail.data?.status !== "DRAFT") return <FormFeedback error="Solo las ventas DRAFT pueden editarse." />;
-  return <SaleEditor id={id} initial={detail.data} />;
+  const [searchParams] = useSearchParams();
+  const detail = useQuery({
+    queryKey: queryKeys.sale(id ?? "new"),
+    queryFn: () => salesApi.detail(id!),
+    enabled: Boolean(id),
+  });
+  if (id && detail.isLoading)
+    return <div className="panel">Cargando venta…</div>;
+  if (id && detail.error)
+    return <FormFeedback error={apiErrorMessage(detail.error)} />;
+  if (id && detail.data?.status !== "DRAFT")
+    return <FormFeedback error="Solo las ventas DRAFT pueden editarse." />;
+  return (
+    <SaleEditor
+      id={id}
+      initial={detail.data}
+      requestedMode={searchParams.get("mode") === "cuenta" ? "cuenta" : undefined}
+    />
+  );
 }
 
-function SaleEditor({ id, initial }: { id?: string; initial?: Sale }) {
+function SaleEditor({
+  id,
+  initial,
+  requestedMode,
+}: {
+  id?: string;
+  initial?: Sale;
+  requestedMode?: SaleMode;
+}) {
   const navigate = useNavigate();
   const client = useQueryClient();
+  const [mode, setMode] = useState<SaleMode>(() => {
+    if (initial?.accountLabel) return "cuenta";
+    if (initial?.customerId) return "cliente";
+    return requestedMode ?? "mostrador";
+  });
   const [customerId, setCustomerId] = useState(initial?.customerId ?? "");
-  const [documentDate, setDocumentDate] = useState(initial?.documentDate.slice(0, 10) ?? "");
-  const [paymentDueDate, setPaymentDueDate] = useState(initial?.paymentDueDate?.slice(0, 10) ?? "");
+  const [accountLabel, setAccountLabel] = useState(initial?.accountLabel ?? "");
+  const [documentDate, setDocumentDate] = useState(
+    initial?.documentDate.slice(0, 10) ?? today(),
+  );
+  const [paymentDueDate, setPaymentDueDate] = useState(
+    initial?.paymentDueDate?.slice(0, 10) ?? "",
+  );
   const [notes, setNotes] = useState(initial?.notes ?? "");
-  const [lines, setLines] = useState<Line[]>(() => initial ? (initial.items ?? []).map((item, index) => ({ key: index + 1, productId: item.productId, sourceLocationId: item.sourceLocationId, quantity: String(item.quantity), unitPrice: item.unitPrice, discountAmount: item.discountAmount, taxAmount: item.taxAmount })) : [newLine(1)]);
+  const [lines, setLines] = useState<Line[]>(() =>
+    initial
+      ? (initial.items ?? []).map((item, index) => ({
+          key: index + 1,
+          productId: item.productId,
+          sourceLocationId: item.sourceLocationId,
+          quantity: String(item.quantity),
+          unitPrice: item.unitPrice,
+          discountAmount: item.discountAmount,
+          taxAmount: item.taxAmount,
+        }))
+      : [newLine(1)],
+  );
   const [formError, setFormError] = useState<string | null>(null);
-  const duplicate = useMemo(() => { const keys = lines.filter((line) => line.productId && line.sourceLocationId).map((line) => `${line.productId}:${line.sourceLocationId}`); return new Set(keys).size !== keys.length; }, [lines]);
-  const mutation = useMutation({ mutationFn: (body: SaleInput) => id ? salesApi.update(id, body) : salesApi.create(body), onSuccess: async (sale) => { client.setQueryData(queryKeys.sale(sale.id), sale); await client.invalidateQueries({ queryKey: queryKeys.salesRoot }); void navigate(`/app/sales/${sale.id}`, { replace: true }); } });
-  const updateLine = (key: number, changes: Partial<Line>) => setLines((current) => current.map((line) => line.key === key ? { ...line, ...changes } : line));
+  const duplicate = useMemo(() => {
+    const keys = lines
+      .filter((line) => line.productId && line.sourceLocationId)
+      .map((line) => `${line.productId}:${line.sourceLocationId}`);
+    return new Set(keys).size !== keys.length;
+  }, [lines]);
+  const mutation = useMutation({
+    mutationFn: (body: SaleInput) =>
+      id ? salesApi.update(id, body) : salesApi.create(body),
+    onSuccess: async (sale) => {
+      client.setQueryData(queryKeys.sale(sale.id), sale);
+      await client.invalidateQueries({ queryKey: queryKeys.salesRoot });
+      void navigate(`/app/sales/${sale.id}`, { replace: true });
+    },
+  });
+  const updateLine = (key: number, changes: Partial<Line>) =>
+    setLines((current) =>
+      current.map((line) => (line.key === key ? { ...line, ...changes } : line)),
+    );
   const addScannedProduct = useCallback((product: Product) => {
     setLines((current) => {
       const price = product.defaultSalePrice ?? "";
       const emptyIndex = current.findIndex((line) => !line.productId);
       if (emptyIndex >= 0) {
-        return current.map((line, index) => index === emptyIndex ? { ...line, productId: product.id, unitPrice: line.unitPrice || price } : line);
+        return current.map((line, index) =>
+          index === emptyIndex
+            ? { ...line, productId: product.id, unitPrice: line.unitPrice || price }
+            : line,
+        );
       }
       const nextKey = Math.max(...current.map((line) => line.key)) + 1;
-      return [...current, { ...newLine(nextKey), productId: product.id, unitPrice: price }];
+      return [
+        ...current,
+        { ...newLine(nextKey), productId: product.id, unitPrice: price },
+      ];
     });
   }, []);
-  const { handleScan, feedback: scanFeedback } = useScanToProduct(addScannedProduct);
+  const { handleScan, feedback: scanFeedback } =
+    useScanToProduct(addScannedProduct);
   useKeyboardWedge(handleScan);
+
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (duplicate) { setFormError("Una combinación de producto y ubicación solo puede aparecer una vez."); return; }
+    if (duplicate) {
+      setFormError(
+        "Una combinación de producto y ubicación solo puede aparecer una vez.",
+      );
+      return;
+    }
+    if (mode === "cuenta" && !accountLabel.trim()) {
+      setFormError(
+        "Ponle una etiqueta a la cuenta para poder distinguirla (por ejemplo «Corolla azul – Juan»).",
+      );
+      return;
+    }
     setFormError(null);
-    mutation.mutate({ customerId: customerId || null, documentDate, paymentDueDate: paymentDueDate || undefined, notes: notes || undefined, items: lines.map((line) => ({ productId: line.productId, sourceLocationId: line.sourceLocationId, quantity: Number(line.quantity), unitPrice: line.unitPrice || undefined, discountAmount: line.discountAmount || undefined, taxAmount: line.taxAmount || undefined })) });
+    mutation.mutate({
+      customerId: mode === "mostrador" ? null : customerId || null,
+      accountLabel:
+        mode === "cuenta" ? accountLabel.trim() : id ? "" : undefined,
+      documentDate,
+      paymentDueDate:
+        mode === "mostrador" ? undefined : paymentDueDate || undefined,
+      notes: notes || undefined,
+      items: lines.map((line) => ({
+        productId: line.productId,
+        sourceLocationId: line.sourceLocationId,
+        quantity: Number(line.quantity),
+        unitPrice: line.unitPrice || undefined,
+        discountAmount: line.discountAmount || undefined,
+        taxAmount: line.taxAmount || undefined,
+      })),
+    });
   }
-  return <div className="page-stack"><PageHeader eyebrow="Ventas" title={id ? "Editar venta" : "Nueva venta"} description="Guardar conserva el borrador sin tocar inventario; el servidor calcula todos los importes exactos." />
-    <form className="panel erp-form" onSubmit={submit}><FormFeedback error={formError ?? (mutation.error ? apiErrorMessage(mutation.error) : null)} /><div className="form-grid"><CustomerSelector id="sale-customer" label="Cliente" value={customerId} onChange={setCustomerId} /><Field label="Fecha del documento" htmlFor="sale-date" required><input id="sale-date" type="date" required value={documentDate} onChange={(e) => setDocumentDate(e.target.value)} /></Field><Field label="Fecha de vencimiento" htmlFor="sale-due"><input id="sale-due" type="date" value={paymentDueDate} onChange={(e) => setPaymentDueDate(e.target.value)} /></Field><Field label="Notas" htmlFor="sale-notes"><textarea id="sale-notes" maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field></div>
-      <fieldset className="form-section purchase-lines"><legend>Productos</legend><p>El precio sugerido se toma del producto; el backend mantiene la verdad histórica en cada línea.</p>
-        <div className="scan-row"><BarcodeScanButton label="Escanear producto" title="Escanear producto para la venta" onScan={handleScan} /><span className="muted">o dispara un lector físico USB/Bluetooth: se agrega el producto a la venta.</span>{scanFeedback ? <span className={`scan-row__feedback scan-row__feedback--${scanFeedback.tone}`}>{scanFeedback.text}</span> : null}</div>
-        {lines.map((line, index) => <div className="purchase-line" key={line.key}>
-        <ProductSelector id={`sale-product-${line.key}`} label={`Producto ${index + 1}`} required value={line.productId} onChange={(productId, item?: Product) => updateLine(line.key, { productId, unitPrice: item?.defaultSalePrice ?? line.unitPrice })} />
-        <LocationSelector id={`sale-location-${line.key}`} label="Ubicación origen" required value={line.sourceLocationId} onChange={(sourceLocationId) => updateLine(line.key, { sourceLocationId })} />
-        <Field label="Cantidad" htmlFor={`sale-qty-${line.key}`} required><input id={`sale-qty-${line.key}`} required type="number" min={1} step={1} value={line.quantity} onChange={(e) => updateLine(line.key, { quantity: e.target.value })} /></Field>
-        <Field label="Precio unitario" htmlFor={`sale-price-${line.key}`} required><input id={`sale-price-${line.key}`} required inputMode="decimal" pattern="\d+(\.\d{1,4})?" value={line.unitPrice} onChange={(e) => updateLine(line.key, { unitPrice: e.target.value })} /></Field>
-        <Field label="Descuento" htmlFor={`sale-discount-${line.key}`}><input id={`sale-discount-${line.key}`} inputMode="decimal" pattern="\d+(\.\d{1,2})?" value={line.discountAmount} onChange={(e) => updateLine(line.key, { discountAmount: e.target.value })} /></Field>
-        <Field label="Impuesto" htmlFor={`sale-tax-${line.key}`}><input id={`sale-tax-${line.key}`} inputMode="decimal" pattern="\d+(\.\d{1,2})?" value={line.taxAmount} onChange={(e) => updateLine(line.key, { taxAmount: e.target.value })} /></Field>
-        {lines.length > 1 && <Button type="button" variant="danger" onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))}>Quitar</Button>}
-      </div>)}<Button type="button" variant="secondary" onClick={() => setLines((current) => [...current, newLine(Math.max(...current.map((line) => line.key)) + 1)])}>Agregar producto</Button></fieldset>
-      <div className="form-actions"><Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancelar</Button><Button type="submit" loading={mutation.isPending}>Guardar borrador</Button></div></form>
-  </div>;
+
+  const modeTitle =
+    mode === "cuenta"
+      ? id
+        ? "Editar cuenta"
+        : "Abrir cuenta"
+      : id
+        ? "Editar venta"
+        : "Nueva venta";
+
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="Ventas"
+        title={modeTitle}
+        description="Guardar conserva el borrador sin tocar inventario; el servidor calcula todos los importes exactos."
+      />
+      <form className="panel erp-form" onSubmit={submit}>
+        <FormFeedback
+          error={formError ?? (mutation.error ? apiErrorMessage(mutation.error) : null)}
+        />
+
+        <fieldset className="form-section">
+          <legend>¿Para quién es esta venta?</legend>
+          <div className="mode-select" role="radiogroup" aria-label="Tipo de venta">
+            {(
+              [
+                ["mostrador", "Venta de mostrador", "Se cobra y se cierra ahora. Sin cliente."],
+                ["cuenta", "Cuenta abierta", "Queda abierta con una etiqueta y se cierra después."],
+                ["cliente", "Cliente registrado", "Se asocia a un cliente del directorio."],
+              ] as Array<[SaleMode, string, string]>
+            ).map(([value, label, hint]) => (
+              <label
+                key={value}
+                className={`mode-select__option ${mode === value ? "mode-select__option--active" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="sale-mode"
+                  value={value}
+                  checked={mode === value}
+                  onChange={() => setMode(value)}
+                />
+                <span>
+                  <strong>{label}</strong>
+                  <small>{hint}</small>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <div className="form-grid">
+          {mode === "cuenta" ? (
+            <Field
+              label="Etiqueta de la cuenta"
+              htmlFor="sale-account-label"
+              required
+              hint="Cómo la reconoces en el mostrador: vehículo, apodo, color… Ej. «Corolla azul – Juan»."
+            >
+              <input
+                id="sale-account-label"
+                required
+                maxLength={120}
+                placeholder="Corolla azul – Juan"
+                value={accountLabel}
+                onChange={(e) => setAccountLabel(e.target.value)}
+              />
+            </Field>
+          ) : null}
+
+          {mode === "cliente" ? (
+            <CustomerSelector
+              id="sale-customer"
+              label="Cliente"
+              value={customerId}
+              onChange={setCustomerId}
+            />
+          ) : null}
+
+          <Field label="Fecha del documento" htmlFor="sale-date" required>
+            <input
+              id="sale-date"
+              type="date"
+              required
+              value={documentDate}
+              onChange={(e) => setDocumentDate(e.target.value)}
+            />
+          </Field>
+
+          {mode !== "mostrador" ? (
+            <Field
+              label="Fecha de vencimiento"
+              htmlFor="sale-due"
+              hint="Opcional. Si la venta queda a crédito, esta fecha marca cuándo vence en Cuentas por Cobrar."
+            >
+              <input
+                id="sale-due"
+                type="date"
+                value={paymentDueDate}
+                onChange={(e) => setPaymentDueDate(e.target.value)}
+              />
+            </Field>
+          ) : null}
+
+          <Field label="Notas" htmlFor="sale-notes">
+            <textarea
+              id="sale-notes"
+              maxLength={1000}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </Field>
+        </div>
+
+        {mode === "mostrador" ? (
+          <p className="muted">
+            ¿Es para un cliente que llevas en el directorio? Cambia a «Cliente
+            registrado» arriba. Para registrar el cobro, guarda y luego usa
+            «Cobrar» en la venta.
+          </p>
+        ) : null}
+
+        {mode === "cuenta" ? (
+          <details className="filter-details">
+            <summary>Asociar un cliente registrado (opcional)</summary>
+            <div className="form-grid">
+              <CustomerSelector
+                id="sale-account-customer"
+                label="Cliente"
+                value={customerId}
+                onChange={setCustomerId}
+              />
+            </div>
+          </details>
+        ) : null}
+
+        <fieldset className="form-section purchase-lines">
+          <legend>Productos</legend>
+          <p>
+            El precio sugerido se toma del producto; el backend mantiene la
+            verdad histórica en cada línea.
+          </p>
+          <div className="scan-row">
+            <BarcodeScanButton
+              label="Escanear producto"
+              title="Escanear producto para la venta"
+              onScan={handleScan}
+            />
+            <span className="muted">
+              o dispara un lector físico USB/Bluetooth: se agrega el producto a
+              la venta.
+            </span>
+            {scanFeedback ? (
+              <span
+                className={`scan-row__feedback scan-row__feedback--${scanFeedback.tone}`}
+              >
+                {scanFeedback.text}
+              </span>
+            ) : null}
+          </div>
+          {lines.map((line, index) => (
+            <div className="purchase-line" key={line.key}>
+              <ProductSelector
+                id={`sale-product-${line.key}`}
+                label={`Producto ${index + 1}`}
+                required
+                value={line.productId}
+                onChange={(productId, item?: Product) =>
+                  updateLine(line.key, {
+                    productId,
+                    unitPrice: item?.defaultSalePrice ?? line.unitPrice,
+                  })
+                }
+              />
+              <LocationSelector
+                id={`sale-location-${line.key}`}
+                label="Ubicación origen"
+                required
+                value={line.sourceLocationId}
+                onChange={(sourceLocationId) =>
+                  updateLine(line.key, { sourceLocationId })
+                }
+              />
+              <Field
+                label="Cantidad"
+                htmlFor={`sale-qty-${line.key}`}
+                required
+              >
+                <input
+                  id={`sale-qty-${line.key}`}
+                  required
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={line.quantity}
+                  onChange={(e) =>
+                    updateLine(line.key, { quantity: e.target.value })
+                  }
+                />
+              </Field>
+              <Field
+                label="Precio unitario"
+                htmlFor={`sale-price-${line.key}`}
+                required
+              >
+                <input
+                  id={`sale-price-${line.key}`}
+                  required
+                  inputMode="decimal"
+                  pattern="\d+(\.\d{1,4})?"
+                  value={line.unitPrice}
+                  onChange={(e) =>
+                    updateLine(line.key, { unitPrice: e.target.value })
+                  }
+                />
+              </Field>
+              <Field label="Descuento" htmlFor={`sale-discount-${line.key}`}>
+                <input
+                  id={`sale-discount-${line.key}`}
+                  inputMode="decimal"
+                  pattern="\d+(\.\d{1,2})?"
+                  value={line.discountAmount}
+                  onChange={(e) =>
+                    updateLine(line.key, { discountAmount: e.target.value })
+                  }
+                />
+              </Field>
+              <Field label="Impuesto" htmlFor={`sale-tax-${line.key}`}>
+                <input
+                  id={`sale-tax-${line.key}`}
+                  inputMode="decimal"
+                  pattern="\d+(\.\d{1,2})?"
+                  value={line.taxAmount}
+                  onChange={(e) =>
+                    updateLine(line.key, { taxAmount: e.target.value })
+                  }
+                />
+              </Field>
+              {lines.length > 1 && (
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() =>
+                    setLines((current) =>
+                      current.filter((item) => item.key !== line.key),
+                    )
+                  }
+                >
+                  Quitar
+                </Button>
+              )}
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() =>
+              setLines((current) => [
+                ...current,
+                newLine(Math.max(...current.map((line) => line.key)) + 1),
+              ])
+            }
+          >
+            Agregar producto
+          </Button>
+        </fieldset>
+        <div className="form-actions">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => navigate(-1)}
+          >
+            Cancelar
+          </Button>
+          <Button type="submit" loading={mutation.isPending}>
+            {mode === "cuenta" ? "Guardar cuenta" : "Guardar venta"}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
 }
 
 export function SaleDetailPage() {
@@ -121,24 +691,205 @@ export function SaleDetailPage() {
   const client = useQueryClient();
   const [returnPage, setReturnPage] = useState(1);
   const [action, setAction] = useState<"post" | "cancel" | null>(null);
-  const detail = useQuery({ queryKey: queryKeys.sale(id), queryFn: () => salesApi.detail(id) });
+  const detail = useQuery({
+    queryKey: queryKeys.sale(id),
+    queryFn: () => salesApi.detail(id),
+  });
   const returnParams = { page: returnPage, limit: 20 };
-  const returns = useQuery({ queryKey: queryKeys.saleReturns(id, returnParams), queryFn: () => salesApi.returns(id, returnParams), enabled: hasPermission("sales.read") });
-  const mutation = useMutation({ mutationFn: () => action === "post" ? salesApi.post(id) : salesApi.cancel(id), onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: queryKeys.sale(id) }), client.invalidateQueries({ queryKey: queryKeys.salesRoot }), client.invalidateQueries({ queryKey: queryKeys.receivablesRoot }), client.invalidateQueries({ queryKey: queryKeys.customerAccountsRoot }), invalidateInventoryIntegration(client), invalidateCommercialSummary(client)]); setAction(null); } });
+  const returns = useQuery({
+    queryKey: queryKeys.saleReturns(id, returnParams),
+    queryFn: () => salesApi.returns(id, returnParams),
+    enabled: hasPermission("sales.read"),
+  });
+  const mutation = useMutation({
+    mutationFn: () =>
+      action === "post" ? salesApi.post(id) : salesApi.cancel(id),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.sale(id) }),
+        client.invalidateQueries({ queryKey: queryKeys.salesRoot }),
+        client.invalidateQueries({ queryKey: queryKeys.receivablesRoot }),
+        client.invalidateQueries({ queryKey: queryKeys.customerAccountsRoot }),
+        invalidateInventoryIntegration(client),
+        invalidateCommercialSummary(client),
+      ]);
+      setAction(null);
+    },
+  });
   if (detail.isLoading) return <div className="panel">Cargando venta…</div>;
-  if (!detail.data || detail.error) return <FormFeedback error={apiErrorMessage(detail.error)} />;
+  if (!detail.data || detail.error)
+    return <FormFeedback error={apiErrorMessage(detail.error)} />;
   const sale = detail.data;
+  const isAccount = Boolean(sale.accountLabel);
   const returnColumns: ErpColumn<SaleReturn>[] = [
-    { key: "number", header: "Devolución", cell: (row) => <Link className="table-link" to={`/app/sales/returns/${row.id}`}>#{row.number}</Link> },
+    {
+      key: "number",
+      header: "Devolución",
+      cell: (row) => (
+        <Link className="table-link" to={`/app/sales/returns/${row.id}`}>
+          #{row.number}
+        </Link>
+      ),
+    },
     { key: "reason", header: "Motivo", cell: (row) => row.reason },
-    { key: "created", header: "Creada", cell: (row) => formatDateTime(row.createdAt) },
-    { key: "status", header: "Estado", cell: (row) => <CommercialStatusBadge status={row.status} /> },
+    {
+      key: "created",
+      header: "Creada",
+      cell: (row) => formatDateTime(row.createdAt),
+    },
+    {
+      key: "status",
+      header: "Estado",
+      cell: (row) => <CommercialStatusBadge status={row.status} />,
+    },
   ];
-  return <div className="page-stack"><PageHeader eyebrow="Ventas" title={`Venta #${sale.number}`} description={sale.customer ? `${sale.customer.code} · ${sale.customer.name}` : "Venta de mostrador"} actions={<><CommercialStatusBadge status={sale.status} />{sale.status === "DRAFT" && hasPermission("sales.update") && <Link className="button button--secondary" to={`/app/sales/${id}/edit`}>Editar</Link>}{sale.status === "DRAFT" && hasPermission("sales.post") && <Button onClick={() => setAction("post")}>Postear</Button>}{sale.status === "DRAFT" && hasPermission("sales.update") && <Button variant="danger" onClick={() => setAction("cancel")}>Cancelar</Button>}{sale.status === "POSTED" && hasPermission("sales.return") && <Link className="button button--secondary" to={`/app/sales/${id}/returns`}>Nueva devolución</Link>}{sale.status === "POSTED" && (hasPermission("payments.read") || hasPermission("payments.create")) && <Link className="button button--secondary" to={`/app/sales/${id}/payments`}>Pagos</Link>}</>} />
-    <section className="panel detail-grid"><div><span className="eyebrow">Fecha</span><p>{formatCalendarDate(sale.documentDate)}</p></div><div><span className="eyebrow">Vencimiento</span><p>{sale.paymentDueDate ? formatCalendarDate(sale.paymentDueDate) : "—"}</p></div><div><span className="eyebrow">Total</span><p>{formatMoney(sale.total)}</p></div><div><span className="eyebrow">Saldo pendiente</span><p>{sale.paymentSummary ? formatMoney(sale.paymentSummary.outstandingAmount) : "—"}</p></div></section>
-    <section className="panel"><h2>Líneas</h2><div className="table-wrap"><table><thead><tr><th>Producto</th><th>Origen</th><th>Cantidad</th><th>Devuelta</th><th>Precio</th><th>Total</th></tr></thead><tbody>{sale.items?.map((item) => <tr key={item.id}><td>{item.product.code} · {item.product.name}</td><td>{item.sourceLocation.code}</td><td>{item.quantity}</td><td>{item.returnedQuantity}</td><td>{formatMoney(item.unitPrice)}</td><td>{formatMoney(item.lineTotal)}</td></tr>)}</tbody></table></div></section>
-    <section className="panel"><h2>Devoluciones</h2><ErpTable columns={returnColumns} rows={returns.data?.data} rowKey={(row) => row.id} loading={returns.isLoading} error={returns.error ? apiErrorMessage(returns.error) : undefined} emptyTitle="Sin devoluciones" /><Pagination meta={returns.data?.meta} onPageChange={setReturnPage} /></section>
-    {mutation.error && <FormFeedback error={apiErrorMessage(mutation.error)} />}
-    <ConfirmDialog open={Boolean(action)} title={action === "post" ? "Postear venta" : "Cancelar venta"} description={action === "post" ? "Esta acción descontará inventario de forma atómica y no puede deshacerse desde la venta." : "Solo se cancela el borrador; no hay efectos de inventario."} confirmLabel={action === "post" ? "Postear venta" : "Cancelar venta"} dangerous={action === "cancel"} loading={mutation.isPending} onCancel={() => setAction(null)} onConfirm={() => mutation.mutate()} />
-  </div>;
+  const closeLabel = isAccount ? "Cerrar cuenta" : "Postear venta";
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="Ventas"
+        title={`${isAccount ? "Cuenta" : "Venta"} #${sale.number}`}
+        description={saleParty(sale)}
+        actions={
+          <>
+            <CommercialStatusBadge status={sale.status} />
+            {sale.status === "DRAFT" && hasPermission("sales.update") && (
+              <Link
+                className="button button--secondary"
+                to={`/app/sales/${id}/edit`}
+              >
+                {isAccount ? "Agregar productos" : "Editar"}
+              </Link>
+            )}
+            {sale.status === "DRAFT" && hasPermission("sales.post") && (
+              <Button onClick={() => setAction("post")}>{closeLabel}</Button>
+            )}
+            {sale.status === "DRAFT" && hasPermission("sales.update") && (
+              <Button variant="danger" onClick={() => setAction("cancel")}>
+                Cancelar
+              </Button>
+            )}
+            {sale.status === "POSTED" && hasPermission("sales.return") && (
+              <Link
+                className="button button--secondary"
+                to={`/app/sales/${id}/returns`}
+              >
+                Nueva devolución
+              </Link>
+            )}
+            {sale.status === "POSTED" &&
+              (hasPermission("payments.read") ||
+                hasPermission("payments.create")) && (
+                <Link
+                  className="button button--secondary"
+                  to={`/app/sales/${id}/payments`}
+                >
+                  {hasPermission("payments.create") ? "Cobrar" : "Pagos"}
+                </Link>
+              )}
+          </>
+        }
+      />
+      {isAccount && sale.status === "DRAFT" ? (
+        <HelpNote title="Cuenta abierta">
+          Agrega productos con «Agregar productos» a lo largo del día. Cuando
+          termines, «Cerrar cuenta» confirma la venta y descuenta el
+          inventario; después registras el pago o la dejas a crédito en Cuentas
+          por Cobrar.
+        </HelpNote>
+      ) : null}
+      <section className="panel detail-grid">
+        {isAccount ? (
+          <div>
+            <span className="eyebrow">Etiqueta de la cuenta</span>
+            <p>{sale.accountLabel}</p>
+          </div>
+        ) : null}
+        <div>
+          <span className="eyebrow">Fecha</span>
+          <p>{formatCalendarDate(sale.documentDate)}</p>
+        </div>
+        <div>
+          <span className="eyebrow">Vencimiento</span>
+          <p>
+            {sale.paymentDueDate
+              ? formatCalendarDate(sale.paymentDueDate)
+              : "—"}
+          </p>
+        </div>
+        <div>
+          <span className="eyebrow">Total</span>
+          <p>{formatMoney(sale.total)}</p>
+        </div>
+        <div>
+          <span className="eyebrow">Saldo pendiente</span>
+          <p>
+            {sale.paymentSummary
+              ? formatMoney(sale.paymentSummary.outstandingAmount)
+              : "—"}
+          </p>
+        </div>
+      </section>
+      <section className="panel">
+        <h2>Líneas</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Origen</th>
+                <th>Cantidad</th>
+                <th>Devuelta</th>
+                <th>Precio</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sale.items?.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    {item.product.code} · {item.product.name}
+                  </td>
+                  <td>{item.sourceLocation.code}</td>
+                  <td>{item.quantity}</td>
+                  <td>{item.returnedQuantity}</td>
+                  <td>{formatMoney(item.unitPrice)}</td>
+                  <td>{formatMoney(item.lineTotal)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section className="panel">
+        <h2>Devoluciones</h2>
+        <ErpTable
+          columns={returnColumns}
+          rows={returns.data?.data}
+          rowKey={(row) => row.id}
+          loading={returns.isLoading}
+          error={returns.error ? apiErrorMessage(returns.error) : undefined}
+          emptyTitle="Sin devoluciones"
+        />
+        <Pagination meta={returns.data?.meta} onPageChange={setReturnPage} />
+      </section>
+      {mutation.error && <FormFeedback error={apiErrorMessage(mutation.error)} />}
+      <ConfirmDialog
+        open={Boolean(action)}
+        title={action === "post" ? closeLabel : "Cancelar venta"}
+        description={
+          action === "post"
+            ? isAccount
+              ? "Se confirmará la venta y se descontará el inventario. Después podrás registrar el pago o dejar la cuenta a crédito."
+              : "Esta acción descontará inventario de forma atómica y no puede deshacerse desde la venta."
+            : "Solo se cancela el borrador; no hay efectos de inventario."
+        }
+        confirmLabel={action === "post" ? closeLabel : "Cancelar venta"}
+        dangerous={action === "cancel"}
+        loading={mutation.isPending}
+        onCancel={() => setAction(null)}
+        onConfirm={() => mutation.mutate()}
+      />
+    </div>
+  );
 }

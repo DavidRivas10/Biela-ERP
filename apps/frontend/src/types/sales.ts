@@ -55,6 +55,7 @@ export interface Sale {
   customerId?: string | null;
   customer?: Customer | null;
   walkIn?: boolean;
+  accountLabel?: string | null;
   documentDate: string;
   paymentDueDate?: string | null;
   status: SaleStatus;

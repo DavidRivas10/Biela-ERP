@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsInt,
@@ -10,6 +11,7 @@ import {
 } from "class-validator";
 import { SaleStatus } from "@prisma/client";
 import { PaginationQueryDto } from "../../common/dto/pagination-query.dto";
+import { booleanQueryTransform } from "../../common/validation/boolean-query.transform";
 
 export class ListSalesQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ minimum: 1 })
@@ -28,6 +30,16 @@ export class ListSalesQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(SaleStatus)
   status?: SaleStatus;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      "When true, only Sales that carry an open-account label; when false, only those without one.",
+  })
+  @IsOptional()
+  @Transform(booleanQueryTransform)
+  @IsBoolean()
+  hasAccountLabel?: boolean;
 
   @ApiPropertyOptional({ format: "uuid" })
   @IsOptional()
