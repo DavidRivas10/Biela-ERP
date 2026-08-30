@@ -47,8 +47,12 @@ describe("Cash operational screens", () => {
     permissions = new Set(["cash-movements.read"]);
     const fetchMock = installFetch();
     renderRoute("/app/cash/sessions/session-1", "/app/cash/sessions/:id", <CashSessionDetailPage />);
-    expect(await screen.findByText("L 135.25")).toBeVisible();
+    // Expected cash appears in the header summary and in the partial-cut panel.
+    expect((await screen.findAllByText("L 135.25")).length).toBeGreaterThan(0);
     expect(await screen.findByText("Entrada manual")).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Corte parcial (informativo)" }),
+    ).toBeVisible();
     expect(fetchMock.mock.calls.some(([input]) => new URL(input instanceof Request ? input.url : input.toString()).searchParams.get("includeMovements") === "false")).toBe(true);
     expect(screen.queryByRole("heading", { name: "Movimiento manual" })).toBeNull();
   });

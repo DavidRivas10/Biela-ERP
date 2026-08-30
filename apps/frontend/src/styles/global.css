@@ -1501,6 +1501,61 @@ h2 {
     order: 3;
   }
 }
+
+/* Cash: informational partial cut */
+.cut-panel {
+  border-color: #b9d7cc;
+}
+.cut-panel__rows {
+  display: grid;
+  gap: 0;
+  margin: 1rem 0 0;
+}
+.cut-panel__rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--line);
+  padding: 0.6rem 0;
+}
+.cut-panel__rows dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.cut-panel__rows dd {
+  margin: 0;
+  font-weight: 700;
+}
+.cut-panel__row--strong {
+  border-bottom: 0 !important;
+  border-top: 2px solid var(--green-700);
+  margin-top: 0.2rem;
+  font-size: 1.05rem;
+}
+.cut-panel__row--strong dt {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+@media print {
+  .sidebar,
+  .sidebar-overlay,
+  .topbar,
+  .subtabs,
+  .page-header__actions,
+  .filter-bar,
+  .form-actions,
+  .pagination {
+    display: none !important;
+  }
+  .app-main {
+    margin-left: 0;
+  }
+  .panel {
+    box-shadow: none;
+    border-color: #999;
+  }
+}
 .scan-row__feedback--ok {
   color: var(--success);
 }

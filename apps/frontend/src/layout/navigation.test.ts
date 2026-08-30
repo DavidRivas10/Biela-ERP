@@ -80,7 +80,7 @@ describe("permission-aware navigation", () => {
     );
   });
 
-  it("shows separate business-facing Cash navigation under exact read permissions", () => {
+  it("shows business-facing Cash navigation under exact read permissions", () => {
     const cashier = {
       ...testUser,
       roles: [{
@@ -96,10 +96,11 @@ describe("permission-aware navigation", () => {
     const entries = visibleNavigation(cashier).flatMap((group) =>
       group.items.map((item) => [item.label, item.path]),
     );
+    // Cash movements live as a tab inside Sesiones, not a top-level entry.
     expect(entries).toEqual(expect.arrayContaining([
       ["Cajas", "/app/cash/registers"],
       ["Sesiones", "/app/cash/sessions"],
-      ["Movimientos", "/app/cash/movements"],
     ]));
+    expect(entries).not.toContainEqual(["Movimientos", "/app/cash/movements"]);
   });
 });

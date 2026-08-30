@@ -149,12 +149,6 @@ export const NAVIGATION: NavigationGroup[] = [
         short: "SE",
         permission: "cash-sessions.read",
       },
-      {
-        label: "Movimientos",
-        path: "/app/cash/movements",
-        short: "MC",
-        permission: "cash-movements.read",
-      },
     ],
   },
   {
@@ -184,6 +178,7 @@ export const AUXILIARY_ROUTE_TITLES: Array<{ path: string; label: string }> = [
   { path: "/app/inventory/movements", label: "Movimientos de inventario" },
   { path: "/app/inventory/transfers", label: "Transferencias de inventario" },
   { path: "/app/search", label: "Buscar repuesto" },
+  { path: "/app/cash/movements", label: "Movimientos de efectivo" },
 ];
 
 export function visibleNavigation(user: CurrentUser | null): NavigationGroup[] {
