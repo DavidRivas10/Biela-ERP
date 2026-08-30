@@ -55,6 +55,13 @@ export class InventoryController {
     return this.inventory.findMovements(query);
   }
 
+  @Get("summary")
+  @RequireBusinessPermissions(BUSINESS_PERMISSIONS.INVENTORY_READ)
+  @ApiOperation({ summary: "Total stock grouped by product category" })
+  categorySummary() {
+    return this.inventory.categorySummary();
+  }
+
   @Get()
   @RequireBusinessPermissions(BUSINESS_PERMISSIONS.INVENTORY_READ)
   @ApiOperation({ summary: "List stock balances by product and location" })

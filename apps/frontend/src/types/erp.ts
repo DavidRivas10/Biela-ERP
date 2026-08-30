@@ -131,6 +131,17 @@ export interface ProductInventory extends Paginated<InventoryBalance> {
   totalQuantity: number;
 }
 
+export interface InventoryCategorySummary {
+  categories: Array<{
+    categoryId: string;
+    categoryName: string;
+    productCount: number;
+    inStockProductCount: number;
+    totalQuantity: number;
+  }>;
+  totalQuantity: number;
+}
+
 export type InventoryMovementType =
   "INITIAL" | "IN" | "OUT" | "ADJUSTMENT" | "TRANSFER";
 

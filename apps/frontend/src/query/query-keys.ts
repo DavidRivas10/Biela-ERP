@@ -27,6 +27,7 @@ export const queryKeys = {
   locations: (filters: object) => ["inventory", "locations", filters] as const,
   inventoryRoot: ["inventory", "balances"] as const,
   inventory: (filters: object) => ["inventory", "balances", filters] as const,
+  inventorySummary: ["inventory", "summary"] as const,
   productInventory: (id: string, filters: object) =>
     ["inventory", "product", id, filters] as const,
   locationInventory: (id: string, filters: object) =>

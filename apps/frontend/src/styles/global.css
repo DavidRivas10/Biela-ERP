@@ -1425,6 +1425,82 @@ h2 {
 .open-accounts__list small {
   color: var(--muted);
 }
+
+/* Sub-navigation tabs (Almacén hub) */
+.subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.15rem;
+}
+.subtabs__tab {
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  padding: 0.55rem 0.9rem;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+.subtabs__tab:hover {
+  color: var(--ink);
+  background: var(--surface-soft);
+}
+.subtabs__tab--active {
+  color: var(--green-900);
+  border-bottom: 2px solid var(--green-700);
+}
+
+/* Stock summary by category */
+.stock-bars {
+  display: grid;
+  gap: 0.6rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.stock-bars li {
+  display: grid;
+  grid-template-columns: minmax(7rem, 12rem) 1fr auto;
+  align-items: center;
+  gap: 0.9rem;
+}
+.stock-bars__label {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.stock-bars__track {
+  height: 1.1rem;
+  border-radius: 3px;
+  background: var(--surface-soft);
+}
+.stock-bars__fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px 4px 4px 3px;
+  background: var(--green-700);
+}
+.stock-bars__value {
+  display: grid;
+  justify-items: end;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+.stock-bars__value small {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 620px) {
+  .stock-bars li {
+    grid-template-columns: 1fr auto;
+  }
+  .stock-bars__track {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+}
 .scan-row__feedback--ok {
   color: var(--success);
 }

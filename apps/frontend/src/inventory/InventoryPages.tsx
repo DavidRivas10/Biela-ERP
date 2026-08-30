@@ -15,6 +15,8 @@ import { FormFeedback } from "../components/FormFeedback";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { useUrlFilters } from "../hooks/use-url-filters";
+import { InventorySummary } from "./InventorySummary";
+import { InventoryTabs } from "./InventoryTabs";
 import { queryKeys } from "../query/query-keys";
 import type {
   InventoryBalance,
@@ -85,6 +87,8 @@ export function InventoryPage() {
         title="Inventario"
         description="Saldos autoritativos por producto y ubicación; no existe edición directa."
       />
+      <InventoryTabs />
+      <InventorySummary />
       <section className="panel filter-bar">
         <ProductSelector
           id="inventory-product-filter"
@@ -287,6 +291,7 @@ export function InventoryMovementsPage() {
           ) : undefined
         }
       />
+      <InventoryTabs />
       <FormFeedback success={success} />
       {showForm ? (
         <form className="panel erp-form" onSubmit={review}>
@@ -567,6 +572,7 @@ export function InventoryTransfersPage() {
         title="Transferencias"
         description="Traslado atómico entre dos ubicaciones activas; sin actualizaciones optimistas."
       />
+      <InventoryTabs />
       <FormFeedback success={success} />
       <form className="panel erp-form" onSubmit={review}>
         <FormFeedback

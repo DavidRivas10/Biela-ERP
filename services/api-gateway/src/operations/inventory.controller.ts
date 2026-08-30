@@ -91,6 +91,12 @@ export class InventoryController {
     return this.get("inventory", authorization, query);
   }
 
+  @Get("inventory/summary")
+  @ApiOperation({ summary: "Total stock grouped by product category" })
+  inventorySummary(@Headers("authorization") authorization?: string) {
+    return this.get("inventory/summary", authorization);
+  }
+
   @Get("inventory/:id")
   @ApiOperation({ summary: "Get one stock balance" })
   inventoryRecord(

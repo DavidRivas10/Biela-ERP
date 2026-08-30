@@ -9,6 +9,7 @@ import { VehicleSelector } from "../components/EntitySelectors";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { Field } from "../components/Field";
 import { PageHeader } from "../components/PageHeader";
+import { InventoryTabs } from "../inventory/InventoryTabs";
 import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
 import { useUrlFilters } from "../hooks/use-url-filters";
@@ -159,9 +160,10 @@ export function SearchPage() {
     <div className="page-stack">
       <PageHeader
         eyebrow="Almacén"
-        title="Búsqueda de productos"
+        title="Buscar repuesto"
         description="Resultados determinísticos del servidor: código exacto primero y orden estable, sin reordenamiento cliente."
       />
+      <InventoryTabs />
       <form
         className="panel erp-form search-form"
         onSubmit={submit}

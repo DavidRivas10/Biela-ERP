@@ -3,11 +3,22 @@ import { Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "../components/Button";
 import { Sidebar } from "./Sidebar";
-import { NAVIGATION, visibleNavigation } from "./navigation";
+import {
+  AUXILIARY_ROUTE_TITLES,
+  NAVIGATION,
+  visibleNavigation,
+} from "./navigation";
 
 function routeTitle(pathname: string): string {
+  const candidates = [
+    ...NAVIGATION.flatMap((group) => group.items).map((item) => ({
+      path: item.path,
+      label: item.label,
+    })),
+    ...AUXILIARY_ROUTE_TITLES,
+  ];
   return (
-    NAVIGATION.flatMap((group) => group.items)
+    candidates
       .filter(
         (item) =>
           pathname === item.path || pathname.startsWith(`${item.path}/`),

@@ -203,6 +203,18 @@ describe("API Gateway HTTP", () => {
     });
   });
 
+  it("forwards the inventory category summary as a thin read", async () => {
+    upstream.request.mockResolvedValue({ categories: [], totalQuantity: 0 });
+    await request(app.getHttpServer())
+      .get("/api/inventory/summary")
+      .set("Authorization", "Bearer inventory-token")
+      .expect(200);
+    expect(upstream.request).toHaveBeenCalledWith("autorepuesto", {
+      path: "inventory/summary",
+      authorization: "Bearer inventory-token",
+    });
+  });
+
   it("forwards deterministic search filters", async () => {
     upstream.request.mockResolvedValue({ data: [], meta: { page: 1 } });
     await request(app.getHttpServer())

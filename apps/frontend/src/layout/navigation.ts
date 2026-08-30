@@ -132,24 +132,6 @@ export const NAVIGATION: NavigationGroup[] = [
         short: "UB",
         permission: "locations.read",
       },
-      {
-        label: "Movimientos",
-        path: "/app/inventory/movements",
-        short: "MI",
-        permission: "inventory.read",
-      },
-      {
-        label: "Transferencias",
-        path: "/app/inventory/transfers",
-        short: "TR",
-        permission: "inventory.transfer",
-      },
-      {
-        label: "Búsqueda",
-        path: "/app/search",
-        short: "BU",
-        permission: "search.read",
-      },
     ],
   },
   {
@@ -192,6 +174,16 @@ export const NAVIGATION: NavigationGroup[] = [
       },
     ],
   },
+];
+
+/**
+ * Titles for routes that are reachable but not their own sidebar entry
+ * (they live as tabs inside another screen). Longest matching prefix wins.
+ */
+export const AUXILIARY_ROUTE_TITLES: Array<{ path: string; label: string }> = [
+  { path: "/app/inventory/movements", label: "Movimientos de inventario" },
+  { path: "/app/inventory/transfers", label: "Transferencias de inventario" },
+  { path: "/app/search", label: "Buscar repuesto" },
 ];
 
 export function visibleNavigation(user: CurrentUser | null): NavigationGroup[] {

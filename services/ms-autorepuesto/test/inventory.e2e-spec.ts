@@ -343,4 +343,26 @@ describe("Inventory HTTP with PostgreSQL", () => {
       }),
     ).rejects.toBeDefined();
   });
+
+  it("summarises total stock by product category", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/inventory/summary")
+      .expect(200);
+    expect(Array.isArray(response.body.categories)).toBe(true);
+    expect(typeof response.body.totalQuantity).toBe("number");
+    const mine = response.body.categories.find(
+      (row: { categoryId: string }) => row.categoryId === categoryId,
+    );
+    expect(mine).toBeDefined();
+    // this suite's product ended with a positive balance after the movements above
+    expect(mine.totalQuantity).toBeGreaterThan(0);
+    expect(mine.productCount).toBeGreaterThanOrEqual(1);
+    expect(mine.inStockProductCount).toBeGreaterThanOrEqual(1);
+    // the grand total is the sum of the category rows
+    const summed = response.body.categories.reduce(
+      (sum: number, row: { totalQuantity: number }) => sum + row.totalQuantity,
+      0,
+    );
+    expect(summed).toBe(response.body.totalQuantity);
+  });
 });

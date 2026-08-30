@@ -64,6 +64,55 @@ export class InventoryService {
     return { data, meta: this.meta(query.page, query.limit, total) };
   }
 
+  /**
+   * Total stock grouped by product category — a quick read of how the warehouse
+   * is distributed. Read-only aggregate over active products; the browser never
+   * recomputes it.
+   */
+  async categorySummary() {
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        categoryId: string;
+        categoryName: string;
+        productCount: bigint;
+        inStockProductCount: bigint;
+        totalQuantity: bigint;
+      }>
+    >(Prisma.sql`
+      SELECT
+        c."id"   AS "categoryId",
+        c."name" AS "categoryName",
+        COUNT(DISTINCT p."id")::bigint AS "productCount",
+        COUNT(DISTINCT p."id") FILTER (
+          WHERE COALESCE(stock."units", 0) > 0
+        )::bigint AS "inStockProductCount",
+        COALESCE(SUM(stock."units"), 0)::bigint AS "totalQuantity"
+      FROM "ProductCategory" c
+      JOIN "Product" p ON p."categoryId" = c."id" AND p."active" = true
+      LEFT JOIN (
+        SELECT "productId", SUM("quantity") AS "units"
+        FROM "Inventory"
+        GROUP BY "productId"
+      ) stock ON stock."productId" = p."id"
+      GROUP BY c."id", c."name"
+      ORDER BY "totalQuantity" DESC, c."name" ASC
+    `);
+    const categories = rows.map((row) => ({
+      categoryId: row.categoryId,
+      categoryName: row.categoryName,
+      productCount: Number(row.productCount),
+      inStockProductCount: Number(row.inStockProductCount),
+      totalQuantity: Number(row.totalQuantity),
+    }));
+    return {
+      categories,
+      totalQuantity: categories.reduce(
+        (sum, category) => sum + category.totalQuantity,
+        0,
+      ),
+    };
+  }
+
   async findOne(id: string) {
     const inventory = await this.prisma.inventory.findUnique({
       where: { id },

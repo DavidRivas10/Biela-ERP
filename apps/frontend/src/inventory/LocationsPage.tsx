@@ -8,6 +8,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
+import { HelpNote } from "../components/HelpNote";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
@@ -90,11 +91,11 @@ export function LocationsPage() {
     { key: "name", header: "Nombre", cell: (row) => row.name },
     {
       key: "physical",
-      header: "Posición física",
+      header: "Pasillo / estante",
       cell: (row) =>
-        [row.zone, row.aisle, row.rack, row.shelf, row.bin]
-          .filter(Boolean)
-          .join(" / ") || "—",
+        [row.aisle, row.shelf].filter(Boolean).join(" · ") ||
+        [row.zone, row.rack, row.bin].filter(Boolean).join(" · ") ||
+        "—",
     },
     {
       key: "status",
@@ -154,6 +155,12 @@ export function LocationsPage() {
           ) : undefined
         }
       />
+      <HelpNote title="Cómo llenarlo">
+        Registra aquí los pasillos y estantes de tu bodega tal como los tienes
+        rotulados. Los rótulos son texto libre —pueden ser palabras, no hace
+        falta que sean números—. El código es un identificador corto para elegir
+        la ubicación en las operaciones (por ejemplo BOD-01 o MOS-01).
+      </HelpNote>
       <FormFeedback success={success} />
       <form
         className="panel filter-bar"
@@ -165,7 +172,7 @@ export function LocationsPage() {
         <Field label="Buscar" htmlFor="location-search">
           <input
             id="location-search"
-            placeholder="Código, nombre, zona o descripción"
+            placeholder="Código, nombre o rótulo"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -222,15 +229,11 @@ export function LocationsPage() {
                 onChange={(e) => setEditor({ ...editor, name: e.target.value })}
               />
             </Field>
-            <Field label="Zona" htmlFor="location-zone">
-              <input
-                id="location-zone"
-                maxLength={80}
-                value={editor.zone}
-                onChange={(e) => setEditor({ ...editor, zone: e.target.value })}
-              />
-            </Field>
-            <Field label="Pasillo" htmlFor="location-aisle">
+            <Field
+              label="Pasillo (rótulo)"
+              htmlFor="location-aisle"
+              hint="Como lo tienes rotulado, por ejemplo «Pasillo de filtros»."
+            >
               <input
                 id="location-aisle"
                 maxLength={40}
@@ -240,15 +243,11 @@ export function LocationsPage() {
                 }
               />
             </Field>
-            <Field label="Rack" htmlFor="location-rack">
-              <input
-                id="location-rack"
-                maxLength={40}
-                value={editor.rack}
-                onChange={(e) => setEditor({ ...editor, rack: e.target.value })}
-              />
-            </Field>
-            <Field label="Estante" htmlFor="location-shelf">
+            <Field
+              label="Estante (rótulo)"
+              htmlFor="location-shelf"
+              hint="El estante dentro del pasillo, con tu propia etiqueta."
+            >
               <input
                 id="location-shelf"
                 maxLength={40}
@@ -256,14 +255,6 @@ export function LocationsPage() {
                 onChange={(e) =>
                   setEditor({ ...editor, shelf: e.target.value })
                 }
-              />
-            </Field>
-            <Field label="Contenedor" htmlFor="location-bin">
-              <input
-                id="location-bin"
-                maxLength={40}
-                value={editor.bin}
-                onChange={(e) => setEditor({ ...editor, bin: e.target.value })}
               />
             </Field>
             <Field label="Descripción" htmlFor="location-description">

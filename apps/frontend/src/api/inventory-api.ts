@@ -1,6 +1,7 @@
 import { apiRequest } from "./api-client";
 import type {
   InventoryBalance,
+  InventoryCategorySummary,
   InventoryMovement,
   InventoryMovementType,
   Location,
@@ -44,6 +45,8 @@ export const inventoryApi = {
     ),
   balances: (query: Record<string, QueryValue>) =>
     apiRequest<Paginated<InventoryBalance>>("/api/inventory", { query }),
+  summary: () =>
+    apiRequest<InventoryCategorySummary>("/api/inventory/summary"),
   productBalances: (id: string, query: Record<string, QueryValue>) =>
     apiRequest<ProductInventory>(`/api/products/${id}/inventory`, { query }),
   locationBalances: (id: string, query: Record<string, QueryValue>) =>
