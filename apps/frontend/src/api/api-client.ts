@@ -39,7 +39,18 @@ export class ApiNetworkError extends Error {
 
 export function getApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim();
-  return (configured || "http://localhost:4000").replace(/\/$/, "");
+  if (configured) return configured.replace(/\/$/, "");
+  // Dev default is the gateway on localhost. When the app is opened from a
+  // LAN address or an HTTPS tunnel instead (e.g. testing on a phone), talk to
+  // the same origin the page came from — the Vite dev server proxies `/api`
+  // to the local gateway, so there is no cross-origin request.
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host && host !== "localhost" && host !== "127.0.0.1") {
+      return window.location.origin;
+    }
+  }
+  return "http://localhost:4000";
 }
 
 export function subscribeUnauthorized(

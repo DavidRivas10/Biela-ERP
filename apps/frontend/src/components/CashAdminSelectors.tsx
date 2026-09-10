@@ -50,9 +50,8 @@ export function CashRegisterSelector({
   return (
     <div className="entity-selector">
       <Field
-        label="Buscar caja"
+        label="Buscar caja por código o nombre"
         htmlFor={`${id}-search`}
-        hint="Búsqueda y paginación del servidor; todas las cajas son alcanzables."
       >
         <input
           id={`${id}-search`}

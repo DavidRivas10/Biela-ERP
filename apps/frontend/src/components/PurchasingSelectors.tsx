@@ -60,9 +60,8 @@ export function SupplierSelector({
   return (
     <div className="entity-selector">
       <Field
-        label={`Buscar ${label.toLowerCase()}`}
+        label={`Buscar ${label.toLowerCase()} por código o nombre`}
         htmlFor={`${id}-search`}
-        hint="Búsqueda paginada del servidor por código o razón social."
       >
         <input
           id={`${id}-search`}

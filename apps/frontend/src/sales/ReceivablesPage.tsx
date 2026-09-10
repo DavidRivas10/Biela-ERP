@@ -14,7 +14,7 @@ import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
 import type { ReceivableDocument } from "../types/sales";
 import { apiErrorMessage } from "../utils/api-error";
-import { formatCalendarDate, formatMoney } from "../utils/formatters";
+import { formatCalendarDate, formatMoney, pluralize } from "../utils/formatters";
 
 const SETTLEMENT_LABELS: Record<string, string> = {
   UNPAID: "Sin pagar",
@@ -29,8 +29,7 @@ function DueCell({ row }: { row: ReceivableDocument }) {
       <span>{formatCalendarDate(row.paymentDueDate)}</span>
       {row.overdue ? (
         <Badge tone="danger">
-          Vencida hace {row.ageInDays}{" "}
-          {row.ageInDays === 1 ? "día" : "días"}
+          Vencida hace {pluralize(row.ageInDays, "día", "días")}
         </Badge>
       ) : null}
     </>
@@ -159,7 +158,11 @@ export function ReceivablesPage() {
               <span>Vencido</span>
               <strong>{formatMoney(summary.overdueAmount)}</strong>
               <small>
-                {summary.overdueCount} venta{summary.overdueCount === 1 ? "" : "s"} atrasada{summary.overdueCount === 1 ? "" : "s"}
+                {pluralize(
+                  summary.overdueCount,
+                  "venta atrasada",
+                  "ventas atrasadas",
+                )}
               </small>
             </article>
             <article className="metric-card">

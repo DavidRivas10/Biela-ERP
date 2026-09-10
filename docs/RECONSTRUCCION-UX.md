@@ -90,13 +90,17 @@ reales asociados. Requiere soporte del backend (conteos) — se implementa por m
 Leyenda: ⬜ pendiente · 🟨 en curso · ✅ hecho y verificado en navegador
 
 ### Inicio
-- 🟨 I1 — Panel general deja de ser "una cabecita", se siente centro de mando
-  (primer pase: acciones directas + métricas con enlace; falta densidad real
-  cuando aterricen los módulos)
-- 🟨 I2 — Tarjetas ventas/caja/CxC/CxP: ahora con etiqueta llana ("Te deben",
-  "Debes") + enlace de acción. Revisar cifras/plural al reconstruir Dinero.
-- 🟨 I3 — "Accesos rápidos" vagos reemplazados por "Qué puedes hacer ahora"
-  (acciones con verbo, filtradas por permiso)
+- ✅ I1 — Panel general se siente centro de mando: acciones directas en tarjetas
+  (no "chips"), métricas con enlace, y la sección "Cortes de turno" siempre
+  presente (con estado vacío propio) para que el panel llene el alto aun sin
+  datos. `.content` del shell ensanchado (91rem → 100rem) para recortar el
+  margen lateral muerto en pantallas anchas.
+- ✅ I2 — Tarjetas ventas/caja/CxC/CxP con etiqueta llana ("Te deben", "Debes")
+  + enlace de acción. Plural correcto vía helper `pluralize(n, singular, plural)`
+  en `utils/formatters` (Inicio, CxC, CxP): "1 venta vencida" / "2 ventas
+  vencidas", sin ternarios repetidos.
+- ✅ I3 — "Qué puedes hacer ahora": acciones con verbo, filtradas por permiso,
+  ahora en tarjetas anchas (mejor blanco de toque para el teléfono).
 - ✅ I4 — Bloque "Estado técnico de la plataforma / API Gateway" eliminado del
   Inicio (se quitó también la consulta a `/api/system/health`)
 
@@ -228,9 +232,12 @@ Leyenda: ⬜ pendiente · 🟨 en curso · ✅ hecho y verificado en navegador
 - ✅ P3 — Filtro "Estado": "Activos e inactivos / Solo activos / Solo inactivos
   (ocultos)" + hint bajo el campo + `title` en el badge explicando que inactivo
   = sigue en historial pero no aparece para vender/comprar.
-- 🟨 P4 — Botón "Cámara" + lector físico (keyboard wedge) presentes y cableados
-  en el form de producto. **Falta E2E real en teléfono** (cámara + getUserMedia;
-  no se puede validar desde esta sesión automatizada). Anotado para el pase Z1.
+- 🟨 P4 — Botón "Cámara" + lector físico (keyboard wedge) presentes y cableados.
+  Sesión 14: David probó en teléfono real → la cámara abre y muestra video, pero
+  el decoder se quedaba "intentando" sin leer ni avisar. Corregido (ver sesión
+  14): stream 1080p + autofocus continuo + formatos de empaque + reintento
+  rápido; aviso de ayuda a los 7 s; **ingreso manual del código siempre visible**
+  en el modal. Falta que David re-pruebe la lectura real.
 
 ### Mantenimientos de catálogo (Categorías/Marcas/Atributos)
 - ✅ M1 — `HelpNote` eliminado de las 3 pantallas. Descripción de una línea
@@ -669,34 +676,143 @@ Leyenda: ⬜ pendiente · 🟨 en curso · ✅ hecho y verificado en navegador
     VH3 · AL1 · AL2 · AL3 · AL4 · UB1 · UB2 · C1 · C2 · V1 · V2 · V3 · V4 · V5 ·
     V6 · V7 · V8 · V9 · CJ1 · CJ2 · CJ3 · CO1 · CO2 · AD1 · PR1 · PR2 · PR3 ·
     F1 · F2 · F3 · F4 · US1 · X1(HelpNote borrado en toda la app).
-  - 🟨 primer pase, falta densidad: I1 · I2 · I3 (Panel de inicio — acciones y
-    métricas con enlace ya están; falta llenar el espacio vacío).
+  - ✅ verificado en navegador (sesión 14): I1 · I2 · I3 (densidad del Panel de
+    inicio) y todos los nits cosméticos de Z5 (ver sesión 14).
   - ⬜ pendiente de David: **P4** — probar el escáner de código de barras E2E en
     un teléfono real. Infra verificada: botón "Cámara" presente y cableado,
     `navigator.mediaDevices.getUserMedia` disponible, `isSecureContext` true,
     `@zxing/browser` empaquetado. No se puede validar la cámara desde esta
     sesión automatizada.
 
-**Z5 — Pendientes (nits, no bloquean)**
-1. **P4**: escáner en móvil real (arriba).
-2. Panel de inicio (I1/I2/I3): densidad/uso del espacio vacío.
-3. Copy "1 factura**s** de proveedor vencida**s**" (plural) en dashboard y CxC/CxP
-   — el fix quedó con ternarios feos; unificar en un helper `plural()`.
-4. `SupplierSelector` (`PurchasingSelectors.tsx`) todavía tiene el hint jerga
-   "Búsqueda paginada del servidor…" (los otros selectores ya se limpiaron).
-5. Descripción de Productos: "Datos maestros de producto…" — jerga leve; no
-   estaba en la lista de David pero conviene ("El catálogo de piezas…").
-6. Barra de filtros de Vehículos: no se plegó en `<details>` como Ventas/CxC/CxP.
-7. Densidad de `.purchase-line` (líneas de producto en Ventas/Compras) apretada
-   en pantallas anchas.
-8. Texto "Módulos operativos" al pie del sidebar quedó obsoleto con la nueva IA.
-9. CSS muerto de `.help-note*` en `global.css` (componente borrado).
-10. eyebrow "Catálogo" en la lista/form de Vehículos (podría ser "Catálogo" ok, o
-    unificar con el resto).
+**Z5 — Pendientes (nits) — cerrado en sesión 14**
+1. **P4**: escáner en móvil real → habilitado (túnel HTTPS, ver sesión 14). Falta
+   que David lo pruebe.
+2. ✅ Panel de inicio (I1/I2/I3): densidad — acciones en tarjetas, "Cortes de
+   turno" siempre visible con estado vacío, `.content` ensanchado.
+3. ✅ Plural: helper `pluralize(n, singular, plural)` en `utils/formatters`,
+   aplicado en `DashboardPage`, `ReceivablesPage`, `PayablesPage`. Sin ternarios.
+4. ✅ `SupplierSelector` y `CashRegisterSelector`: hint jerga eliminado; el "por
+   código o nombre" pasó al label, como los demás selectores.
+5. ✅ Descripción de Productos reescrita sin "datos maestros" (y el test de
+   `AppRoutes` actualizado a la nueva cadena).
+6. ✅ Barra de filtros de Vehículos plegada en `<details className="filter-details">`
+   con `open={hasActiveFilters}`, igual que Ventas/CxC/CxP.
+7. ✅ `.purchase-line`: `align-items: end` → `start` (los campos numéricos ya no
+   caen al fondo de una fila alta), columna de producto más ancha, más `column-gap`.
+8. ✅ "Módulos operativos" eliminado del pie del sidebar (y su CSS
+   `.sidebar__phase`).
+9. ✅ CSS muerto `.help-note*` eliminado de `global.css`.
+10. eyebrow "Catálogo" en Vehículos: se dejó — ya es coherente con Productos
+    (lista/form = grupo de nav; detalle = "Vehículo"/"Producto"). Sin cambio.
 
 **Commit**
-- **Todo el trabajo sigue sin commitear**, en el árbol, junto a los cambios del
-  Bloque 11 (tema oscuro) que ya estaban sin commitear al empezar. Archivos de
-  la reconstrucción vs. Bloque 11: ver `git diff --stat`. Los del Bloque 11 son
-  `index.html`, `main.tsx`, `AppShell.tsx`, `LoginPage.tsx`, `package*.json` y
-  parte de `global.css`; el resto es reconstrucción. **Decisión de David.**
+- Sesión 12 y anteriores: commiteadas en `redesign/producto-ux` como
+  `edc318f` (Bloque 11 tema oscuro) y `143795d` (reconstrucción total, módulos 1–12).
+
+### Sesión 13 — 2026-09-09 — Commit, limpieza de datos, acceso por teléfono, densidad de Inicio
+
+**Commit (hecho)**
+- `edc318f` — Bloque 11 (tema claro/oscuro con toggle), 9 archivos.
+- `143795d` — reconstrucción total UX según el recorrido de David (módulos 1–12),
+  83 archivos. `global.css` se partió en la línea del bloque nuevo para separar
+  ambos commits (no hay `git add -p` en este entorno; se hizo por truncado).
+
+**Limpieza de datos (hecho, verificado)**
+- Respaldo previo en `backups/20260910T022426Z/` (pg_dump `--format=custom` +
+  mongodump `--archive --gzip`, con `SHA256SUMS`).
+- Postgres: las 31 tablas de negocio truncadas a 0 (`TRUNCATE ... RESTART IDENTITY
+  CASCADE` vía `DO $$…$$`). `_prisma_migrations` intacta (18 filas), esquema "up to
+  date". **No se tocó `schema.prisma` ni se corrió ninguna migración.**
+- Mongo `biela_users`: se conservó el admin (users = 1) y el catálogo de roles
+  (roles = 8). Todo lo demás de negocio, borrado.
+- ⚠️ `PaymentMethod` (Postgres) también quedó en 0 (eran 3: Efectivo/Tarjeta/
+  Transferencia). Hace falta al menos uno para registrar cobros/pagos en las
+  pruebas. Se pueden restaurar desde el backup (`scripts/restore-local.sh` a una
+  BD desechable y copiar las 3 filas) — **pendiente de decisión de David.**
+- Conteos antes/después confirmados tabla por tabla. Admin login OK tras la
+  limpieza; servicios sanos.
+
+**Acceso por teléfono (hecho)**
+- El escáner de cámara necesita HTTPS salvo en `localhost`. Solución sin cambiar
+  el backend: el frontend habla siempre con **su propio origen** y Vite hace de
+  proxy de `/api` al Gateway local → no hay petición cross-origin, así que **no
+  hace falta tocar `CORS_ORIGINS`**.
+  - `apps/frontend/vite.config.ts`: `server.host = true`, `allowedHosts: true`,
+    `proxy["/api"] → http://127.0.0.1:4000`.
+  - `apps/frontend/src/api/api-client.ts`: `getApiBaseUrl()` devuelve
+    `window.location.origin` cuando el host no es `localhost`/`127.0.0.1`.
+- Túnel: `cloudflared tunnel --url http://localhost:5173` (binario en scratchpad,
+  sin cuenta, sin interstitial). QUIC falla en esta red y cae a HTTP/2; el túnel
+  sirve igual. Verificado: `GET /` → 200 (título "BIELA ERP"),
+  `POST /api/auth/login` → 200.
+- **El túnel es efímero**: la URL cambia cada vez que se reinicia `cloudflared`.
+  Runbook para David en la entrega de esta sesión.
+
+**Densidad de Inicio + nits (hecho, verificado en navegador — sesión "14")**
+- Ver checklist I1/I2/I3 y Z5 arriba (todos ✅ salvo el eyebrow de Vehículos, que
+  ya era coherente y se dejó igual).
+- Nuevo helper `pluralize()` en `utils/formatters.ts`.
+- `DashboardPage`: acciones en `.action-card` (grid ancho), sección "Cortes de
+  turno" siempre visible con `LoadingState`/`ErrorState`/`EmptyState`.
+- `global.css`: `.content` 91rem → 100rem; `.action-row/.action-chip` →
+  `.action-grid/.action-card`; `.help-note*` y `.sidebar__phase` borrados;
+  `.purchase-line` con `align-items: start`.
+- Técnica: `tsc -b` OK · `npm run lint` OK (0 warnings) · `vitest` 161/161 ·
+  `vite build` OK.
+
+**Sin push.** Todo el trabajo de la sesión 13 sigue **sin commitear** (túnel +
+densidad + nits), a la espera de que David pruebe en teléfono y navegador.
+
+### Sesión 14 — 2026-09-09 — Escáner de código de barras no decodifica en teléfono
+
+**Síntoma (David, teléfono real):** la cámara abre, se ve el video, pero apuntando
+a un código lineal real el escáner se queda "intentando" para siempre, sin leer y
+sin ningún aviso.
+
+**Diagnóstico (medido, no supuesto).** Test propio: código CODE_128 real generado
+con JsBarcode, decodificado con `@zxing/browser` 0.1.5 (misma versión de la app),
+barriendo ancho-del-código-en-el-cuadro × desenfoque. Resultado:
+`scratchpad/zxing-decode-test.html` (captura en la entrega).
+- Con imagen nítida, el decoder **solo** lee si el código ocupa **≥ ~360 px** del
+  cuadro capturado; con desenfoque leve necesita ~640 px. Por debajo de eso:
+  falla en silencio — exactamente el síntoma.
+- `TRY_HARDER` y restringir formatos **no cambian nada** en esa tabla: el problema
+  no son los formatos (el reader por defecto ya prueba CODE_128/39/EAN/UPC), es la
+  **cantidad de píxeles sobre las barras**.
+- Causa raíz: `decodeFromVideoDevice(undefined, …)` pide
+  `{ video: { facingMode: 'environment' } }` **sin resolución**, así que el
+  teléfono entrega ~640×480 y las barras finas no se resuelven. Sin autofocus
+  forzado, además, el cuadro llega borroso.
+
+**Corrección — `components/BarcodeCameraModal.tsx`:**
+1. `decodeFromConstraints` con `width/height ideal 1920×1080` +
+   `advanced:[{focusMode:'continuous'}]`, y re-`applyConstraints` del focusMode
+   sobre el track ya vivo (muchos navegadores lo ignoran en getUserMedia).
+2. Hints: `POSSIBLE_FORMATS` = set de empaques (CODE_128/39/93, EAN_13/8,
+   UPC_A/E, ITF, CODABAR, QR, DataMatrix) + `TRY_HARDER`. Efecto real modesto
+   (ver test) pero acelera cada intento y evita lecturas raras.
+3. `delayBetweenScanAttempts: 150` (antes 500) → ~3× más intentos por segundo.
+4. **Feedback + respaldo manual:** a los 7 s sin lectura aparece un aviso
+   ("Todavía no se detecta ningún código. Acerca/aleja…"). Y **campo de ingreso
+   manual del código siempre visible** dentro del modal (no un `<form>` anidado —
+   el modal se monta dentro de otro form), con botón "Usar código". El código
+   escrito pasa por el mismo `handleScan` → `useScanToProduct`, que ya da
+   "Ningún producto activo con el código «…»" si no existe.
+5. Reticle más ancho y bajo (guía "llená el recuadro con el código").
+- `@zxing/library` agregado como dep directa del frontend (ya estaba en el árbol
+  vía `@zxing/browser`; solo se usa para el enum `DecodeHintType`).
+
+**Verificación.**
+- Test nuevo `src/components/BarcodeCameraModal.test.tsx` (4): manual siempre
+  disponible mientras escanea; constraint 1080p + environment; aviso de ayuda a
+  los 7 s; manual funciona incluso si la cámara no arranca.
+- En navegador (cámara del equipo): modal abre en "scanning", aviso aparece a los
+  ~7,5 s, "Usar código" cierra el modal y dispara `handleScan` **sin navegar**
+  (se verificó que el form de venta no se envía).
+- `tsc -b` OK · `npm run lint` OK · `vitest` **165/165** · `vite build` OK
+  (bundle inicial igual; zxing sigue en chunk lazy).
+
+**Qué le queda a David:** re-probar la lectura real en el teléfono con esta
+versión. Si un código concreto sigue sin leer, el respaldo manual ya lo desbloquea.
+
+**Sin push.** Sesión 13 + 14 siguen **sin commitear**.

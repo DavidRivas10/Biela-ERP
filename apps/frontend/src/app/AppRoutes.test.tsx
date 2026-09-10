@@ -168,7 +168,7 @@ describe("AppRoutes", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Datos maestros de producto; el inventario se administra por ubicación.",
+        "La ficha de cada repuesto: código, nombre, categoría, marca y precio. Cuánto tenés y en qué ubicación se ve en Inventario.",
       ),
     ).toBeInTheDocument();
     expect(

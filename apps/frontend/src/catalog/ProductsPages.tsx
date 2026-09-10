@@ -237,7 +237,7 @@ export function ProductsPage() {
       <PageHeader
         eyebrow="Catálogo"
         title="Productos"
-        description="Datos maestros de producto; el inventario se administra por ubicación."
+        description="La ficha de cada repuesto: código, nombre, categoría, marca y precio. Cuánto tenés y en qué ubicación se ve en Inventario."
         actions={
           hasPermission("products.create") ? (
             <Link

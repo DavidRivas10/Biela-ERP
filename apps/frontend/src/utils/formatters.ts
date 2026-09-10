@@ -30,6 +30,10 @@ export function formatPaymentType(value: PaymentType): string {
   return paymentTypeLabels[value];
 }
 
+export function pluralize(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
 export function formatMoney(value: string): string {
   const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(value);
   if (!match) return value;

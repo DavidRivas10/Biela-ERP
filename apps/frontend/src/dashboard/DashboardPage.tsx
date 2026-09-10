@@ -5,6 +5,7 @@ import { getCommercialSummary } from "../api/commercial-api";
 import { useAuth } from "../auth/AuthContext";
 import { hasPermission } from "../auth/permissions";
 import { Alert } from "../components/Alert";
+import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { queryKeys } from "../query/query-keys";
@@ -12,6 +13,7 @@ import {
   formatBusinessDate,
   formatDateTime,
   formatMoney,
+  pluralize,
 } from "../utils/formatters";
 
 function Metric({
@@ -128,14 +130,15 @@ export function DashboardPage() {
               <h2 id="quick-actions-title">Qué puedes hacer ahora</h2>
             </div>
           </div>
-          <div className="action-row">
+          <div className="action-grid">
             {actions.map((action) => (
               <Link
-                className="action-chip"
+                className="action-card"
                 to={action.to}
                 key={action.to}
               >
-                {action.label}
+                <span>{action.label}</span>
+                <span aria-hidden="true">→</span>
               </Link>
             ))}
           </div>
@@ -166,7 +169,11 @@ export function DashboardPage() {
                 <Metric
                   label="Vendido hoy"
                   value={formatMoney(summary.data.sales.today.total)}
-                  detail={`${summary.data.sales.today.count} ventas confirmadas hoy`}
+                  detail={`${pluralize(
+                    summary.data.sales.today.count,
+                    "venta confirmada",
+                    "ventas confirmadas",
+                  )} hoy`}
                   to="/app/sales"
                   linkLabel="Ver ventas"
                 />
@@ -192,14 +199,22 @@ export function DashboardPage() {
                   value={formatMoney(
                     summary.data.receivables.outstandingAmount,
                   )}
-                  detail={`${summary.data.receivables.overdueCount} ventas vencidas · ${formatMoney(summary.data.receivables.overdueAmount)} atrasado`}
+                  detail={`${pluralize(
+                    summary.data.receivables.overdueCount,
+                    "venta vencida",
+                    "ventas vencidas",
+                  )} · ${formatMoney(summary.data.receivables.overdueAmount)} atrasado`}
                   to="/app/commercial/receivables"
                   linkLabel="Cobrar"
                 />
                 <Metric
                   label="Debes (por pagar)"
                   value={formatMoney(summary.data.payables.outstandingAmount)}
-                  detail={`${summary.data.payables.overdueCount} facturas de proveedor vencidas`}
+                  detail={pluralize(
+                    summary.data.payables.overdueCount,
+                    "factura de proveedor vencida",
+                    "facturas de proveedor vencidas",
+                  )}
                   to="/app/commercial/payables"
                   linkLabel="Ver pagos"
                 />
@@ -218,7 +233,7 @@ export function DashboardPage() {
         </Alert>
       )}
 
-      {canReadCashSessions && closedShifts.length > 0 ? (
+      {canReadCashSessions ? (
         <section aria-labelledby="shift-cuts-title">
           <div className="section-heading">
             <div>
@@ -229,47 +244,62 @@ export function DashboardPage() {
               Ver todos
             </Link>
           </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Caja</th>
-                  <th>Cerró</th>
-                  <th>Fecha</th>
-                  <th>Esperado</th>
-                  <th>Contado</th>
-                  <th>Diferencia</th>
-                </tr>
-              </thead>
-              <tbody>
-                {closedShifts.map((session) => (
-                  <tr key={session.id}>
-                    <td>
-                      <Link
-                        className="table-link"
-                        to={`/app/cash/sessions/${session.id}`}
-                      >
-                        {session.cashRegister.code}
-                      </Link>
-                    </td>
-                    <td>{session.closedByActorId ?? "—"}</td>
-                    <td>
-                      {session.closedAt
-                        ? formatDateTime(session.closedAt)
-                        : "—"}
-                    </td>
-                    <td>{formatMoney(session.expectedAmount ?? "0")}</td>
-                    <td>{formatMoney(session.countedAmount ?? "0")}</td>
-                    <td>
-                      {session.differenceAmount != null
-                        ? formatMoney(session.differenceAmount)
-                        : "—"}
-                    </td>
+          {recentClosed.isPending ? (
+            <LoadingState label="Consultando los últimos cierres de caja" />
+          ) : recentClosed.isError ? (
+            <ErrorState
+              title="No se pudieron cargar los cierres de caja"
+              message="El resto del panel sigue disponible."
+              onRetry={() => void recentClosed.refetch()}
+            />
+          ) : closedShifts.length === 0 ? (
+            <EmptyState title="Todavía no hay cierres de caja">
+              Cuando alguien cierre una sesión de caja, el corte del turno
+              aparece acá con lo esperado, lo contado y la diferencia.
+            </EmptyState>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Caja</th>
+                    <th>Cerró</th>
+                    <th>Fecha</th>
+                    <th>Esperado</th>
+                    <th>Contado</th>
+                    <th>Diferencia</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {closedShifts.map((session) => (
+                    <tr key={session.id}>
+                      <td>
+                        <Link
+                          className="table-link"
+                          to={`/app/cash/sessions/${session.id}`}
+                        >
+                          {session.cashRegister.code}
+                        </Link>
+                      </td>
+                      <td>{session.closedByActorId ?? "—"}</td>
+                      <td>
+                        {session.closedAt
+                          ? formatDateTime(session.closedAt)
+                          : "—"}
+                      </td>
+                      <td>{formatMoney(session.expectedAmount ?? "0")}</td>
+                      <td>{formatMoney(session.countedAmount ?? "0")}</td>
+                      <td>
+                        {session.differenceAmount != null
+                          ? formatMoney(session.differenceAmount)
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       ) : null}
     </section>

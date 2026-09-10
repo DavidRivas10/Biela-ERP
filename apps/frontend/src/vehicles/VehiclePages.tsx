@@ -517,96 +517,99 @@ export function VehiclesPage() {
         }
       />
       <VehicleChain current="vehicle" />
-      <section className="panel filter-bar">
-        <Field label="Marca" htmlFor="vehicle-brand-filter">
-          <select
-            id="vehicle-brand-filter"
-            value={filters.values.brandId ?? ""}
-            onChange={(e) =>
-              filters.update({ brandId: e.target.value, modelId: undefined })
-            }
-          >
-            <option value="">Todas las marcas</option>
-            {brands.data?.map((row) => (
-              <option key={row.id} value={row.id}>
-                {row.name}
+      <details className="filter-details" open={hasActiveFilters}>
+        <summary>Buscar o filtrar vehículos</summary>
+        <div className="filter-bar">
+          <Field label="Marca" htmlFor="vehicle-brand-filter">
+            <select
+              id="vehicle-brand-filter"
+              value={filters.values.brandId ?? ""}
+              onChange={(e) =>
+                filters.update({ brandId: e.target.value, modelId: undefined })
+              }
+            >
+              <option value="">Todas las marcas</option>
+              {brands.data?.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Modelo" htmlFor="vehicle-model-filter">
+            <select
+              id="vehicle-model-filter"
+              value={filters.values.modelId ?? ""}
+              onChange={(e) => filters.update({ modelId: e.target.value })}
+              disabled={!filters.values.brandId}
+            >
+              <option value="">
+                {filters.values.brandId
+                  ? "Todos los modelos"
+                  : "Elegí una marca primero"}
               </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Modelo" htmlFor="vehicle-model-filter">
-          <select
-            id="vehicle-model-filter"
-            value={filters.values.modelId ?? ""}
-            onChange={(e) => filters.update({ modelId: e.target.value })}
-            disabled={!filters.values.brandId}
+              {models.data?.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Año" htmlFor="vehicle-year-filter">
+            <input
+              id="vehicle-year-filter"
+              type="number"
+              min={1886}
+              max={2100}
+              value={filters.values.year ?? ""}
+              onChange={(e) => filters.update({ year: e.target.value })}
+            />
+          </Field>
+          <Field label="Motor" htmlFor="vehicle-engine-filter">
+            <input
+              id="vehicle-engine-filter"
+              value={filters.values.engine ?? ""}
+              onChange={(e) => filters.update({ engine: e.target.value })}
+            />
+          </Field>
+          <Field label="VIN" htmlFor="vehicle-vin-filter">
+            <input
+              id="vehicle-vin-filter"
+              value={filters.values.vin ?? ""}
+              onChange={(e) => filters.update({ vin: e.target.value })}
+            />
+          </Field>
+          <Field label="N.º de motor" htmlFor="vehicle-engine-number-filter">
+            <input
+              id="vehicle-engine-number-filter"
+              value={filters.values.engineNumber ?? ""}
+              onChange={(e) => filters.update({ engineNumber: e.target.value })}
+            />
+          </Field>
+          <Field
+            label="Estado"
+            htmlFor="vehicle-active-filter"
+            hint="«Inactivo» = el vehículo sigue en el historial pero no aparece al crear compatibilidades."
           >
-            <option value="">
-              {filters.values.brandId
-                ? "Todos los modelos"
-                : "Elegí una marca primero"}
-            </option>
-            {models.data?.map((row) => (
-              <option key={row.id} value={row.id}>
-                {row.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Año" htmlFor="vehicle-year-filter">
-          <input
-            id="vehicle-year-filter"
-            type="number"
-            min={1886}
-            max={2100}
-            value={filters.values.year ?? ""}
-            onChange={(e) => filters.update({ year: e.target.value })}
-          />
-        </Field>
-        <Field label="Motor" htmlFor="vehicle-engine-filter">
-          <input
-            id="vehicle-engine-filter"
-            value={filters.values.engine ?? ""}
-            onChange={(e) => filters.update({ engine: e.target.value })}
-          />
-        </Field>
-        <Field label="VIN" htmlFor="vehicle-vin-filter">
-          <input
-            id="vehicle-vin-filter"
-            value={filters.values.vin ?? ""}
-            onChange={(e) => filters.update({ vin: e.target.value })}
-          />
-        </Field>
-        <Field label="N.º de motor" htmlFor="vehicle-engine-number-filter">
-          <input
-            id="vehicle-engine-number-filter"
-            value={filters.values.engineNumber ?? ""}
-            onChange={(e) => filters.update({ engineNumber: e.target.value })}
-          />
-        </Field>
-        <Field
-          label="Estado"
-          htmlFor="vehicle-active-filter"
-          hint="«Inactivo» = el vehículo sigue en el historial pero no aparece al crear compatibilidades."
-        >
-          <select
-            id="vehicle-active-filter"
-            value={filters.values.active ?? ""}
-            onChange={(e) => filters.update({ active: e.target.value })}
-          >
-            <option value="">Activos e inactivos</option>
-            <option value="true">Solo activos</option>
-            <option value="false">Solo inactivos (ocultos)</option>
-          </select>
-        </Field>
-        {hasActiveFilters ? (
-          <div className="filter-actions">
-            <Button variant="ghost" onClick={filters.clear}>
-              Limpiar filtros
-            </Button>
-          </div>
-        ) : null}
-      </section>
+            <select
+              id="vehicle-active-filter"
+              value={filters.values.active ?? ""}
+              onChange={(e) => filters.update({ active: e.target.value })}
+            >
+              <option value="">Activos e inactivos</option>
+              <option value="true">Solo activos</option>
+              <option value="false">Solo inactivos (ocultos)</option>
+            </select>
+          </Field>
+          {hasActiveFilters ? (
+            <div className="filter-actions">
+              <Button variant="ghost" onClick={filters.clear}>
+                Limpiar filtros
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </details>
       <section className="panel">
         <ErpTable
           columns={columns}
