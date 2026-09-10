@@ -5,6 +5,7 @@ import { Alert } from "../components/Alert";
 import { BielaMark } from "../components/BielaMark";
 import { Button } from "../components/Button";
 import { EngineLoader } from "../components/EngineLoader";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../auth/AuthContext";
 
 function safeDestination(value: unknown): string {
@@ -80,6 +81,9 @@ export function LoginPage() {
       </section>
 
       <section className="login-form-panel">
+        <div className="login-form-panel__top">
+          <ThemeToggle />
+        </div>
         <form className="login-form" onSubmit={(event) => void submit(event)}>
           <div>
             <p className="eyebrow">Acceso seguro</p>

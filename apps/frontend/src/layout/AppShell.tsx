@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "../components/Button";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { Sidebar } from "./Sidebar";
 import {
   AUXILIARY_ROUTE_TITLES,
@@ -86,6 +87,7 @@ export function AppShell() {
               <strong>{displayName}</strong>
               <span>{roleNames}</span>
             </div>
+            <ThemeToggle />
             <Button variant="ghost" onClick={logout}>
               Salir
             </Button>
