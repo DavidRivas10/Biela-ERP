@@ -135,7 +135,7 @@ describe("AppRoutes", () => {
       await screen.findByRole("heading", { name: "Proveedores" }),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText("No se encontraron proveedores"),
+      await screen.findByText("Todavía no registraste proveedores"),
     ).toBeInTheDocument();
   });
 
@@ -172,7 +172,7 @@ describe("AppRoutes", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText("No se encontraron productos"),
+      await screen.findByText("Todavía no hay productos"),
     ).toBeInTheDocument();
   });
 

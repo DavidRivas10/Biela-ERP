@@ -7,6 +7,7 @@ import { VehicleCatalogsService } from "./vehicle-catalogs.service";
 
 const vehicleInclude = {
   model: { include: { brand: true } },
+  _count: { select: { compatibilities: true } },
 } satisfies Prisma.VehicleInclude;
 
 @Injectable()

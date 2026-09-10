@@ -8,6 +8,7 @@ import { useAuth } from "../auth/AuthContext";
 import { BarcodeScanButton } from "../components/BarcodeScanButton";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EmptyState } from "../components/EmptyState";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
@@ -27,6 +28,25 @@ import type {
 } from "../types/erp";
 import { apiErrorMessage } from "../utils/api-error";
 import { formatDateTime, formatMoney } from "../utils/formatters";
+
+/** One plain sentence describing which filters produced an empty result. */
+function describeActiveFilters(parts: {
+  search?: string;
+  categoryName?: string;
+  brandName?: string;
+  active?: string;
+}): string {
+  const clauses: string[] = [];
+  if (parts.search) clauses.push(`con el texto «${parts.search}»`);
+  if (parts.categoryName)
+    clauses.push(`en la categoría "${parts.categoryName}"`);
+  if (parts.brandName) clauses.push(`de la marca "${parts.brandName}"`);
+  if (parts.active === "true") clauses.push("que estén activos");
+  if (parts.active === "false") clauses.push("que estén inactivos (ocultos)");
+  return clauses.length
+    ? `No hay ningún producto ${clauses.join(", ")}.`
+    : "No hay ningún producto que coincida.";
+}
 
 export function ProductsPage() {
   const { hasPermission } = useAuth();
@@ -52,6 +72,106 @@ export function ProductsPage() {
     queryKey: queryKeys.productBrands,
     queryFn: catalogApi.brands,
   });
+
+  const hasActiveFilters = Boolean(
+    filters.values.search ||
+      filters.values.categoryId ||
+      filters.values.brandId ||
+      filters.values.active,
+  );
+  const selectedCategory = categories.data?.find(
+    (row) => row.id === filters.values.categoryId,
+  );
+  const selectedBrand = brands.data?.find(
+    (row) => row.id === filters.values.brandId,
+  );
+  // Never offer a filter value that has zero products behind it — that is the
+  // "Brembo no hay, NGK no hay" dead end. The currently applied value stays
+  // listed even if it drops to zero, so the control keeps making sense.
+  const categoryOptions = (categories.data ?? []).filter(
+    (row) =>
+      (row._count?.products ?? 0) > 0 || row.id === filters.values.categoryId,
+  );
+  const brandOptions = (brands.data ?? []).filter(
+    (row) =>
+      (row._count?.products ?? 0) > 0 || row.id === filters.values.brandId,
+  );
+
+  const emptyState = hasActiveFilters ? (
+    <EmptyState
+      tone="search"
+      title="Ningún producto coincide"
+      action={
+        <div className="row-actions">
+          {filters.values.search ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setSearch("");
+                filters.update({ search: undefined });
+              }}
+            >
+              Quitar «{filters.values.search}»
+            </Button>
+          ) : null}
+          {filters.values.categoryId ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => filters.update({ categoryId: undefined })}
+            >
+              Quitar categoría
+            </Button>
+          ) : null}
+          {filters.values.brandId ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => filters.update({ brandId: undefined })}
+            >
+              Quitar marca
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              filters.clear();
+            }}
+          >
+            Ver todos los productos
+          </Button>
+        </div>
+      }
+    >
+      {describeActiveFilters({
+        search: filters.values.search,
+        categoryName: selectedCategory?.name,
+        brandName: selectedBrand?.name,
+        active: filters.values.active,
+      })}{" "}
+      Revisá el código o quitá algún filtro.
+    </EmptyState>
+  ) : (
+    <EmptyState
+      title="Todavía no hay productos"
+      action={
+        hasPermission("products.create") ? (
+          <Link
+            className="button button--primary"
+            to="/app/catalog/products/new"
+          >
+            Agregar el primer producto
+          </Link>
+        ) : undefined
+      }
+    >
+      Cuando registres productos aparecerán aquí con su código, categoría, marca
+      y precio sugerido.
+    </EmptyState>
+  );
+
   const columns: ErpColumn<Product>[] = [
     {
       key: "code",
@@ -134,10 +254,14 @@ export function ProductsPage() {
         onSubmit={submit}
         aria-label="Filtros de productos"
       >
-        <Field label="Buscar" htmlFor="product-search">
+        <Field
+          label="Buscar por código o nombre"
+          htmlFor="product-search"
+          hint="Escribí el código exacto (p. ej. FILT-001) o parte del nombre y presioná Buscar."
+        >
           <input
             id="product-search"
-            placeholder="Código, nombre o descripción"
+            placeholder="FILT-001, pastillas, filtro de aceite…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -148,10 +272,10 @@ export function ProductsPage() {
             value={filters.values.categoryId ?? ""}
             onChange={(e) => filters.update({ categoryId: e.target.value })}
           >
-            <option value="">Todas</option>
-            {categories.data?.map((row) => (
+            <option value="">Todas las categorías</option>
+            {categoryOptions.map((row) => (
               <option key={row.id} value={row.id}>
-                {row.name}
+                {row.name} ({row._count?.products ?? 0})
               </option>
             ))}
           </select>
@@ -162,37 +286,43 @@ export function ProductsPage() {
             value={filters.values.brandId ?? ""}
             onChange={(e) => filters.update({ brandId: e.target.value })}
           >
-            <option value="">Todas</option>
-            {brands.data?.map((row) => (
+            <option value="">Todas las marcas</option>
+            {brandOptions.map((row) => (
               <option key={row.id} value={row.id}>
-                {row.name}
+                {row.name} ({row._count?.products ?? 0})
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Estado" htmlFor="product-active-filter">
+        <Field
+          label="Estado"
+          htmlFor="product-active-filter"
+          hint="«Inactivo» = el producto sigue en el historial pero ya no aparece para vender ni comprar."
+        >
           <select
             id="product-active-filter"
             value={filters.values.active ?? ""}
             onChange={(e) => filters.update({ active: e.target.value })}
           >
-            <option value="">Todos</option>
-            <option value="true">Activos</option>
-            <option value="false">Inactivos</option>
+            <option value="">Activos e inactivos</option>
+            <option value="true">Solo activos</option>
+            <option value="false">Solo inactivos (ocultos)</option>
           </select>
         </Field>
         <div className="filter-actions">
-          <Button type="submit">Aplicar</Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setSearch("");
-              filters.clear();
-            }}
-          >
-            Limpiar
-          </Button>
+          <Button type="submit">Buscar</Button>
+          {hasActiveFilters ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setSearch("");
+                filters.clear();
+              }}
+            >
+              Limpiar filtros
+            </Button>
+          ) : null}
         </div>
       </form>
       <section className="panel">
@@ -203,7 +333,7 @@ export function ProductsPage() {
           loading={products.isLoading}
           error={products.error ? apiErrorMessage(products.error) : undefined}
           onRetry={() => void products.refetch()}
-          emptyTitle="No se encontraron productos"
+          emptyState={emptyState}
         />
         <Pagination
           meta={products.data?.meta}

@@ -6,16 +6,17 @@ import { vehiclesApi, type VehicleInput } from "../api/vehicles-api";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EmptyState } from "../components/EmptyState";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
-import { HelpNote } from "../components/HelpNote";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
 import { invalidateVehicleReferenceIntegration } from "../query/invalidation";
+import { VehicleChain } from "./VehicleChain";
 import type {
   NestedCompatibility,
   Product,
@@ -53,6 +54,18 @@ export function VehicleBrandsPage() {
     { key: "code", header: "Código", cell: (row) => <code>{row.code}</code> },
     { key: "name", header: "Nombre", cell: (row) => row.name },
     {
+      key: "models",
+      header: "Modelos",
+      cell: (row) =>
+        row._count?.models === undefined ? (
+          "—"
+        ) : row._count.models === 0 ? (
+          <span className="muted">Sin modelos</span>
+        ) : (
+          `${row._count.models} ${row._count.models === 1 ? "modelo" : "modelos"}`
+        ),
+    },
+    {
       key: "status",
       header: "Estado",
       cell: (row) => <StatusBadge active={row.active} />,
@@ -88,9 +101,9 @@ export function VehicleBrandsPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Vehículos"
-        title="Marcas de vehículos"
-        description="Fabricantes para la jerarquía de aplicaciones vehiculares."
+        eyebrow="Mantenimientos"
+        title="Marcas de vehículo"
+        description="Las marcas de carro (Toyota, Nissan, Hyundai). Son el primer nivel: una marca agrupa modelos, y cada modelo tiene vehículos concretos."
         actions={
           hasPermission("vehicles.create") && !editor ? (
             <Button
@@ -101,6 +114,7 @@ export function VehicleBrandsPage() {
           ) : undefined
         }
       />
+      <VehicleChain current="brand" />
       <FormFeedback success={success} />
       {editor ? (
         <form className="panel erp-form" onSubmit={submit}>
@@ -161,6 +175,8 @@ export function VehicleBrandsPage() {
           rowKey={(row) => row.id}
           loading={query.isLoading}
           error={query.error ? apiErrorMessage(query.error) : undefined}
+          emptyTitle="Todavía no hay marcas de vehículo"
+          emptyDescription="Creá las marcas de carro con las que trabajás. El siguiente paso es registrar sus modelos."
         />
       </section>
     </div>
@@ -207,6 +223,20 @@ export function VehicleModelsPage() {
     { key: "code", header: "Código", cell: (row) => <code>{row.code}</code> },
     { key: "name", header: "Modelo", cell: (row) => row.name },
     {
+      key: "vehicles",
+      header: "Vehículos",
+      cell: (row) =>
+        row._count?.vehicles === undefined ? (
+          "—"
+        ) : row._count.vehicles === 0 ? (
+          <span className="muted">Sin vehículos</span>
+        ) : (
+          `${row._count.vehicles} ${
+            row._count.vehicles === 1 ? "vehículo" : "vehículos"
+          }`
+        ),
+    },
+    {
       key: "status",
       header: "Estado",
       cell: (row) => <StatusBadge active={row.active} />,
@@ -243,9 +273,9 @@ export function VehicleModelsPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Vehículos"
-        title="Modelos de vehículos"
-        description="Modelos asociados a una marca específica."
+        eyebrow="Mantenimientos"
+        title="Modelos de vehículo"
+        description="El modelo concreto de cada marca (Hilux, Sentra, Accent). Primero elegís la marca; después registrás los vehículos (año + motor) de ese modelo."
         actions={
           hasPermission("vehicles.create") && !editor ? (
             <Button
@@ -258,18 +288,22 @@ export function VehicleModelsPage() {
           ) : undefined
         }
       />
+      <VehicleChain current="model" />
       <FormFeedback success={success} />
       <section className="panel filter-bar">
-        <Field label="Marca" htmlFor="model-brand-filter">
+        <Field label="Filtrar por marca" htmlFor="model-brand-filter">
           <select
             id="model-brand-filter"
             value={filters.values.brandId ?? ""}
             onChange={(e) => filters.update({ brandId: e.target.value })}
           >
-            <option value="">Todas</option>
+            <option value="">Todas las marcas</option>
             {brands.data?.map((row) => (
               <option key={row.id} value={row.id}>
                 {row.name}
+                {row._count?.models !== undefined
+                  ? ` (${row._count.models})`
+                  : ""}
               </option>
             ))}
           </select>
@@ -282,7 +316,20 @@ export function VehicleModelsPage() {
             error={mutation.error ? apiErrorMessage(mutation.error) : null}
           />
           <div className="form-grid">
-            <Field label="Marca" htmlFor="model-brand" required>
+            <Field
+              label="Marca"
+              htmlFor="model-brand"
+              required
+              hint={
+                <>
+                  Vienen de{" "}
+                  <Link className="table-link" to="/app/mantenimientos/marcas-vehiculo">
+                    Marcas de vehículo
+                  </Link>
+                  . Si falta una, agregala ahí primero.
+                </>
+              }
+            >
               <select
                 id="model-brand"
                 required
@@ -353,6 +400,12 @@ export function VehicleModelsPage() {
           rowKey={(row) => row.id}
           loading={models.isLoading}
           error={models.error ? apiErrorMessage(models.error) : undefined}
+          emptyTitle={
+            filters.values.brandId
+              ? "Esta marca no tiene modelos todavía"
+              : "Todavía no hay modelos de vehículo"
+          }
+          emptyDescription="Agregá los modelos de cada marca (Hilux, Sentra…). Después vas a poder registrar sus vehículos por año y motor."
         />
       </section>
     </div>
@@ -385,6 +438,15 @@ export function VehiclesPage() {
     queryKey: queryKeys.vehicleModels(filters.values.brandId),
     queryFn: () => vehiclesApi.models(filters.values.brandId),
   });
+  const hasActiveFilters = Boolean(
+    filters.values.brandId ||
+      filters.values.modelId ||
+      filters.values.year ||
+      filters.values.engine ||
+      filters.values.vin ||
+      filters.values.engineNumber ||
+      filters.values.active,
+  );
   const columns: ErpColumn<Vehicle>[] = [
     {
       key: "vehicle",
@@ -402,6 +464,18 @@ export function VehiclesPage() {
       header: "Generación / versión",
       cell: (row) =>
         [row.generation, row.trim].filter(Boolean).join(" · ") || "—",
+    },
+    {
+      key: "compat",
+      header: "Repuestos compatibles",
+      cell: (row) =>
+        row._count?.compatibilities === undefined ? (
+          "—"
+        ) : row._count.compatibilities === 0 ? (
+          <span className="muted">Ninguno</span>
+        ) : (
+          `${row._count.compatibilities}`
+        ),
     },
     {
       key: "status",
@@ -431,9 +505,9 @@ export function VehiclesPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Vehículos"
+        eyebrow="Catálogo"
         title="Vehículos"
-        description="Variantes determinísticas por modelo, año y motor."
+        description="Cada vehículo es una combinación exacta de marca, modelo, año y motor. Con él marcás qué repuestos le quedan, y eso se hace en Compatibilidad."
         actions={
           hasPermission("vehicles.create") ? (
             <Link className="button button--primary" to="/app/vehicles/new">
@@ -442,17 +516,7 @@ export function VehiclesPage() {
           ) : undefined
         }
       />
-      <HelpNote title="Para qué sirve esta pantalla">
-        Los vehículos que registras aquí se usan para marcar qué productos
-        aplican a cada uno. Esa relación se administra en{" "}
-        <Link className="table-link" to="/app/compatibility">
-          Compatibilidad
-        </Link>
-        , y es la que permite que en el mostrador busques un repuesto por el
-        carro del cliente (marca, modelo, año y motor). El VIN y el número de
-        motor son opcionales y sirven para identificar el vehículo con certeza
-        cuando esos datos no alcanzan.
-      </HelpNote>
+      <VehicleChain current="vehicle" />
       <section className="panel filter-bar">
         <Field label="Marca" htmlFor="vehicle-brand-filter">
           <select
@@ -462,7 +526,7 @@ export function VehiclesPage() {
               filters.update({ brandId: e.target.value, modelId: undefined })
             }
           >
-            <option value="">Todas</option>
+            <option value="">Todas las marcas</option>
             {brands.data?.map((row) => (
               <option key={row.id} value={row.id}>
                 {row.name}
@@ -475,8 +539,13 @@ export function VehiclesPage() {
             id="vehicle-model-filter"
             value={filters.values.modelId ?? ""}
             onChange={(e) => filters.update({ modelId: e.target.value })}
+            disabled={!filters.values.brandId}
           >
-            <option value="">Todos</option>
+            <option value="">
+              {filters.values.brandId
+                ? "Todos los modelos"
+                : "Elegí una marca primero"}
+            </option>
             {models.data?.map((row) => (
               <option key={row.id} value={row.id}>
                 {row.name}
@@ -515,22 +584,28 @@ export function VehiclesPage() {
             onChange={(e) => filters.update({ engineNumber: e.target.value })}
           />
         </Field>
-        <Field label="Estado" htmlFor="vehicle-active-filter">
+        <Field
+          label="Estado"
+          htmlFor="vehicle-active-filter"
+          hint="«Inactivo» = el vehículo sigue en el historial pero no aparece al crear compatibilidades."
+        >
           <select
             id="vehicle-active-filter"
             value={filters.values.active ?? ""}
             onChange={(e) => filters.update({ active: e.target.value })}
           >
-            <option value="">Todos</option>
-            <option value="true">Activos</option>
-            <option value="false">Inactivos</option>
+            <option value="">Activos e inactivos</option>
+            <option value="true">Solo activos</option>
+            <option value="false">Solo inactivos (ocultos)</option>
           </select>
         </Field>
-        <div className="filter-actions">
-          <Button variant="ghost" onClick={filters.clear}>
-            Limpiar
-          </Button>
-        </div>
+        {hasActiveFilters ? (
+          <div className="filter-actions">
+            <Button variant="ghost" onClick={filters.clear}>
+              Limpiar filtros
+            </Button>
+          </div>
+        ) : null}
       </section>
       <section className="panel">
         <ErpTable
@@ -540,7 +615,39 @@ export function VehiclesPage() {
           loading={vehicles.isLoading}
           error={vehicles.error ? apiErrorMessage(vehicles.error) : undefined}
           onRetry={() => void vehicles.refetch()}
-          emptyTitle="No se encontraron vehículos"
+          emptyState={
+            hasActiveFilters ? (
+              <EmptyState
+                tone="search"
+                title="Ningún vehículo coincide"
+                action={
+                  <Button type="button" onClick={filters.clear}>
+                    Quitar los filtros
+                  </Button>
+                }
+              >
+                No hay ningún vehículo con los filtros aplicados. Revisá la
+                marca, el modelo, el año o el motor.
+              </EmptyState>
+            ) : (
+              <EmptyState
+                title="Todavía no hay vehículos"
+                action={
+                  hasPermission("vehicles.create") ? (
+                    <Link
+                      className="button button--primary"
+                      to="/app/vehicles/new"
+                    >
+                      Registrar el primer vehículo
+                    </Link>
+                  ) : undefined
+                }
+              >
+                Un vehículo es marca + modelo + año + motor. Necesitás tener la
+                marca y el modelo cargados antes de registrarlo.
+              </EmptyState>
+            )
+          }
         />
         <Pagination
           meta={vehicles.data?.meta}
@@ -637,10 +744,11 @@ export function VehicleFormPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Vehículos"
+        eyebrow="Catálogo"
         title={editing ? "Editar vehículo" : "Nuevo vehículo"}
-        description="El año permitido por contrato está entre 1886 y 2100."
+        description="Un vehículo es una combinación exacta de marca, modelo, año y motor. Una vez creado, en Compatibilidad marcás qué repuestos le quedan."
       />
+      <VehicleChain current="vehicle" />
       <form className="panel erp-form" onSubmit={submit}>
         <FormFeedback
           error={
@@ -652,7 +760,23 @@ export function VehicleFormPage() {
           }
         />
         <div className="form-grid">
-          <Field label="Marca" htmlFor="vehicle-brand" required>
+          <Field
+            label="Marca"
+            htmlFor="vehicle-brand"
+            required
+            hint={
+              <>
+                Sale de tu lista de{" "}
+                <Link
+                  className="table-link"
+                  to="/app/mantenimientos/marcas-vehiculo"
+                >
+                  Marcas de vehículo
+                </Link>
+                . Si falta una, agregala ahí primero.
+              </>
+            }
+          >
             <select
               id="vehicle-brand"
               required
@@ -671,14 +795,37 @@ export function VehicleFormPage() {
                 ))}
             </select>
           </Field>
-          <Field label="Modelo" htmlFor="vehicle-model" required>
+          <Field
+            label="Modelo"
+            htmlFor="vehicle-model"
+            required
+            hint={
+              form.brandId && models.data && models.data.length === 0 ? (
+                <>
+                  Esta marca no tiene modelos. Agregá uno en{" "}
+                  <Link
+                    className="table-link"
+                    to="/app/mantenimientos/modelos"
+                  >
+                    Modelos de vehículo
+                  </Link>
+                  .
+                </>
+              ) : (
+                "Depende de la marca que elijas arriba."
+              )
+            }
+          >
             <select
               id="vehicle-model"
               required
+              disabled={!form.brandId}
               value={form.modelId}
               onChange={(e) => setForm({ ...form, modelId: e.target.value })}
             >
-              <option value="">Seleccionar</option>
+              <option value="">
+                {form.brandId ? "Seleccionar" : "Elegí una marca primero"}
+              </option>
               {models.data
                 ?.filter((row) => row.active || row.id === form.modelId)
                 .map((row) => (
@@ -699,7 +846,12 @@ export function VehicleFormPage() {
               onChange={(e) => setForm({ ...form, year: e.target.value })}
             />
           </Field>
-          <Field label="Motor" htmlFor="vehicle-engine" required>
+          <Field
+            label="Motor"
+            htmlFor="vehicle-engine"
+            required
+            hint="El tipo o cilindrada del motor (p. ej. 2.4L, 1NZ-FE). El número grabado en el bloque va más abajo, en «Número de motor»."
+          >
             <input
               id="vehicle-engine"
               required

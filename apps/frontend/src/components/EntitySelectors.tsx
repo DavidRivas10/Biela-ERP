@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { catalogApi } from "../api/catalog-api";
 import { inventoryApi } from "../api/inventory-api";
 import { vehiclesApi } from "../api/vehicles-api";
@@ -46,6 +46,42 @@ function withSelected<T extends { id: string }>(rows: T[], selected?: T): T[] {
   return [selected, ...rows];
 }
 
+/** A short line under the search box so a query never looks like it did nothing. */
+function SearchStatus({
+  term,
+  noun,
+  searching,
+  total,
+}: {
+  term: string;
+  noun: string;
+  searching: boolean;
+  total: number;
+}) {
+  if (!term) {
+    return (
+      <p className="entity-selector__status">
+        Escribí el código o el nombre, o elegí de la lista.
+      </p>
+    );
+  }
+  if (searching) {
+    return <p className="entity-selector__status">Buscando…</p>;
+  }
+  if (total === 0) {
+    return (
+      <p className="entity-selector__status entity-selector__status--empty">
+        No se encontró {noun} con «{term}». Revisá el código.
+      </p>
+    );
+  }
+  return (
+    <p className="entity-selector__status">
+      {total} {total === 1 ? "coincidencia" : "coincidencias"}. Elegila abajo.
+    </p>
+  );
+}
+
 export function ProductSelector({
   id,
   label,
@@ -75,19 +111,32 @@ export function ProductSelector({
     queryFn: () => catalogApi.product(value),
     enabled: enabled && Boolean(value) && !selectedInPage,
   });
-  const rows = withSelected(list.data?.data ?? [], selected.data);
+  const results = list.data?.data ?? [];
+  const rows = withSelected(results, selected.data);
+
+  // Typing an exact code is enough — select that product automatically.
+  useEffect(() => {
+    if (!debouncedSearch || list.isFetching) return;
+    const exact = results.find(
+      (row) => row.code.toLowerCase() === debouncedSearch.toLowerCase(),
+    );
+    if (exact && exact.id !== value) onChange(exact.id, exact);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, list.isFetching, value]);
+
+  const chosen = rows.find((row) => row.id === value);
 
   return (
     <div className="entity-selector">
       <Field
-        label={`Buscar ${label.toLowerCase()}`}
+        label={`Buscar ${label.toLowerCase()} por código o nombre`}
         htmlFor={`${id}-search`}
-        hint="Búsqueda del servidor por código, nombre o descripción."
       >
         <input
           id={`${id}-search`}
           type="search"
           autoComplete="off"
+          placeholder="Ej.: FILT-001 o «filtro de aceite»"
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
@@ -95,6 +144,12 @@ export function ProductSelector({
           }}
         />
       </Field>
+      <SearchStatus
+        term={debouncedSearch}
+        noun="ningún producto"
+        searching={list.isFetching}
+        total={list.data?.meta.total ?? results.length}
+      />
       <Field label={label} htmlFor={id} required={required}>
         <select
           id={id}
@@ -116,6 +171,11 @@ export function ProductSelector({
           ))}
         </select>
       </Field>
+      {chosen ? (
+        <p className="entity-selector__chosen">
+          Elegido: <strong>{chosen.code}</strong> · {chosen.name}
+        </p>
+      ) : null}
       <SelectorPagination
         meta={list.data?.meta}
         onPageChange={setPage}
@@ -154,19 +214,32 @@ export function LocationSelector({
     queryFn: () => inventoryApi.location(value),
     enabled: enabled && Boolean(value) && !selectedInPage,
   });
-  const rows = withSelected(list.data?.data ?? [], selected.data);
+  const results = list.data?.data ?? [];
+  const rows = withSelected(results, selected.data);
+
+  // Typing an exact location code is enough — select it automatically.
+  useEffect(() => {
+    if (!debouncedSearch || list.isFetching) return;
+    const exact = results.find(
+      (row) => row.code.toLowerCase() === debouncedSearch.toLowerCase(),
+    );
+    if (exact && exact.id !== value) onChange(exact.id, exact);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, list.isFetching, value]);
+
+  const chosen = rows.find((row) => row.id === value);
 
   return (
     <div className="entity-selector">
       <Field
-        label={`Buscar ${label.toLowerCase()}`}
+        label={`Buscar ${label.toLowerCase()} por código o nombre`}
         htmlFor={`${id}-search`}
-        hint="Búsqueda del servidor por código, nombre, zona o descripción."
       >
         <input
           id={`${id}-search`}
           type="search"
           autoComplete="off"
+          placeholder="Ej.: BOD-01 o «bodega»"
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
@@ -174,6 +247,12 @@ export function LocationSelector({
           }}
         />
       </Field>
+      <SearchStatus
+        term={debouncedSearch}
+        noun="ninguna ubicación"
+        searching={list.isFetching}
+        total={list.data?.meta.total ?? results.length}
+      />
       <Field label={label} htmlFor={id} required={required}>
         <select
           id={id}
@@ -195,6 +274,11 @@ export function LocationSelector({
           ))}
         </select>
       </Field>
+      {chosen ? (
+        <p className="entity-selector__chosen">
+          Elegida: <strong>{chosen.code}</strong> · {chosen.name}
+        </p>
+      ) : null}
       <SelectorPagination
         meta={list.data?.meta}
         onPageChange={setPage}

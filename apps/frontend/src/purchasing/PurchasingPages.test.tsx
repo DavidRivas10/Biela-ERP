@@ -255,7 +255,9 @@ describe("Frontend Phase 10.C purchasing screens", () => {
     expect(screen.getByText("Borrador")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Confirmar" }));
     const dialog = screen.getByRole("alertdialog");
-    expect(within(dialog).getByText(/no modifica Inventario/i)).toBeVisible();
+    expect(
+      within(dialog).getByText(/Todavía no toca el inventario/i),
+    ).toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "Confirmar" }));
     expect(
       await screen.findByText(/Estado inválido para confirmar/i),
@@ -444,8 +446,8 @@ describe("Frontend Phase 10.C purchasing screens", () => {
       "/app/commercial/payables",
       <PayablesPage />,
     );
-    expect(await screen.findByText("Vencida · 10 días")).toBeVisible();
-    await user.selectOptions(screen.getByLabelText("Vencimiento"), "true");
+    expect(await screen.findByText("Vencida hace 10 días")).toBeVisible();
+    await user.selectOptions(screen.getByLabelText("Mostrar"), "true");
     await waitFor(() =>
       expect(
         fetchMock.mock.calls.some(([input]) => {

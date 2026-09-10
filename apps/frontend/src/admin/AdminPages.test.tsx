@@ -5,7 +5,12 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AuthContextValue } from "../auth/AuthContext";
 import { jsonResponse, testUser } from "../test/fixtures";
-import { RoleDetailPage, UserDetailPage } from "./AdminPages";
+import {
+  RoleDetailPage,
+  RoleFormPage,
+  UserDetailPage,
+  UserFormPage,
+} from "./AdminPages";
 
 let permissions = new Set<string>();
 vi.mock("../auth/AuthContext", () => ({ useAuth: (): AuthContextValue => ({ status: "authenticated", user: testUser, permissions, isAuthenticated: true, isInitializing: false, restoreError: null, login: vi.fn(), logout: vi.fn(), retryRestore: vi.fn(), hasPermission: (permission) => permissions.has(permission), hasAnyPermission: () => false, hasAllPermissions: () => false }) }));
@@ -20,7 +25,7 @@ describe("Users and Roles screens", () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(jsonResponse(user))));
     renderRoute("/app/admin/users/user-2", "/app/admin/users/:id", <UserDetailPage />);
     expect(await screen.findByRole("heading", { name: "Carmen Díaz" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Desactivar" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Quitar acceso" })).toBeVisible();
     expect(screen.queryByText(/passwordHash/i)).toBeNull();
   });
 
@@ -68,5 +73,30 @@ describe("Users and Roles screens", () => {
     expect(await screen.findByText("cash-sessions.read")).toBeVisible();
     expect(screen.getByText("cash-movements.read")).toBeVisible();
     expect(screen.queryByRole("link", { name: "Editar" })).toBeNull();
+  });
+
+  it("groups the user form into named sections", async () => {
+    permissions = new Set(["users.create"]);
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(jsonResponse([role]))));
+    renderRoute("/app/admin/users/new", "/app/admin/users/new", <UserFormPage />);
+    expect(
+      await screen.findByRole("group", { name: "Datos de la persona" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "¿Qué puede hacer? (roles)" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a live permission count in the role form", async () => {
+    permissions = new Set(["roles.manage"]);
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(jsonResponse([]))));
+    renderRoute("/app/admin/roles/new", "/app/admin/roles/new", <RoleFormPage />);
+    expect(
+      screen.getByText(/Permisos · 0 de \d+ marcados/),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText(/Crear productos/));
+    expect(
+      screen.getByText(/Permisos · 1 de \d+ marcados/),
+    ).toBeInTheDocument();
   });
 });

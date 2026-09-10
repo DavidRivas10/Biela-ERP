@@ -20,9 +20,18 @@ export interface CatalogRecord {
   updatedAt: string;
 }
 
-export type ProductCategory = CatalogRecord;
-export type ProductBrand = Omit<CatalogRecord, "description">;
-export type VehicleBrand = Omit<CatalogRecord, "description">;
+export interface ProductCategory extends CatalogRecord {
+  /** Present on the list endpoint: how many records point at this category. */
+  _count?: { products: number; attributeDefinitions: number };
+}
+export interface ProductBrand extends Omit<CatalogRecord, "description"> {
+  /** Present on the list endpoint: how many products carry this brand. */
+  _count?: { products: number };
+}
+export interface VehicleBrand extends Omit<CatalogRecord, "description"> {
+  /** Present on the list endpoint: how many models this brand has. */
+  _count?: { models: number };
+}
 
 export type ProductAttributeValueType = "STRING" | "NUMBER" | "BOOLEAN";
 
@@ -32,6 +41,8 @@ export interface ProductAttributeDefinition extends CatalogRecord {
   valueType: ProductAttributeValueType;
   unit?: string | null;
   required: boolean;
+  /** Present on the list endpoint: how many products set a value for this. */
+  _count?: { values: number };
 }
 
 export interface ProductAttributeValue {
@@ -71,6 +82,8 @@ export interface ProductPhoto {
 export interface VehicleModel extends CatalogRecord {
   brandId: string;
   brand: VehicleBrand;
+  /** Present on the list endpoint: how many vehicles use this model. */
+  _count?: { vehicles: number };
 }
 
 export interface Vehicle {
@@ -86,6 +99,8 @@ export interface Vehicle {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Present on list/detail: how many product-compatibility links point here. */
+  _count?: { compatibilities: number };
 }
 
 export interface Compatibility {
@@ -114,6 +129,8 @@ export interface Location extends CatalogRecord {
   rack?: string | null;
   shelf?: string | null;
   bin?: string | null;
+  /** Present on the list endpoint: how many product balances sit here. */
+  _count?: { inventories: number };
 }
 
 export interface InventoryBalance {

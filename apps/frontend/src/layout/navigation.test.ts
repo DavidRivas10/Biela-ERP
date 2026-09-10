@@ -99,7 +99,7 @@ describe("permission-aware navigation", () => {
     // Cash movements live as a tab inside Sesiones, not a top-level entry.
     expect(entries).toEqual(expect.arrayContaining([
       ["Cajas", "/app/cash/registers"],
-      ["Sesiones", "/app/cash/sessions"],
+      ["Sesiones de caja", "/app/cash/sessions"],
     ]));
     expect(entries).not.toContainEqual(["Movimientos", "/app/cash/movements"]);
   });

@@ -12,11 +12,11 @@ import { BarcodeScanButton } from "../components/BarcodeScanButton";
 import { Button } from "../components/Button";
 import { CommercialStatusBadge } from "../components/CommercialStatusBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EmptyState } from "../components/EmptyState";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { LocationSelector, ProductSelector } from "../components/EntitySelectors";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
-import { HelpNote } from "../components/HelpNote";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { CustomerSelector } from "../components/SalesSelectors";
@@ -40,6 +40,32 @@ import {
 const statuses: SaleStatus[] = ["DRAFT", "POSTED", "CANCELLED"];
 const today = () => new Date().toISOString().slice(0, 10);
 
+/** Plain-language names for the sale lifecycle (V6: "no entiendo estado"). */
+const SALE_STATUS_LABELS: Record<SaleStatus, string> = {
+  DRAFT: "Borrador",
+  POSTED: "Confirmada",
+  CANCELLED: "Cancelada",
+};
+const SALE_STATUS_FILTER_LABELS: Record<SaleStatus, string> = {
+  DRAFT: "Borrador (empezada, sin confirmar)",
+  POSTED: "Confirmada (ya descontó inventario)",
+  CANCELLED: "Cancelada",
+};
+
+function SaleStatusChip({ status }: { status: SaleStatus }) {
+  const tone =
+    status === "POSTED"
+      ? "success"
+      : status === "CANCELLED"
+        ? "danger"
+        : "neutral";
+  return (
+    <span className={`badge badge--${tone}`}>
+      {SALE_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
 /** How the counter identifies who a Sale is for. */
 type SaleMode = "mostrador" | "cuenta" | "cliente";
 
@@ -47,6 +73,32 @@ function saleParty(sale: Pick<Sale, "accountLabel" | "customer">): string {
   if (sale.accountLabel) return sale.accountLabel;
   if (sale.customer) return `${sale.customer.code} · ${sale.customer.name}`;
   return "Venta de mostrador";
+}
+
+/** The "Para" cell: says plainly who the sale is for and of what kind. */
+function SaleParty({ sale }: { sale: Sale }) {
+  if (sale.accountLabel) {
+    return (
+      <>
+        <strong>{sale.accountLabel}</strong>
+        <small>Cuenta abierta</small>
+      </>
+    );
+  }
+  if (sale.customer) {
+    return (
+      <>
+        <strong>{sale.customer.name}</strong>
+        <small>Cliente registrado · {sale.customer.code}</small>
+      </>
+    );
+  }
+  return (
+    <>
+      <strong>Mostrador</strong>
+      <small>Sin cliente</small>
+    </>
+  );
 }
 
 function OpenAccountsPanel() {
@@ -112,21 +164,32 @@ export function SalesPage() {
     queryKey: queryKeys.sales(params),
     queryFn: () => salesApi.list(params),
   });
+  const hasActiveFilters = Boolean(
+    filters.values.customerId ||
+      filters.values.productId ||
+      filters.values.status ||
+      filters.values.number ||
+      filters.values.from ||
+      filters.values.to,
+  );
   const columns: ErpColumn<Sale>[] = [
     {
       key: "number",
-      header: "Venta",
+      header: "Venta N.º",
       cell: (row) => (
         <Link className="table-link" to={`/app/sales/${row.id}`}>
           <strong>#{row.number}</strong>
-          <small>{row._count?.items ?? 0} líneas</small>
+          <small>
+            {row._count?.items ?? 0}{" "}
+            {(row._count?.items ?? 0) === 1 ? "producto" : "productos"}
+          </small>
         </Link>
       ),
     },
     {
       key: "party",
-      header: "Para",
-      cell: (row) => saleParty(row),
+      header: "Para quién",
+      cell: (row) => <SaleParty sale={row} />,
     },
     {
       key: "date",
@@ -135,7 +198,7 @@ export function SalesPage() {
     },
     {
       key: "due",
-      header: "Vence",
+      header: "Vence el pago",
       cell: (row) =>
         row.paymentDueDate ? formatCalendarDate(row.paymentDueDate) : "—",
     },
@@ -143,90 +206,101 @@ export function SalesPage() {
     {
       key: "status",
       header: "Estado",
-      cell: (row) => <CommercialStatusBadge status={row.status} />,
+      cell: (row) => <SaleStatusChip status={row.status} />,
     },
   ];
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Ventas"
+        eyebrow="Vender"
         title="Ventas"
-        description="Venta de mostrador rápida, cuentas abiertas y ventas a clientes registrados."
+        description="Todas las ventas: las de mostrador que se cobran al momento, las de clientes registrados y las cuentas abiertas que se cierran después."
         actions={
           hasPermission("sales.create") ? (
             <>
               <Link className="button button--primary" to="/app/sales/new">
-                Venta de mostrador
+                Registrar una venta
               </Link>
               <Link
                 className="button button--secondary"
                 to="/app/sales/new?mode=cuenta"
               >
-                Abrir cuenta
+                Abrir una cuenta
               </Link>
             </>
           ) : undefined
         }
       />
       <OpenAccountsPanel />
-      <section className="panel filter-bar">
-        <CustomerSelector
-          id="sales-customer-filter"
-          label="Cliente"
-          value={filters.values.customerId ?? ""}
-          emptyLabel="Todos"
-          onChange={(customerId) => filters.update({ customerId })}
-        />
-        <ProductSelector
-          id="sales-product-filter"
-          label="Producto"
-          value={filters.values.productId ?? ""}
-          emptyLabel="Todos"
-          onChange={(productId) => filters.update({ productId })}
-        />
-        <Field label="Estado" htmlFor="sale-status">
-          <select
-            id="sale-status"
-            value={filters.values.status ?? ""}
-            onChange={(e) => filters.update({ status: e.target.value })}
+      <details className="filter-details" open={hasActiveFilters}>
+        <summary>Buscar o filtrar ventas</summary>
+        <div className="filter-bar">
+          <CustomerSelector
+            id="sales-customer-filter"
+            label="Cliente registrado"
+            value={filters.values.customerId ?? ""}
+            emptyLabel="Cualquiera"
+            onChange={(customerId) => filters.update({ customerId })}
+          />
+          <ProductSelector
+            id="sales-product-filter"
+            label="Producto vendido"
+            value={filters.values.productId ?? ""}
+            emptyLabel="Cualquiera"
+            onChange={(productId) => filters.update({ productId })}
+          />
+          <Field label="Estado" htmlFor="sale-status">
+            <select
+              id="sale-status"
+              value={filters.values.status ?? ""}
+              onChange={(e) => filters.update({ status: e.target.value })}
+            >
+              <option value="">Cualquier estado</option>
+              {statuses.map((status) => (
+                <option key={status} value={status}>
+                  {SALE_STATUS_FILTER_LABELS[status]}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field
+            label="Número de venta"
+            htmlFor="sale-number"
+            hint="El # que aparece en cada venta (ej.: 4)."
           >
-            <option value="">Todos</option>
-            {statuses.map((status) => (
-              <option key={status}>{status}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Número" htmlFor="sale-number">
-          <input
-            id="sale-number"
-            type="number"
-            min={1}
-            value={filters.values.number ?? ""}
-            onChange={(e) => filters.update({ number: e.target.value })}
-          />
-        </Field>
-        <Field label="Desde" htmlFor="sale-from">
-          <input
-            id="sale-from"
-            type="date"
-            value={filters.values.from ?? ""}
-            onChange={(e) => filters.update({ from: e.target.value })}
-          />
-        </Field>
-        <Field label="Hasta" htmlFor="sale-to">
-          <input
-            id="sale-to"
-            type="date"
-            value={filters.values.to ?? ""}
-            onChange={(e) => filters.update({ to: e.target.value })}
-          />
-        </Field>
-        <div className="filter-actions">
-          <Button variant="ghost" onClick={filters.clear}>
-            Limpiar
-          </Button>
+            <input
+              id="sale-number"
+              type="number"
+              min={1}
+              value={filters.values.number ?? ""}
+              onChange={(e) => filters.update({ number: e.target.value })}
+            />
+          </Field>
+          <Field label="Fecha desde" htmlFor="sale-from">
+            <input
+              id="sale-from"
+              type="date"
+              value={filters.values.from ?? ""}
+              onChange={(e) => filters.update({ from: e.target.value })}
+            />
+          </Field>
+          <Field label="Fecha hasta" htmlFor="sale-to">
+            <input
+              id="sale-to"
+              type="date"
+              value={filters.values.to ?? ""}
+              onChange={(e) => filters.update({ to: e.target.value })}
+            />
+          </Field>
+          {hasActiveFilters ? (
+            <div className="filter-actions">
+              <Button variant="ghost" onClick={filters.clear}>
+                Limpiar filtros
+              </Button>
+            </div>
+          ) : null}
         </div>
-      </section>
+      </details>
       <section className="panel">
         <ErpTable
           columns={columns}
@@ -235,7 +309,39 @@ export function SalesPage() {
           loading={list.isLoading}
           error={list.error ? apiErrorMessage(list.error) : undefined}
           onRetry={() => void list.refetch()}
-          emptyTitle="No se encontraron ventas"
+          emptyState={
+            hasActiveFilters ? (
+              <EmptyState
+                tone="search"
+                title="Ninguna venta coincide"
+                action={
+                  <Button type="button" onClick={filters.clear}>
+                    Quitar los filtros
+                  </Button>
+                }
+              >
+                No hay ventas para el cliente, el producto, el estado, el número
+                o las fechas que filtraste.
+              </EmptyState>
+            ) : (
+              <EmptyState
+                title="Todavía no registraste ventas"
+                action={
+                  hasPermission("sales.create") ? (
+                    <Link
+                      className="button button--primary"
+                      to="/app/sales/new"
+                    >
+                      Registrar la primera venta
+                    </Link>
+                  ) : undefined
+                }
+              >
+                Empezá con «Registrar una venta»: elegís quién compra (o nadie,
+                si es de mostrador), agregás los productos y cobrás.
+              </EmptyState>
+            )
+          }
         />
         <Pagination
           meta={list.data?.meta}
@@ -284,6 +390,7 @@ export function SaleFormPage() {
       id={id}
       initial={detail.data}
       requestedMode={searchParams.get("mode") === "cuenta" ? "cuenta" : undefined}
+      requestedCustomerId={searchParams.get("customerId") ?? undefined}
     />
   );
 }
@@ -292,19 +399,24 @@ function SaleEditor({
   id,
   initial,
   requestedMode,
+  requestedCustomerId,
 }: {
   id?: string;
   initial?: Sale;
   requestedMode?: SaleMode;
+  requestedCustomerId?: string;
 }) {
   const navigate = useNavigate();
   const client = useQueryClient();
   const [mode, setMode] = useState<SaleMode>(() => {
     if (initial?.accountLabel) return "cuenta";
     if (initial?.customerId) return "cliente";
+    if (!id && requestedCustomerId) return "cliente";
     return requestedMode ?? "mostrador";
   });
-  const [customerId, setCustomerId] = useState(initial?.customerId ?? "");
+  const [customerId, setCustomerId] = useState(
+    initial?.customerId ?? (!id ? (requestedCustomerId ?? "") : ""),
+  );
   const [accountLabel, setAccountLabel] = useState(initial?.accountLabel ?? "");
   const [documentDate, setDocumentDate] = useState(
     initial?.documentDate.slice(0, 10) ?? today(),
@@ -414,9 +526,9 @@ function SaleEditor({
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Ventas"
+        eyebrow="Vender"
         title={modeTitle}
-        description="Guardar conserva el borrador sin tocar inventario; el servidor calcula todos los importes exactos."
+        description="Al guardar queda como borrador y todavía no toca el inventario. El inventario se descuenta cuando confirmás la venta."
       />
       <form className="panel erp-form" onSubmit={submit}>
         <FormFeedback
@@ -424,13 +536,25 @@ function SaleEditor({
         />
 
         <fieldset className="form-section">
-          <legend>¿Para quién es esta venta?</legend>
+          <legend>¿Cómo es esta venta?</legend>
           <div className="mode-select" role="radiogroup" aria-label="Tipo de venta">
             {(
               [
-                ["mostrador", "Venta de mostrador", "Se cobra y se cierra ahora. Sin cliente."],
-                ["cuenta", "Cuenta abierta", "Queda abierta con una etiqueta y se cierra después."],
-                ["cliente", "Cliente registrado", "Se asocia a un cliente del directorio."],
+                [
+                  "mostrador",
+                  "Venta rápida (mostrador)",
+                  "El cliente paga y se lleva la pieza ahora. No hace falta registrarlo.",
+                ],
+                [
+                  "cliente",
+                  "A un cliente registrado",
+                  "Para alguien de tu directorio. Podés dejarla a crédito y cobrarla después.",
+                ],
+                [
+                  "cuenta",
+                  "Cuenta abierta",
+                  "Se le van sumando piezas durante el día o el trabajo y se cierra al final. Le ponés un nombre para reconocerla.",
+                ],
               ] as Array<[SaleMode, string, string]>
             ).map(([value, label, hint]) => (
               <label
@@ -518,9 +642,9 @@ function SaleEditor({
 
         {mode === "mostrador" ? (
           <p className="muted">
-            ¿Es para un cliente que llevas en el directorio? Cambia a «Cliente
-            registrado» arriba. Para registrar el cobro, guarda y luego usa
-            «Cobrar» en la venta.
+            ¿Es para un cliente que ya tenés registrado? Elegí «A un cliente
+            registrado» arriba. El cobro se registra después, con el botón
+            «Cobrar» de la venta.
           </p>
         ) : null}
 
@@ -541,8 +665,8 @@ function SaleEditor({
         <fieldset className="form-section purchase-lines">
           <legend>Productos</legend>
           <p>
-            El precio sugerido se toma del producto; el backend mantiene la
-            verdad histórica en cada línea.
+            El precio arranca del precio sugerido del producto; podés cambiarlo
+            en cada línea. Escaneá o escribí el código para agregarlo.
           </p>
           <div className="scan-row">
             <BarcodeScanButton
@@ -743,7 +867,7 @@ export function SaleDetailPage() {
       cell: (row) => <CommercialStatusBadge status={row.status} />,
     },
   ];
-  const closeLabel = isAccount ? "Cerrar cuenta" : "Postear venta";
+  const closeLabel = isAccount ? "Cerrar cuenta" : "Confirmar venta";
   return (
     <div className="page-stack">
       <PageHeader
@@ -790,13 +914,12 @@ export function SaleDetailPage() {
           </>
         }
       />
-      {isAccount && sale.status === "DRAFT" ? (
-        <HelpNote title="Cuenta abierta">
-          Agrega productos con «Agregar productos» a lo largo del día. Cuando
-          termines, «Cerrar cuenta» confirma la venta y descuenta el
-          inventario; después registras el pago o la dejas a crédito en Cuentas
-          por Cobrar.
-        </HelpNote>
+      {sale.status === "DRAFT" ? (
+        <p className="muted">
+          {isAccount
+            ? "Cuenta abierta: seguí sumando piezas con «Agregar productos». Al terminar, «Cerrar cuenta» descuenta el inventario; después cobrás o la dejás a crédito en Cuentas por cobrar."
+            : "Es un borrador: podés seguir editándolo. «Confirmar venta» descuenta el inventario y a partir de ahí ya no se puede editar."}
+        </p>
       ) : null}
       <section className="panel detail-grid">
         {isAccount ? (
@@ -880,9 +1003,9 @@ export function SaleDetailPage() {
         description={
           action === "post"
             ? isAccount
-              ? "Se confirmará la venta y se descontará el inventario. Después podrás registrar el pago o dejar la cuenta a crédito."
-              : "Esta acción descontará inventario de forma atómica y no puede deshacerse desde la venta."
-            : "Solo se cancela el borrador; no hay efectos de inventario."
+              ? "Se confirma la venta y se descuenta el inventario. Después registrás el pago o la dejás a crédito."
+              : "Se descuenta el inventario y no se puede deshacer desde la venta."
+            : "Solo se cancela el borrador. No afecta el inventario."
         }
         confirmLabel={action === "post" ? closeLabel : "Cancelar venta"}
         dangerous={action === "cancel"}

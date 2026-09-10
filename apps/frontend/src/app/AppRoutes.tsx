@@ -20,6 +20,8 @@ import {
 } from "../inventory/InventoryPages";
 import { LocationsPage } from "../inventory/LocationsPage";
 import { AppShell } from "../layout/AppShell";
+import { MaintenanceHubPage } from "../maintenance/MaintenanceHubPage";
+import { PosPage } from "../pos/PosPage";
 import { ForbiddenPage } from "../pages/ForbiddenPage";
 import { LoginPage } from "../pages/LoginPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
@@ -49,6 +51,7 @@ import {
   PurchaseFormPage,
   PurchasesPage,
 } from "../purchasing/PurchasePages";
+import { PurchaseInboxPage } from "../purchasing/PurchaseInboxPage";
 import {
   PurchasePaymentsPage,
   PurchaseReturnDetailPage,
@@ -97,6 +100,58 @@ export function AppRoutes() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route
+            path="mantenimientos"
+            element={<MaintenanceHubPage />}
+          />
+          <Route
+            path="mantenimientos/categorias"
+            element={
+              <RequirePermission permission="products.read">
+                <ProductCategoriesPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="mantenimientos/marcas-producto"
+            element={
+              <RequirePermission permission="products.read">
+                <ProductBrandsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="mantenimientos/atributos"
+            element={
+              <RequirePermission permission="products.read">
+                <ProductAttributesPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="mantenimientos/marcas-vehiculo"
+            element={
+              <RequirePermission permission="vehicles.read">
+                <VehicleBrandsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="mantenimientos/modelos"
+            element={
+              <RequirePermission permission="vehicles.read">
+                <VehicleModelsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="mantenimientos/ubicaciones"
+            element={
+              <RequirePermission permission="locations.read">
+                <LocationsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
             path="catalog/products"
             element={
               <RequirePermission permission="products.read">
@@ -131,25 +186,19 @@ export function AppRoutes() {
           <Route
             path="catalog/categories"
             element={
-              <RequirePermission permission="products.read">
-                <ProductCategoriesPage />
-              </RequirePermission>
+              <Navigate to="/app/mantenimientos/categorias" replace />
             }
           />
           <Route
             path="catalog/brands"
             element={
-              <RequirePermission permission="products.read">
-                <ProductBrandsPage />
-              </RequirePermission>
+              <Navigate to="/app/mantenimientos/marcas-producto" replace />
             }
           />
           <Route
             path="catalog/attributes"
             element={
-              <RequirePermission permission="products.read">
-                <ProductAttributesPage />
-              </RequirePermission>
+              <Navigate to="/app/mantenimientos/atributos" replace />
             }
           />
           <Route
@@ -187,17 +236,13 @@ export function AppRoutes() {
           <Route
             path="vehicles/brands"
             element={
-              <RequirePermission permission="vehicles.read">
-                <VehicleBrandsPage />
-              </RequirePermission>
+              <Navigate to="/app/mantenimientos/marcas-vehiculo" replace />
             }
           />
           <Route
             path="vehicles/models"
             element={
-              <RequirePermission permission="vehicles.read">
-                <VehicleModelsPage />
-              </RequirePermission>
+              <Navigate to="/app/mantenimientos/modelos" replace />
             }
           />
           <Route
@@ -219,9 +264,7 @@ export function AppRoutes() {
           <Route
             path="inventory/locations"
             element={
-              <RequirePermission permission="locations.read">
-                <LocationsPage />
-              </RequirePermission>
+              <Navigate to="/app/mantenimientos/ubicaciones" replace />
             }
           />
           <Route
@@ -277,6 +320,14 @@ export function AppRoutes() {
             element={
               <RequirePermission permission="suppliers.update">
                 <SupplierFormPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="purchasing/inbox"
+            element={
+              <RequirePermission permission="purchases.read">
+                <PurchaseInboxPage />
               </RequirePermission>
             }
           />
@@ -360,6 +411,7 @@ export function AppRoutes() {
               </RequirePermission>
             }
           />
+          <Route path="pos" element={<RequirePermission permission="sales.read"><PosPage /></RequirePermission>} />
           <Route path="sales" element={<RequirePermission permission="sales.read"><SalesPage /></RequirePermission>} />
           <Route path="sales/new" element={<RequirePermission permission="sales.create"><SaleFormPage /></RequirePermission>} />
           <Route path="sales/:id" element={<RequirePermission permission="sales.read"><SaleDetailPage /></RequirePermission>} />
@@ -411,7 +463,11 @@ export function AppRoutes() {
           />
           <Route
             path="locations/*"
-            element={<Navigate to="/app/inventory/locations" replace />}
+            element={<Navigate to="/app/mantenimientos/ubicaciones" replace />}
+          />
+          <Route
+            path="catalog/*"
+            element={<Navigate to="/app/mantenimientos" replace />}
           />
         </Route>
         <Route path="/forbidden" element={<ForbiddenPage />} />

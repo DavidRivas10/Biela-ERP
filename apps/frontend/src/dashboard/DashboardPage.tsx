@@ -2,14 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { cashApi } from "../api/cash-api";
 import { getCommercialSummary } from "../api/commercial-api";
-import { getSystemHealth } from "../api/system-api";
 import { useAuth } from "../auth/AuthContext";
 import { hasPermission } from "../auth/permissions";
 import { Alert } from "../components/Alert";
-import { Badge } from "../components/Badge";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
-import { visibleNavigation } from "../layout/navigation";
 import { queryKeys } from "../query/query-keys";
 import {
   formatBusinessDate,
@@ -21,35 +18,72 @@ function Metric({
   label,
   value,
   detail,
+  to,
+  linkLabel,
 }: {
   label: string;
   value: string;
   detail: string;
+  to?: string;
+  linkLabel?: string;
 }) {
   return (
     <article className="metric-card">
       <span>{label}</span>
       <strong>{value}</strong>
       <small>{detail}</small>
+      {to && linkLabel ? (
+        <Link className="metric-card__link" to={to}>
+          {linkLabel} →
+        </Link>
+      ) : null}
     </article>
   );
 }
+
+interface QuickAction {
+  label: string;
+  to: string;
+  permission: string;
+}
+
+const QUICK_ACTIONS: QuickAction[] = [
+  { label: "Registrar una venta", to: "/app/sales/new", permission: "sales.create" },
+  {
+    label: "Registrar una compra",
+    to: "/app/purchasing/purchases/new",
+    permission: "purchases.create",
+  },
+  {
+    label: "Abrir o cerrar caja",
+    to: "/app/cash/sessions",
+    permission: "cash-sessions.open",
+  },
+  {
+    label: "Cobrar a un cliente",
+    to: "/app/commercial/receivables",
+    permission: "commercial-receivables.read",
+  },
+  {
+    label: "Agregar un producto",
+    to: "/app/catalog/products/new",
+    permission: "products.create",
+  },
+  {
+    label: "Consultar inventario",
+    to: "/app/inventory",
+    permission: "inventory.read",
+  },
+];
 
 export function DashboardPage() {
   const { user } = useAuth();
   const canReadSummary = hasPermission(user, "commercial-summary.read");
   const canReadCashSessions = hasPermission(user, "cash-sessions.read");
-  const quickAccess = visibleNavigation(user)
-    .flatMap((group) => group.items)
-    .filter((item) => item.path !== "/app/dashboard")
-    .slice(0, 4);
+  const actions = QUICK_ACTIONS.filter((action) =>
+    hasPermission(user, action.permission),
+  ).slice(0, 5);
 
-  const health = useQuery({
-    queryKey: ["system-health"],
-    queryFn: getSystemHealth,
-    retry: 1,
-    refetchInterval: 60_000,
-  });
   const summary = useQuery({
     queryKey: queryKeys.commercialSummary,
     queryFn: getCommercialSummary,
@@ -63,8 +97,7 @@ export function DashboardPage() {
       limit: 6,
       dashboard: true,
     }),
-    queryFn: () =>
-      cashApi.sessions({ status: "CLOSED", page: 1, limit: 6 }),
+    queryFn: () => cashApi.sessions({ status: "CLOSED", page: 1, limit: 6 }),
     enabled: canReadCashSessions,
     retry: false,
   });
@@ -86,6 +119,28 @@ export function DashboardPage() {
           </span>
         ) : null}
       </div>
+
+      {actions.length > 0 ? (
+        <section aria-labelledby="quick-actions-title">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Empezar</p>
+              <h2 id="quick-actions-title">Qué puedes hacer ahora</h2>
+            </div>
+          </div>
+          <div className="action-row">
+            {actions.map((action) => (
+              <Link
+                className="action-chip"
+                to={action.to}
+                key={action.to}
+              >
+                {action.label}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {canReadSummary ? (
         <section aria-labelledby="today-title">
@@ -109,9 +164,11 @@ export function DashboardPage() {
             <>
               <div className="metrics-grid">
                 <Metric
-                  label="Venta de hoy"
+                  label="Vendido hoy"
                   value={formatMoney(summary.data.sales.today.total)}
-                  detail={`${summary.data.sales.today.count} ventas confirmadas`}
+                  detail={`${summary.data.sales.today.count} ventas confirmadas hoy`}
+                  to="/app/sales"
+                  linkLabel="Ver ventas"
                 />
                 <Metric
                   label="Caja"
@@ -124,34 +181,40 @@ export function DashboardPage() {
                   }
                   detail={
                     openSessions > 0
-                      ? `Efectivo esperado ${formatMoney(summary.data.cash.expectedCash)}`
-                      : "No hay sesión de caja abierta"
+                      ? `Efectivo esperado en caja: ${formatMoney(summary.data.cash.expectedCash)}`
+                      : "Nadie tiene una sesión de caja abierta ahora"
                   }
+                  to="/app/cash/sessions"
+                  linkLabel={openSessions > 0 ? "Ver sesión" : "Abrir caja"}
                 />
                 <Metric
-                  label="Cuentas por cobrar"
+                  label="Te deben (por cobrar)"
                   value={formatMoney(
                     summary.data.receivables.outstandingAmount,
                   )}
-                  detail={`${summary.data.receivables.overdueCount} vencidas · ${formatMoney(summary.data.receivables.overdueAmount)}`}
+                  detail={`${summary.data.receivables.overdueCount} ventas vencidas · ${formatMoney(summary.data.receivables.overdueAmount)} atrasado`}
+                  to="/app/commercial/receivables"
+                  linkLabel="Cobrar"
                 />
                 <Metric
-                  label="Cuentas por pagar"
+                  label="Debes (por pagar)"
                   value={formatMoney(summary.data.payables.outstandingAmount)}
-                  detail={`${summary.data.payables.overdueCount} vencidas`}
+                  detail={`${summary.data.payables.overdueCount} facturas de proveedor vencidas`}
+                  to="/app/commercial/payables"
+                  linkLabel="Ver pagos"
                 />
               </div>
               <p className="data-note">
-                Valores operativos derivados por el backend; no representan
-                utilidad, COGS ni estados contables.
+                Son montos operativos del día calculados por el sistema. No son
+                utilidad, costo de venta ni estados contables.
               </p>
             </>
           ) : null}
         </section>
       ) : (
-        <Alert tone="info" title="Resumen comercial restringido">
-          Tu rol no incluye <code>commercial-summary.read</code>. No se realizó
-          ninguna solicitud a ese endpoint.
+        <Alert tone="info" title="No ves el resumen del día">
+          Tu usuario no tiene permiso para el resumen comercial. El resto de los
+          módulos funciona normal según tus permisos.
         </Alert>
       )}
 
@@ -209,97 +272,6 @@ export function DashboardPage() {
           </div>
         </section>
       ) : null}
-
-      {quickAccess.length > 0 ? (
-        <section aria-labelledby="quick-access-title">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Según tus permisos</p>
-              <h2 id="quick-access-title">Accesos rápidos</h2>
-            </div>
-          </div>
-          <div className="quick-grid">
-            {quickAccess.map((item) => (
-              <Link className="quick-link" to={item.path} key={item.path}>
-                <span className="nav-link__icon" aria-hidden="true">
-                  {item.short}
-                </span>
-                <span>
-                  <strong>{item.label}</strong>
-                  <small>Ir al módulo</small>
-                </span>
-                <span aria-hidden="true">→</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      <details className="system-details">
-        <summary>
-          Estado técnico de la plataforma
-          {health.data ? (
-            <Badge
-              tone={health.data.status === "ok" ? "success" : "warning"}
-            >
-              {health.data.status === "ok" ? "Operativo" : "Degradado"}
-            </Badge>
-          ) : null}
-        </summary>
-        <div className="system-details__body">
-          <p className="muted">
-            Información de infraestructura para diagnóstico. No es un dato de
-            negocio.
-          </p>
-          {health.isPending ? (
-            <LoadingState label="Consultando servicios" />
-          ) : null}
-          {health.isError ? (
-            <ErrorState
-              title="No pudimos consultar el estado del sistema"
-              message="El Gateway no respondió. Esto no invalida automáticamente tu sesión."
-              onRetry={() => void health.refetch()}
-            />
-          ) : null}
-          {health.data ? (
-            <>
-              <Badge
-                tone={health.data.status === "ok" ? "success" : "warning"}
-              >
-                {health.data.status === "ok"
-                  ? "Sistema operativo"
-                  : "Sistema degradado"}
-              </Badge>
-              <div className="service-grid">
-                {Object.entries(health.data.services).map(
-                  ([name, service]) => (
-                    <div className="service-status" key={name}>
-                      <span
-                        className={`status-dot status-dot--${service.status}`}
-                        aria-hidden="true"
-                      />
-                      <div>
-                        <strong>
-                          {name === "users"
-                            ? "Identidad"
-                            : name === "autorepuesto"
-                              ? "Operación ERP"
-                              : "API Gateway"}
-                        </strong>
-                        <span>
-                          {service.status === "ok"
-                            ? "Disponible"
-                            : "No disponible"}
-                        </span>
-                      </div>
-                    </div>
-                  ),
-                )}
-              </div>
-            </>
-          ) : null}
-        </div>
-      </details>
     </section>
   );
 }

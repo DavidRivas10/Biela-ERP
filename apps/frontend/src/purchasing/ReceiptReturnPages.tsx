@@ -68,9 +68,9 @@ export function PurchaseReceiptCreatePage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Recepción"
-        title={`Recibir compra #${purchase.data?.number ?? "…"}`}
-        description="Crear el borrador no cambia Inventario. La entrada ocurre únicamente al publicar."
+        eyebrow="Comprar"
+        title={`Recibir la mercadería · compra #${purchase.data?.number ?? "…"}`}
+        description="Marcá cuánto llegó de cada producto y a qué ubicación. Se guarda como borrador; el inventario recién sube cuando confirmás la recepción."
       />
       <form className="panel erp-form" onSubmit={submit}>
         <FormFeedback
@@ -175,9 +175,9 @@ export function PurchaseReceiptDetailPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Recepción de compra"
+        eyebrow="Comprar"
         title={`Recepción #${row.number}`}
-        description={`Compra #${row.purchase.number} · ${row.destinationLocation.code}`}
+        description={`De la compra #${row.purchase.number} · llega a ${row.destinationLocation.code}`}
         actions={
           row.status === "DRAFT" && hasPermission("purchases.receive") ? (
             <Button onClick={() => setConfirm(true)}>Publicar recepción</Button>
@@ -230,7 +230,7 @@ export function PurchaseReceiptDetailPage() {
       <ConfirmDialog
         open={confirm}
         title="Publicar recepción"
-        description="El backend registrará Inventory IN para cada línea en una única transacción. El documento quedará inmutable."
+        description="Cada producto de esta recepción se suma al inventario de su ubicación. Después ya no se puede modificar."
         loading={post.isPending}
         onCancel={() => setConfirm(false)}
         onConfirm={() => post.mutate()}
@@ -279,9 +279,9 @@ export function PurchaseReturnCreatePage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Devolución"
-        title={`Devolver compra #${purchase.data?.number ?? "…"}`}
-        description="Crear el borrador no cambia Inventario ni registra dinero recibido del proveedor."
+        eyebrow="Comprar"
+        title={`Devolver mercadería al proveedor · compra #${purchase.data?.number ?? "…"}`}
+        description="Marcá qué productos le devolvés al proveedor y desde qué ubicación salen. Se guarda como borrador; el inventario baja cuando confirmás la devolución. El ajuste del dinero es aparte."
       />
       <form
         className="panel erp-form"

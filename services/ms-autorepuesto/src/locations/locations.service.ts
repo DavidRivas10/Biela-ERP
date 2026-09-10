@@ -48,6 +48,7 @@ export class LocationsService {
     const [data, total] = await Promise.all([
       this.prisma.location.findMany({
         where,
+        include: { _count: { select: { inventories: true } } },
         orderBy: [{ code: "asc" }, { id: "asc" }],
         skip: (query.page - 1) * query.limit,
         take: query.limit,

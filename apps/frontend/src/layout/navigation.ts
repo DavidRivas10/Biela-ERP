@@ -1,11 +1,14 @@
 import type { CurrentUser } from "../types/api";
-import { hasPermission } from "../auth/permissions";
+import { hasAnyPermission, hasPermission } from "../auth/permissions";
 
 export interface NavigationItem {
   label: string;
   path: string;
   short: string;
+  /** Visible when the user holds this permission. */
   permission?: string;
+  /** Visible when the user holds at least one of these permissions. */
+  anyPermission?: readonly string[];
 }
 
 export interface NavigationGroup {
@@ -13,14 +16,27 @@ export interface NavigationGroup {
   items: NavigationItem[];
 }
 
+/** Permissions behind every screen grouped under "Mantenimientos". */
+export const MAINTENANCE_PERMISSIONS = [
+  "products.read",
+  "vehicles.read",
+  "locations.read",
+] as const;
+
 export const NAVIGATION: NavigationGroup[] = [
   {
     label: "Inicio",
-    items: [{ label: "Panel general", path: "/app/dashboard", short: "PG" }],
+    items: [{ label: "Panel general", path: "/app/dashboard", short: "IN" }],
   },
   {
-    label: "Comercial",
+    label: "Vender",
     items: [
+      {
+        label: "Punto de venta",
+        path: "/app/pos",
+        short: "PV",
+        anyPermission: ["sales.create", "cash-sessions.open", "payments.create"],
+      },
       {
         label: "Ventas",
         path: "/app/sales",
@@ -32,6 +48,17 @@ export const NAVIGATION: NavigationGroup[] = [
         path: "/app/sales/customers",
         short: "CL",
         permission: "customers.read",
+      },
+    ],
+  },
+  {
+    label: "Comprar",
+    items: [
+      {
+        label: "Recepción de facturas",
+        path: "/app/purchasing/inbox",
+        short: "RF",
+        anyPermission: ["purchases.receive", "purchases.pay"],
       },
       {
         label: "Compras",
@@ -45,6 +72,11 @@ export const NAVIGATION: NavigationGroup[] = [
         short: "PR",
         permission: "suppliers.read",
       },
+    ],
+  },
+  {
+    label: "Dinero",
+    items: [
       {
         label: "Cuentas por cobrar",
         path: "/app/commercial/receivables",
@@ -56,6 +88,18 @@ export const NAVIGATION: NavigationGroup[] = [
         path: "/app/commercial/payables",
         short: "CP",
         permission: "commercial-payables.read",
+      },
+      {
+        label: "Cajas",
+        path: "/app/cash/registers",
+        short: "CJ",
+        permission: "cash-registers.read",
+      },
+      {
+        label: "Sesiones de caja",
+        path: "/app/cash/sessions",
+        short: "SC",
+        permission: "cash-sessions.read",
       },
     ],
   },
@@ -69,50 +113,15 @@ export const NAVIGATION: NavigationGroup[] = [
         permission: "products.read",
       },
       {
-        label: "Categorías",
-        path: "/app/catalog/categories",
-        short: "CA",
-        permission: "products.read",
-      },
-      {
-        label: "Marcas",
-        path: "/app/catalog/brands",
-        short: "MA",
-        permission: "products.read",
-      },
-      {
-        label: "Atributos",
-        path: "/app/catalog/attributes",
-        short: "AT",
-        permission: "products.read",
-      },
-    ],
-  },
-  {
-    label: "Vehículos",
-    items: [
-      {
         label: "Vehículos",
         path: "/app/vehicles",
         short: "VH",
         permission: "vehicles.read",
       },
       {
-        label: "Marcas",
-        path: "/app/vehicles/brands",
-        short: "MV",
-        permission: "vehicles.read",
-      },
-      {
-        label: "Modelos",
-        path: "/app/vehicles/models",
-        short: "MO",
-        permission: "vehicles.read",
-      },
-      {
         label: "Compatibilidad",
         path: "/app/compatibility",
-        short: "CP",
+        short: "CB",
         permission: "compatibilities.read",
       },
     ],
@@ -123,31 +132,19 @@ export const NAVIGATION: NavigationGroup[] = [
       {
         label: "Inventario",
         path: "/app/inventory",
-        short: "IN",
+        short: "IV",
         permission: "inventory.read",
-      },
-      {
-        label: "Ubicaciones",
-        path: "/app/inventory/locations",
-        short: "UB",
-        permission: "locations.read",
       },
     ],
   },
   {
-    label: "Caja",
+    label: "Mantenimientos",
     items: [
       {
-        label: "Cajas",
-        path: "/app/cash/registers",
-        short: "CJ",
-        permission: "cash-registers.read",
-      },
-      {
-        label: "Sesiones",
-        path: "/app/cash/sessions",
-        short: "SE",
-        permission: "cash-sessions.read",
+        label: "Mantenimientos",
+        path: "/app/mantenimientos",
+        short: "MN",
+        anyPermission: MAINTENANCE_PERMISSIONS,
       },
     ],
   },
@@ -172,20 +169,36 @@ export const NAVIGATION: NavigationGroup[] = [
 
 /**
  * Titles for routes that are reachable but not their own sidebar entry
- * (they live as tabs inside another screen). Longest matching prefix wins.
+ * (tabs inside another screen, or the maintenance catalogs that live under the
+ * Mantenimientos hub). Longest matching prefix wins.
  */
 export const AUXILIARY_ROUTE_TITLES: Array<{ path: string; label: string }> = [
   { path: "/app/inventory/movements", label: "Movimientos de inventario" },
   { path: "/app/inventory/transfers", label: "Transferencias de inventario" },
   { path: "/app/search", label: "Buscar repuesto" },
   { path: "/app/cash/movements", label: "Movimientos de efectivo" },
+  { path: "/app/mantenimientos/categorias", label: "Categorías de producto" },
+  {
+    path: "/app/mantenimientos/marcas-producto",
+    label: "Marcas de producto",
+  },
+  { path: "/app/mantenimientos/atributos", label: "Atributos de producto" },
+  { path: "/app/mantenimientos/marcas-vehiculo", label: "Marcas de vehículo" },
+  { path: "/app/mantenimientos/modelos", label: "Modelos de vehículo" },
+  { path: "/app/mantenimientos/ubicaciones", label: "Ubicaciones" },
 ];
+
+function itemVisible(user: CurrentUser | null, item: NavigationItem): boolean {
+  if (item.permission && !hasPermission(user, item.permission)) return false;
+  if (item.anyPermission && !hasAnyPermission(user, item.anyPermission)) {
+    return false;
+  }
+  return true;
+}
 
 export function visibleNavigation(user: CurrentUser | null): NavigationGroup[] {
   return NAVIGATION.map((group) => ({
     ...group,
-    items: group.items.filter(
-      (item) => !item.permission || hasPermission(user, item.permission),
-    ),
+    items: group.items.filter((item) => itemVisible(user, item)),
   })).filter((group) => group.items.length > 0);
 }

@@ -37,7 +37,12 @@ export class ProductCatalogsService {
   }
 
   listCategories() {
-    return this.prisma.productCategory.findMany({ orderBy: { name: "asc" } });
+    return this.prisma.productCategory.findMany({
+      orderBy: { name: "asc" },
+      include: {
+        _count: { select: { products: true, attributeDefinitions: true } },
+      },
+    });
   }
 
   async updateCategory(id: string, dto: UpdateProductCategoryDto) {
@@ -72,7 +77,10 @@ export class ProductCatalogsService {
   }
 
   listBrands() {
-    return this.prisma.productBrand.findMany({ orderBy: { name: "asc" } });
+    return this.prisma.productBrand.findMany({
+      orderBy: { name: "asc" },
+      include: { _count: { select: { products: true } } },
+    });
   }
 
   async updateBrand(id: string, dto: UpdateProductBrandDto) {
@@ -114,7 +122,7 @@ export class ProductCatalogsService {
   listAttributeDefinitions(categoryId?: string) {
     return this.prisma.productAttributeDefinition.findMany({
       where: categoryId ? { categoryId } : undefined,
-      include: { category: true },
+      include: { category: true, _count: { select: { values: true } } },
       orderBy: [{ category: { name: "asc" } }, { name: "asc" }],
     });
   }

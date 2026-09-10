@@ -40,6 +40,7 @@ export class SuppliersService {
     const [data, total] = await Promise.all([
       this.prisma.supplier.findMany({
         where,
+        include: { _count: { select: { purchases: true } } },
         orderBy: [{ code: "asc" }, { id: "asc" }],
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -58,7 +59,10 @@ export class SuppliersService {
   }
 
   async findOne(id: string) {
-    const supplier = await this.prisma.supplier.findUnique({ where: { id } });
+    const supplier = await this.prisma.supplier.findUnique({
+      where: { id },
+      include: { _count: { select: { purchases: true } } },
+    });
     if (!supplier) throw new NotFoundException("Supplier not found");
     return supplier;
   }

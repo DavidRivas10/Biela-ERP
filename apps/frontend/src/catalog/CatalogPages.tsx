@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent } from "react";
 import {
   catalogApi,
   type AttributeDefinitionInput,
@@ -10,7 +10,6 @@ import { Button } from "../components/Button";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
-import { HelpNote } from "../components/HelpNote";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { queryKeys } from "../query/query-keys";
@@ -41,7 +40,9 @@ function CatalogPage<T extends CatalogRecord>({
   kind,
   title,
   description,
-  help,
+  createLabel,
+  emptyDescription,
+  usageColumns = [],
   queryKey,
   queryFn,
   createFn,
@@ -51,7 +52,12 @@ function CatalogPage<T extends CatalogRecord>({
   kind: string;
   title: string;
   description: string;
-  help?: ReactNode;
+  /** Specific button/heading verb, e.g. "Nueva categoría". */
+  createLabel: string;
+  /** Shown when the list is empty (no filters exist on these screens). */
+  emptyDescription: string;
+  /** Columns that show how much each record is used elsewhere. */
+  usageColumns?: ErpColumn<T>[];
   queryKey: readonly unknown[];
   queryFn: () => Promise<T[]>;
   createFn: (input: CatalogInput) => Promise<T>;
@@ -103,6 +109,7 @@ function CatalogPage<T extends CatalogRecord>({
           },
         ]
       : []),
+    ...usageColumns,
     {
       key: "status",
       header: "Estado",
@@ -142,7 +149,7 @@ function CatalogPage<T extends CatalogRecord>({
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Catálogo"
+        eyebrow="Mantenimientos"
         title={title}
         description={description}
         actions={
@@ -153,12 +160,11 @@ function CatalogPage<T extends CatalogRecord>({
                 setEditor(blankEditor);
               }}
             >
-              Nuevo registro
+              {createLabel}
             </Button>
           ) : undefined
         }
       />
-      {help ? <HelpNote>{help}</HelpNote> : null}
       <FormFeedback success={success} />
       {editor ? (
         <form className="panel erp-form" onSubmit={submit}>
@@ -240,19 +246,69 @@ function CatalogPage<T extends CatalogRecord>({
           loading={query.isLoading}
           error={query.error ? apiErrorMessage(query.error) : undefined}
           onRetry={() => void query.refetch()}
+          emptyTitle={`Todavía no hay ${title.toLowerCase()}`}
+          emptyDescription={emptyDescription}
         />
       </section>
     </div>
   );
 }
 
+function UsageCount({ value, one, many }: {
+  value: number | undefined;
+  one: string;
+  many: string;
+}) {
+  if (value === undefined) return <>—</>;
+  if (value === 0) return <span className="muted">Sin uso</span>;
+  return (
+    <>
+      {value} {value === 1 ? one : many}
+    </>
+  );
+}
+
+const VALUE_TYPE_LABELS: Record<
+  ProductAttributeDefinition["valueType"],
+  string
+> = {
+  STRING: "Texto",
+  NUMBER: "Número",
+  BOOLEAN: "Sí / No",
+};
+
 export function ProductCategoriesPage() {
   return (
     <CatalogPage<ProductCategory>
       kind="Categoría"
       title="Categorías de producto"
-      description="Clasificación controlada para catálogo y atributos."
-      help="Estas categorías aparecen en la lista desplegable al crear o editar un producto. También agrupan los atributos técnicos. Crea aquí las categorías con las que trabajas (por ejemplo Filtros, Frenos, Lubricantes) antes de dar de alta productos."
+      description="Los grupos con los que ordenás el catálogo (Filtros, Frenos, Lubricantes). Se eligen al crear un producto y agrupan sus atributos técnicos."
+      createLabel="Nueva categoría"
+      emptyDescription="Creá las categorías con las que trabajás antes de dar de alta productos. Aparecerán en la lista al crear cada producto."
+      usageColumns={[
+        {
+          key: "products",
+          header: "Productos",
+          cell: (row) => (
+            <UsageCount
+              value={row._count?.products}
+              one="producto"
+              many="productos"
+            />
+          ),
+        },
+        {
+          key: "attributes",
+          header: "Atributos",
+          cell: (row) => (
+            <UsageCount
+              value={row._count?.attributeDefinitions}
+              one="atributo"
+              many="atributos"
+            />
+          ),
+        },
+      ]}
       queryKey={queryKeys.productCategories}
       queryFn={catalogApi.categories}
       createFn={catalogApi.createCategory}
@@ -267,8 +323,22 @@ export function ProductBrandsPage() {
     <CatalogPage<ProductBrand>
       kind="Marca"
       title="Marcas de producto"
-      description="Fabricantes y marcas comerciales del catálogo."
-      help="Estas marcas aparecen en la lista desplegable al crear o editar un producto. Son los fabricantes o marcas comerciales de la pieza (por ejemplo Bosch, NGK, Monroe), no las marcas de vehículo."
+      description="El fabricante de la pieza (Bosch, NGK, Monroe). Se elige al crear un producto. No son marcas de carro."
+      createLabel="Nueva marca"
+      emptyDescription="Creá las marcas de las piezas que vendés. Aparecerán en la lista al crear cada producto y en el filtro de productos."
+      usageColumns={[
+        {
+          key: "products",
+          header: "Productos",
+          cell: (row) => (
+            <UsageCount
+              value={row._count?.products}
+              one="producto"
+              many="productos"
+            />
+          ),
+        },
+      ]}
       queryKey={queryKeys.productBrands}
       queryFn={catalogApi.brands}
       createFn={catalogApi.createBrand}
@@ -317,13 +387,25 @@ export function ProductAttributesPage() {
     { key: "name", header: "Nombre", cell: (row) => row.name },
     {
       key: "type",
-      header: "Tipo / unidad",
-      cell: (row) => `${row.valueType}${row.unit ? ` · ${row.unit}` : ""}`,
+      header: "Tipo de dato",
+      cell: (row) =>
+        `${VALUE_TYPE_LABELS[row.valueType]}${row.unit ? ` · ${row.unit}` : ""}`,
     },
     {
       key: "required",
-      header: "Requerido",
+      header: "Obligatorio",
       cell: (row) => (row.required ? "Sí" : "No"),
+    },
+    {
+      key: "usage",
+      header: "En uso",
+      cell: (row) => (
+        <UsageCount
+          value={row._count?.values}
+          one="producto"
+          many="productos"
+        />
+      ),
     },
     {
       key: "status",
@@ -365,9 +447,9 @@ export function ProductAttributesPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Catálogo"
+        eyebrow="Mantenimientos"
         title="Atributos de producto"
-        description="Definiciones controladas por categoría; los valores se capturan en cada producto."
+        description="Las características técnicas de cada categoría (diámetro, rosca, viscosidad). Aparecen como campos para llenar al crear un producto de esa categoría."
         actions={
           canCreate && !editor ? (
             <Button
@@ -388,12 +470,6 @@ export function ProductAttributesPage() {
           ) : undefined
         }
       />
-      <HelpNote>
-        Los atributos son las características técnicas de una pieza (por ejemplo
-        &quot;diámetro&quot;, &quot;rosca&quot;, &quot;viscosidad&quot;). Se
-        definen por categoría y aparecen como campos para llenar al crear un
-        producto de esa categoría.
-      </HelpNote>
       <FormFeedback success={success} />
       {editor ? (
         <form className="panel erp-form" onSubmit={submit}>
@@ -508,6 +584,8 @@ export function ProductAttributesPage() {
             definitions.error ? apiErrorMessage(definitions.error) : undefined
           }
           onRetry={() => void definitions.refetch()}
+          emptyTitle="Todavía no hay atributos"
+          emptyDescription="Definí primero una categoría, luego agregá sus atributos técnicos. Se pedirán al crear productos de esa categoría."
         />
       </section>
     </div>

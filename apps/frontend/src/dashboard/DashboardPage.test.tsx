@@ -1,13 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  commercialSummary,
-  jsonResponse,
-  systemHealth,
-  testUser,
-} from "../test/fixtures";
+import { commercialSummary, jsonResponse, testUser } from "../test/fixtures";
 import type { CurrentUser } from "../types/api";
 import { DashboardPage } from "./DashboardPage";
 
@@ -32,68 +27,37 @@ function renderDashboard() {
 }
 
 describe("DashboardPage", () => {
-  it("requests health but never requests commercial summary without permission", async () => {
-    currentUser = testUser;
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(systemHealth));
+  it("never calls system health and hides the summary without permission", async () => {
+    currentUser = testUser; // products.read + inventory.read only
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({}));
     vi.stubGlobal("fetch", fetchMock);
     renderDashboard();
 
-    await screen.findByText("API Gateway");
+    await screen.findByText("No ves el resumen del día");
+    expect(fetchMock).not.toHaveBeenCalled();
+    // Quick actions are gated by permission: inventory yes, sales no.
     expect(
-      screen.getByText("Resumen comercial restringido"),
+      screen.getByRole("link", { name: "Consultar inventario" }),
     ).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock.mock.calls[0]?.[0]).toContain("/api/system/health");
-    expect(screen.getByRole("link", { name: /Productos/ })).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /Ventas/ }),
+      screen.queryByRole("link", { name: "Registrar una venta" }),
     ).not.toBeInTheDocument();
   });
 
-  it("shows an intentional loading state while health is pending", () => {
-    currentUser = testUser;
+  it("shows an intentional loading state while the summary is pending", () => {
+    currentUser = {
+      ...testUser,
+      roles: [
+        { ...testUser.roles[0], permissions: ["commercial-summary.read"] },
+      ],
+    };
     vi.stubGlobal(
       "fetch",
       vi.fn(() => new Promise<Response>(() => undefined)),
     );
     renderDashboard();
-    expect(screen.getByText("Consultando servicios")).toBeInTheDocument();
-  });
-
-  it("labels a degraded backend response without hiding service detail", async () => {
-    currentUser = testUser;
-    const degraded = {
-      ...systemHealth,
-      status: "degraded" as const,
-      services: {
-        ...systemHealth.services,
-        users: { status: "error" as const, service: "ms-users" },
-      },
-    };
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(degraded)));
-    renderDashboard();
-
-    expect(await screen.findByText("Sistema degradado")).toBeInTheDocument();
-    expect(screen.getByText("No disponible")).toBeInTheDocument();
-  });
-
-  it("shows a retryable health error", async () => {
-    currentUser = testUser;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(jsonResponse({ message: "Unavailable" }, 503)),
-    );
-    renderDashboard();
-
     expect(
-      await screen.findByText(
-        "No pudimos consultar el estado del sistema",
-        undefined,
-        { timeout: 3_000 },
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Reintentar" }),
+      screen.getByText("Consultando el resumen del día"),
     ).toBeInTheDocument();
   });
 
@@ -106,48 +70,50 @@ describe("DashboardPage", () => {
     };
     const fetchMock = vi.fn((url: string) =>
       Promise.resolve(
-        jsonResponse(
-          url.includes("commercial/summary") ? commercialSummary : systemHealth,
-        ),
+        url.includes("commercial/summary")
+          ? jsonResponse(commercialSummary)
+          : jsonResponse({}),
       ),
     );
     vi.stubGlobal("fetch", fetchMock);
     renderDashboard();
 
-    // The day's numbers come straight from the backend summary.
-    await screen.findByText("L 1,360.00"); // venta de hoy
-    expect(screen.getByText("L 800.00")).toBeInTheDocument(); // cuentas por cobrar
-    expect(screen.getByText("L 475.50")).toBeInTheDocument(); // cuentas por pagar
+    await screen.findByText("L 1,360.00"); // vendido hoy
+    expect(screen.getByText("L 800.00")).toBeInTheDocument(); // te deben
+    expect(screen.getByText("L 475.50")).toBeInTheDocument(); // debes
     expect(
-      screen.getByText(/Efectivo esperado L 250\.25/),
+      screen.getByText(/Efectivo esperado en caja: L 250\.25/),
     ).toBeInTheDocument();
     expect(
       fetchMock.mock.calls.some(([url]) =>
         String(url).includes("/api/commercial/summary"),
       ),
     ).toBe(true);
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes("/api/system/health"),
+      ),
+    ).toBe(false);
   });
 
-  it("surfaces a commercial query failure without hiding system health", async () => {
+  it("surfaces a commercial query failure with a retry", async () => {
     currentUser = {
       ...testUser,
       roles: [
         { ...testUser.roles[0], permissions: ["commercial-summary.read"] },
       ],
     };
-    const fetchMock = vi.fn((url: string) =>
-      Promise.resolve(
-        url.includes("commercial/summary")
-          ? jsonResponse({ message: "Unavailable" }, 503)
-          : jsonResponse(systemHealth),
-      ),
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ message: "Unavailable" }, 503)),
     );
-    vi.stubGlobal("fetch", fetchMock);
     renderDashboard();
 
-    await screen.findByText("El resumen comercial no está disponible");
-    await waitFor(() =>
-      expect(screen.getByText("API Gateway")).toBeInTheDocument(),
-    );
+    expect(
+      await screen.findByText("El resumen comercial no está disponible"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Reintentar" }),
+    ).toBeInTheDocument();
   });
 });

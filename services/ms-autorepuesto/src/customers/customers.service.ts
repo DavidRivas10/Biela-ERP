@@ -44,6 +44,7 @@ export class CustomersService {
     const [data, total] = await Promise.all([
       this.prisma.customer.findMany({
         where,
+        include: { _count: { select: { sales: true } } },
         orderBy: [{ code: "asc" }, { id: "asc" }],
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -62,7 +63,10 @@ export class CustomersService {
   }
 
   async findOne(id: string) {
-    const customer = await this.prisma.customer.findUnique({ where: { id } });
+    const customer = await this.prisma.customer.findUnique({
+      where: { id },
+      include: { _count: { select: { sales: true } } },
+    });
     if (!customer) throw new NotFoundException("Customer not found");
     return customer;
   }

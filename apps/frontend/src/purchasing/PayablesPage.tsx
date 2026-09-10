@@ -1,23 +1,46 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { purchasingFinanceApi } from "../api/purchasing-finance-api";
+import { useAuth } from "../auth/AuthContext";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
-import { CommercialStatusBadge } from "../components/CommercialStatusBadge";
+import { EmptyState } from "../components/EmptyState";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { Field } from "../components/Field";
-import { HelpNote } from "../components/HelpNote";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { SupplierSelector } from "../components/PurchasingSelectors";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
-import type { PayableDocument, SettlementStatus } from "../types/purchasing";
+import type { PayableDocument } from "../types/purchasing";
 import { apiErrorMessage } from "../utils/api-error";
 import { formatCalendarDate, formatMoney } from "../utils/formatters";
 
+const SETTLEMENT_LABELS: Record<string, string> = {
+  UNPAID: "Sin pagar",
+  PARTIALLY_PAID: "Pago parcial",
+  PAID: "Pagada",
+};
+
+function DueCell({ row }: { row: PayableDocument }) {
+  if (!row.paymentDueDate) return <span className="muted">Sin fecha</span>;
+  return (
+    <>
+      <span>{formatCalendarDate(row.paymentDueDate)}</span>
+      {row.overdue ? (
+        <Badge tone="danger">
+          Vencida hace {row.ageInDays}{" "}
+          {row.ageInDays === 1 ? "día" : "días"}
+        </Badge>
+      ) : null}
+    </>
+  );
+}
+
 export function PayablesPage() {
+  const { hasPermission } = useAuth();
   const filters = useUrlFilters();
+  const canPay = hasPermission("purchases.pay");
   const params = {
     page: filters.page,
     limit: filters.limit,
@@ -33,17 +56,17 @@ export function PayablesPage() {
     queryKey: queryKeys.payables(params),
     queryFn: () => purchasingFinanceApi.payables(params),
   });
+  const hasActiveFilters = Boolean(
+    filters.values.supplierId ||
+      filters.values.settlementStatus ||
+      filters.values.overdueOnly ||
+      filters.values.dueFrom ||
+      filters.values.dueTo ||
+      filters.values.documentFrom ||
+      filters.values.documentTo,
+  );
+
   const columns: ErpColumn<PayableDocument>[] = [
-    {
-      key: "purchase",
-      header: "Compra",
-      cell: (row) => (
-        <Link className="table-link" to={`/app/purchasing/purchases/${row.id}`}>
-          <strong>#{row.number}</strong>
-          <small>{formatCalendarDate(row.documentDate)}</small>
-        </Link>
-      ),
-    },
     {
       key: "supplier",
       header: "Proveedor",
@@ -52,184 +75,186 @@ export function PayablesPage() {
           className="table-link"
           to={`/app/purchasing/suppliers/${row.supplierId}`}
         >
-          <strong>{row.supplier.code}</strong>
-          <small>{row.supplier.businessName}</small>
+          <strong>{row.supplier.businessName}</strong>
+          <small>{row.supplier.code}</small>
         </Link>
       ),
     },
     {
-      key: "net",
-      header: "Obligación neta",
-      cell: (row) => formatMoney(row.netPurchaseObligation),
-    },
-    {
-      key: "paid",
-      header: "Pagado neto",
-      cell: (row) => formatMoney(row.netPaidAmount),
+      key: "document",
+      header: "Compra",
+      cell: (row) => (
+        <Link
+          className="table-link"
+          to={`/app/purchasing/purchases/${row.id}`}
+        >
+          <strong>#{row.number}</strong>
+          <small>{formatCalendarDate(row.documentDate)}</small>
+        </Link>
+      ),
     },
     {
       key: "outstanding",
-      header: "Pendiente",
-      cell: (row) => <strong>{formatMoney(row.outstandingAmount)}</strong>,
-    },
-    {
-      key: "credit",
-      header: "Crédito proveedor",
-      cell: (row) => formatMoney(row.supplierCreditAmount),
-    },
-    {
-      key: "due",
-      header: "Vencimiento",
+      header: "Le debés",
       cell: (row) => (
         <>
-          <span>
-            {row.paymentDueDate ? formatCalendarDate(row.paymentDueDate) : "—"}
-          </span>
-          {row.overdue ? (
-            <Badge tone="danger">Vencida · {row.ageInDays} días</Badge>
-          ) : null}
+          <strong>{formatMoney(row.outstandingAmount)}</strong>
+          <small>de {formatMoney(row.netPurchaseObligation)}</small>
         </>
       ),
     },
     {
-      key: "settlement",
-      header: "Liquidación",
-      cell: (row) => <CommercialStatusBadge status={row.settlementStatus} />,
+      key: "due",
+      header: "Vence el pago",
+      cell: (row) => <DueCell row={row} />,
+    },
+    {
+      key: "status",
+      header: "Estado del pago",
+      cell: (row) => (
+        <Badge
+          tone={row.settlementStatus === "PARTIALLY_PAID" ? "warning" : "danger"}
+        >
+          {SETTLEMENT_LABELS[row.settlementStatus] ?? row.settlementStatus}
+        </Badge>
+      ),
+    },
+    {
+      key: "action",
+      header: "",
+      cell: (row) =>
+        canPay ? (
+          <Link
+            className="button button--primary"
+            to={`/app/purchasing/purchases/${row.id}/payments`}
+          >
+            Pagar
+          </Link>
+        ) : (
+          <Link
+            className="button button--ghost"
+            to={`/app/purchasing/purchases/${row.id}`}
+          >
+            Ver compra
+          </Link>
+        ),
     },
   ];
+
   const summary = list.data?.summary;
+
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Comercial"
+        eyebrow="Dinero"
         title="Cuentas por pagar"
-        description="Obligaciones y créditos operacionales derivados; no es contabilidad."
+        description="Lo que le debés a tus proveedores: compras confirmadas que todavía no pagaste por completo. «Le debés» es el valor de la compra (menos devoluciones) menos lo que ya le pagaste. Una compra está «vencida» cuando pasó su fecha de pago y sigue debiendo."
       />
-      <HelpNote title="Qué es esto">
-        Es lo que <strong>tú le debes a tus proveedores</strong>. Aparecen aquí
-        las compras que todavía no has pagado por completo. La obligación es el
-        valor de la compra menos las devoluciones que le hiciste al proveedor, y
-        el &quot;pendiente&quot; descuenta además lo que ya le pagaste. Una
-        compra se marca <strong>vencida</strong> cuando pasó su fecha de pago y
-        aún se debe dinero. Los pagos a proveedores se registran desde el
-        detalle de cada compra.
-      </HelpNote>
+
       {summary ? (
-        <section className="commercial-summary-grid panel">
-          <span>
-            Documentos <strong>{summary.documentCount}</strong>
-          </span>
-          <span>
-            Compra bruta <strong>{formatMoney(summary.grossAmount)}</strong>
-          </span>
-          <span>
-            Devoluciones <strong>{formatMoney(summary.returnAmount)}</strong>
-          </span>
-          <span>
-            Obligación neta <strong>{formatMoney(summary.netAmount)}</strong>
-          </span>
-          <span>
-            Pagado <strong>{formatMoney(summary.paidAmount)}</strong>
-          </span>
-          <span>
-            Reembolsado <strong>{formatMoney(summary.refundedAmount)}</strong>
-          </span>
-          <span>
-            Pendiente <strong>{formatMoney(summary.outstandingAmount)}</strong>
-          </span>
-          <span>
-            Crédito proveedor{" "}
-            <strong>{formatMoney(summary.creditAmount)}</strong>
-          </span>
-          <span>
-            Vencido <strong>{formatMoney(summary.overdueAmount)}</strong>
-          </span>
-          <span>
-            Sin pagar <strong>{summary.unpaidCount}</strong>
-          </span>
-          <span>
-            Pago parcial <strong>{summary.partiallyPaidCount}</strong>
-          </span>
-          <span>
-            Pagadas <strong>{summary.paidCount}</strong>
-          </span>
-        </section>
+        <>
+          <div className="metrics-grid">
+            <article className="metric-card">
+              <span>Debés en total</span>
+              <strong>{formatMoney(summary.outstandingAmount)}</strong>
+            </article>
+            <article className="metric-card">
+              <span>Vencido</span>
+              <strong>{formatMoney(summary.overdueAmount)}</strong>
+              <small>
+                {summary.overdueCount} compra{summary.overdueCount === 1 ? "" : "s"} atrasada{summary.overdueCount === 1 ? "" : "s"}
+              </small>
+            </article>
+            <article className="metric-card">
+              <span>Compras con saldo</span>
+              <strong>{summary.documentCount}</strong>
+            </article>
+          </div>
+          {list.data?.businessDate ? (
+            <p className="data-note">
+              Datos al {formatCalendarDate(list.data.businessDate)}.
+            </p>
+          ) : null}
+        </>
       ) : null}
-      <section className="panel filter-bar">
-        <SupplierSelector
-          id="payables-supplier"
-          label="Proveedor"
-          value={filters.values.supplierId ?? ""}
-          emptyLabel="Todos"
-          onChange={(supplierId) => filters.update({ supplierId })}
-        />
-        <Field label="Liquidación" htmlFor="payables-status">
-          <select
-            id="payables-status"
-            value={filters.values.settlementStatus ?? ""}
-            onChange={(e) =>
-              filters.update({ settlementStatus: e.target.value })
-            }
-          >
-            <option value="">Pendientes o con crédito</option>
-            {(["UNPAID", "PARTIALLY_PAID", "PAID"] as SettlementStatus[]).map(
-              (status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ),
-            )}
-          </select>
-        </Field>
-        <Field label="Vencimiento" htmlFor="payables-overdue">
-          <select
-            id="payables-overdue"
-            value={filters.values.overdueOnly ?? ""}
-            onChange={(e) => filters.update({ overdueOnly: e.target.value })}
-          >
-            <option value="">Todos</option>
-            <option value="true">Solo vencidos</option>
-            <option value="false">No vencidos</option>
-          </select>
-        </Field>
-        <Field label="Vence desde" htmlFor="payables-due-from">
-          <input
-            id="payables-due-from"
-            type="date"
-            value={filters.values.dueFrom ?? ""}
-            onChange={(e) => filters.update({ dueFrom: e.target.value })}
+
+      <details className="filter-details" open={hasActiveFilters}>
+        <summary>Buscar o filtrar</summary>
+        <div className="filter-bar">
+          <SupplierSelector
+            id="payables-supplier"
+            label="Proveedor"
+            value={filters.values.supplierId ?? ""}
+            emptyLabel="Cualquiera"
+            onChange={(supplierId) => filters.update({ supplierId })}
           />
-        </Field>
-        <Field label="Vence hasta" htmlFor="payables-due-to">
-          <input
-            id="payables-due-to"
-            type="date"
-            value={filters.values.dueTo ?? ""}
-            onChange={(e) => filters.update({ dueTo: e.target.value })}
-          />
-        </Field>
-        <Field label="Documento desde" htmlFor="payables-doc-from">
-          <input
-            id="payables-doc-from"
-            type="date"
-            value={filters.values.documentFrom ?? ""}
-            onChange={(e) => filters.update({ documentFrom: e.target.value })}
-          />
-        </Field>
-        <Field label="Documento hasta" htmlFor="payables-doc-to">
-          <input
-            id="payables-doc-to"
-            type="date"
-            value={filters.values.documentTo ?? ""}
-            onChange={(e) => filters.update({ documentTo: e.target.value })}
-          />
-        </Field>
-        <div className="filter-actions">
-          <Button variant="ghost" onClick={filters.clear}>
-            Limpiar
-          </Button>
+          <Field label="Estado del pago" htmlFor="payables-status">
+            <select
+              id="payables-status"
+              value={filters.values.settlementStatus ?? ""}
+              onChange={(e) =>
+                filters.update({ settlementStatus: e.target.value })
+              }
+            >
+              <option value="">Con saldo pendiente</option>
+              <option value="UNPAID">Sin pagar</option>
+              <option value="PARTIALLY_PAID">Pago parcial</option>
+              <option value="PAID">Pagadas</option>
+            </select>
+          </Field>
+          <Field label="Mostrar" htmlFor="payables-overdue">
+            <select
+              id="payables-overdue"
+              value={filters.values.overdueOnly ?? ""}
+              onChange={(e) => filters.update({ overdueOnly: e.target.value })}
+            >
+              <option value="">Todas</option>
+              <option value="true">Solo vencidas</option>
+              <option value="false">Solo al día</option>
+            </select>
+          </Field>
+          <Field label="Vence desde" htmlFor="payables-due-from">
+            <input
+              id="payables-due-from"
+              type="date"
+              value={filters.values.dueFrom ?? ""}
+              onChange={(e) => filters.update({ dueFrom: e.target.value })}
+            />
+          </Field>
+          <Field label="Vence hasta" htmlFor="payables-due-to">
+            <input
+              id="payables-due-to"
+              type="date"
+              value={filters.values.dueTo ?? ""}
+              onChange={(e) => filters.update({ dueTo: e.target.value })}
+            />
+          </Field>
+          <Field label="Compra desde" htmlFor="payables-doc-from">
+            <input
+              id="payables-doc-from"
+              type="date"
+              value={filters.values.documentFrom ?? ""}
+              onChange={(e) => filters.update({ documentFrom: e.target.value })}
+            />
+          </Field>
+          <Field label="Compra hasta" htmlFor="payables-doc-to">
+            <input
+              id="payables-doc-to"
+              type="date"
+              value={filters.values.documentTo ?? ""}
+              onChange={(e) => filters.update({ documentTo: e.target.value })}
+            />
+          </Field>
+          {hasActiveFilters ? (
+            <div className="filter-actions">
+              <Button variant="ghost" onClick={filters.clear}>
+                Limpiar filtros
+              </Button>
+            </div>
+          ) : null}
         </div>
-      </section>
+      </details>
+
       <section className="panel">
         <ErpTable
           columns={columns}
@@ -238,7 +263,27 @@ export function PayablesPage() {
           loading={list.isLoading}
           error={list.error ? apiErrorMessage(list.error) : undefined}
           onRetry={() => void list.refetch()}
-          emptyTitle="Sin cuentas por pagar para estos filtros"
+          rowClassName={(row) => (row.overdue ? "erp-row--overdue" : undefined)}
+          emptyState={
+            hasActiveFilters ? (
+              <EmptyState
+                tone="search"
+                title="Ninguna compra coincide"
+                action={
+                  <Button type="button" onClick={filters.clear}>
+                    Quitar los filtros
+                  </Button>
+                }
+              >
+                No hay compras por pagar con el proveedor, el estado o las
+                fechas que filtraste.
+              </EmptyState>
+            ) : (
+              <EmptyState title="No debés nada a proveedores">
+                Todas las compras confirmadas están pagadas por completo.
+              </EmptyState>
+            )
+          }
         />
         <Pagination
           meta={list.data?.meta}

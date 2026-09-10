@@ -101,29 +101,53 @@ export function RoleSelector({
   onChange: (roleIds: string[]) => void;
 }) {
   const roles = useQuery({ queryKey: queryKeys.rolesRoot, queryFn: rolesApi.list });
+  const available = roles.data ?? [];
   return (
     <fieldset className="form-section">
-      <legend>Roles</legend>
-      <p className="muted">Catálogo controlado por el servicio de usuarios.</p>
-      <div className="permission-grid">
-        {(roles.data ?? []).map((role) => (
-          <label className="check-field" key={role.id}>
-            <input
-              type="checkbox"
-              checked={selected.includes(role.id)}
-              disabled={!role.active}
-              onChange={(event) =>
-                onChange(
-                  event.target.checked
-                    ? [...selected, role.id]
-                    : selected.filter((id) => id !== role.id),
-                )
-              }
-            />
-            {role.name}{role.active ? "" : " (inactivo)"}
-          </label>
-        ))}
-      </div>
+      <legend>¿Qué puede hacer? (roles)</legend>
+      <p className="muted">
+        Marcá uno o más. Cada rol es un conjunto de permisos; si asignás varios,
+        la persona tiene la suma de todos.
+      </p>
+      {available.length === 0 ? (
+        <p className="muted">
+          Todavía no hay roles. Creá al menos uno en Administración → Roles.
+        </p>
+      ) : (
+        <div className="permission-options">
+          {available.map((role) => (
+            <label
+              className="permission-option"
+              key={role.id}
+              title={role.name}
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(role.id)}
+                disabled={!role.active}
+                onChange={(event) =>
+                  onChange(
+                    event.target.checked
+                      ? [...selected, role.id]
+                      : selected.filter((id) => id !== role.id),
+                  )
+                }
+              />
+              <span className="permission-option__text">
+                <span className="permission-option__name">
+                  {role.name}
+                  {role.active ? "" : " (inactivo)"}
+                </span>
+                {role.description ? (
+                  <span className="permission-option__hint">
+                    {role.description}
+                  </span>
+                ) : null}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
     </fieldset>
   );
 }

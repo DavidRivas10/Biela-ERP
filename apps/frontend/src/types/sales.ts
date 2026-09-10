@@ -20,6 +20,8 @@ export interface Customer {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Present on list/detail: how many sales this customer has. */
+  _count?: { sales: number };
 }
 
 export type SaleStatus = "DRAFT" | "POSTED" | "CANCELLED";

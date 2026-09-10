@@ -374,7 +374,7 @@ describe("Frontend Phase 10.C purchasing permission contract", () => {
       <SupplierDetailPage />,
     );
     expect(
-      await screen.findByRole("heading", { name: "Cuenta por pagar" }),
+      await screen.findByRole("heading", { name: "Cuánto le debés" }),
     ).toBeVisible();
     expect(
       fetchMock.mock.calls.some(

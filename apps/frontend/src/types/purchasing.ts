@@ -13,6 +13,8 @@ export interface Supplier {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Present on list/detail: how many purchases this supplier has. */
+  _count?: { purchases: number };
 }
 
 export type PurchaseStatus =

@@ -5,6 +5,7 @@ import { inventoryApi, type MovementInput } from "../api/inventory-api";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EmptyState } from "../components/EmptyState";
 import {
   LocationSelector,
   ProductSelector,
@@ -41,6 +42,11 @@ export function InventoryPage() {
     queryKey: queryKeys.inventory(params),
     queryFn: () => inventoryApi.balances(params),
   });
+  const hasActiveFilters = Boolean(
+    filters.values.productId ||
+      filters.values.locationId ||
+      filters.values.inStock,
+  );
   const columns: ErpColumn<InventoryBalance>[] = [
     {
       key: "product",
@@ -85,7 +91,7 @@ export function InventoryPage() {
       <PageHeader
         eyebrow="Almacén"
         title="Inventario"
-        description="Saldos autoritativos por producto y ubicación; no existe edición directa."
+        description="Cuánto tenés de cada producto y en qué ubicación. Se actualiza solo con movimientos, compras y ventas: no se edita a mano."
       />
       <InventoryTabs />
       <InventorySummary />
@@ -110,16 +116,18 @@ export function InventoryPage() {
             value={filters.values.inStock ?? ""}
             onChange={(e) => filters.update({ inStock: e.target.value })}
           >
-            <option value="">Todas</option>
-            <option value="true">Con existencia</option>
-            <option value="false">En cero</option>
+            <option value="">Con y sin stock</option>
+            <option value="true">Solo con stock</option>
+            <option value="false">Solo en cero</option>
           </select>
         </Field>
-        <div className="filter-actions">
-          <Button variant="ghost" onClick={filters.clear}>
-            Limpiar
-          </Button>
-        </div>
+        {hasActiveFilters ? (
+          <div className="filter-actions">
+            <Button variant="ghost" onClick={filters.clear}>
+              Limpiar filtros
+            </Button>
+          </div>
+        ) : null}
       </section>
       <section className="panel">
         <ErpTable
@@ -129,7 +137,28 @@ export function InventoryPage() {
           loading={list.isLoading}
           error={list.error ? apiErrorMessage(list.error) : undefined}
           onRetry={() => void list.refetch()}
-          emptyTitle="Sin saldos de inventario"
+          emptyState={
+            hasActiveFilters ? (
+              <EmptyState
+                tone="search"
+                title="Ningún saldo coincide"
+                action={
+                  <Button type="button" onClick={filters.clear}>
+                    Quitar los filtros
+                  </Button>
+                }
+              >
+                No hay inventario para el producto, la ubicación o el estado de
+                existencia que filtraste.
+              </EmptyState>
+            ) : (
+              <EmptyState title="Todavía no hay inventario cargado">
+                El stock aparece cuando registrás un movimiento inicial, recibís
+                una compra o hacés una venta. Empezá en la pestaña{" "}
+                <strong>Movimientos</strong>.
+              </EmptyState>
+            )
+          }
         />
         <Pagination
           meta={list.data?.meta}
@@ -160,6 +189,14 @@ const movementLabels: Record<InventoryMovementType, string> = {
   OUT: "Salida manual",
   ADJUSTMENT: "Ajuste",
   TRANSFER: "Transferencia",
+};
+const movementHelp: Record<ManualMovement["type"], string> = {
+  INITIAL:
+    "Cargá la cantidad con la que arranca ese producto en esa ubicación (por ejemplo al inaugurar la bodega). Va a la ubicación destino.",
+  IN: "Sumá unidades que entraron por fuera de una compra: una devolución de cliente, una pieza que apareció al ordenar. Va a la ubicación destino.",
+  OUT: "Restá unidades que salieron por fuera de una venta: rotura, merma, uso interno del taller. Sale de la ubicación origen.",
+  ADJUSTMENT:
+    "Poné el conteo real de la ubicación; el sistema calcula solo la diferencia contra lo que figuraba.",
 };
 
 export function InventoryMovementsPage() {
@@ -282,7 +319,7 @@ export function InventoryMovementsPage() {
       <PageHeader
         eyebrow="Almacén"
         title="Movimientos de inventario"
-        description="Libro trazable de toda mutación de existencias."
+        description="Todo lo que suma o resta stock, con quién lo hizo y cuándo. No se puede borrar ni editar."
         actions={
           hasPermission("inventory.adjust") && !showForm ? (
             <Button onClick={() => setShowForm(true)}>
@@ -296,10 +333,7 @@ export function InventoryMovementsPage() {
       {showForm ? (
         <form className="panel erp-form" onSubmit={review}>
           <h2>Movimiento manual</h2>
-          <p>
-            INITIAL, IN y ADJUSTMENT usan ubicación destino; OUT usa ubicación
-            origen. El backend valida el saldo.
-          </p>
+          <p>{movementHelp[form.type]}</p>
           <FormFeedback
             error={mutation.error ? apiErrorMessage(mutation.error) : null}
           />
@@ -570,7 +604,7 @@ export function InventoryTransfersPage() {
       <PageHeader
         eyebrow="Almacén"
         title="Transferencias"
-        description="Traslado atómico entre dos ubicaciones activas; sin actualizaciones optimistas."
+        description="Mover unidades de una ubicación a otra. Se hace de una sola vez: o se completa entera o no se aplica nada."
       />
       <InventoryTabs />
       <FormFeedback success={success} />
@@ -643,8 +677,8 @@ export function InventoryTransfersPage() {
               </span>
             </div>
             <p>
-              El servidor bloqueará y validará ambos saldos al confirmar. El
-              resultado se mostrará únicamente después de la transacción.
+              El sistema revisa los dos saldos al confirmar. El resultado se ve
+              recién después de aplicar la transferencia.
             </p>
           </section>
         ) : null}

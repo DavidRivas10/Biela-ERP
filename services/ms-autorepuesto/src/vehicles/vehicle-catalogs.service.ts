@@ -31,7 +31,10 @@ export class VehicleCatalogsService {
   }
 
   listBrands() {
-    return this.prisma.vehicleBrand.findMany({ orderBy: { name: "asc" } });
+    return this.prisma.vehicleBrand.findMany({
+      orderBy: { name: "asc" },
+      include: { _count: { select: { models: true } } },
+    });
   }
 
   async updateBrand(id: string, dto: UpdateVehicleBrandDto) {
@@ -75,7 +78,7 @@ export class VehicleCatalogsService {
   listModels(brandId?: string) {
     return this.prisma.vehicleModel.findMany({
       where: brandId ? { brandId } : undefined,
-      include: { brand: true },
+      include: { brand: true, _count: { select: { vehicles: true } } },
       orderBy: [{ brand: { name: "asc" } }, { name: "asc" }],
     });
   }

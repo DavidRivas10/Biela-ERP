@@ -7,10 +7,10 @@ import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
 import { CommercialStatusBadge } from "../components/CommercialStatusBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EmptyState } from "../components/EmptyState";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
-import { HelpNote } from "../components/HelpNote";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
@@ -47,6 +47,10 @@ export function SuppliersPage() {
     queryKey: queryKeys.suppliers(params),
     queryFn: () => suppliersApi.list(params),
   });
+  const canBuy = hasPermission("purchases.create");
+  const hasActiveFilters = Boolean(
+    filters.values.search || filters.values.active,
+  );
   const columns: ErpColumn<Supplier>[] = [
     {
       key: "supplier",
@@ -74,17 +78,45 @@ export function SuppliersPage() {
       cell: (row) => row.taxId || "—",
     },
     {
+      key: "purchases",
+      header: "Compras",
+      cell: (row) =>
+        row._count?.purchases === undefined
+          ? "—"
+          : row._count.purchases === 0
+            ? "Sin compras aún"
+            : `${row._count.purchases} ${
+                row._count.purchases === 1 ? "compra" : "compras"
+              }`,
+    },
+    {
       key: "active",
       header: "Estado",
       cell: (row) => <StatusBadge active={row.active} />,
     },
+    ...(canBuy
+      ? [
+          {
+            key: "actions",
+            header: "Acciones",
+            cell: (row: Supplier) => (
+              <Link
+                className="button button--ghost"
+                to={`/app/purchasing/purchases/new?supplierId=${row.id}`}
+              >
+                Registrar una factura
+              </Link>
+            ),
+          },
+        ]
+      : []),
   ];
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Compras"
+        eyebrow="Comprar"
         title="Proveedores"
-        description="Directorio comercial con historial preservado y búsqueda del servidor."
+        description="A quién le comprás mercadería. Cada proveedor guarda sus datos, tu historial de compras y cuánto le debés. Un proveedor inactivo se conserva en el historial pero no aparece al registrar compras nuevas."
         actions={
           hasPermission("suppliers.create") ? (
             <Link
@@ -96,12 +128,6 @@ export function SuppliersPage() {
           ) : undefined
         }
       />
-      <HelpNote>
-        Los proveedores que registras aquí son a quienes les compras mercadería.
-        Se seleccionan al crear una compra y su historial se conserva aunque
-        luego los desactives. Un proveedor desactivado no puede usarse en compras
-        nuevas.
-      </HelpNote>
       <form
         className="panel filter-bar"
         onSubmit={(event) => {
@@ -109,10 +135,10 @@ export function SuppliersPage() {
           filters.update({ search });
         }}
       >
-        <Field label="Buscar" htmlFor="supplier-search">
+        <Field label="Buscar por código o razón social" htmlFor="supplier-search">
           <input
             id="supplier-search"
-            placeholder="Código o razón social"
+            placeholder="Ej.: SUP-001 o «Repuestos del Sur»"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -123,23 +149,25 @@ export function SuppliersPage() {
             value={filters.values.active ?? ""}
             onChange={(event) => filters.update({ active: event.target.value })}
           >
-            <option value="">Todos</option>
-            <option value="true">Activos</option>
-            <option value="false">Inactivos</option>
+            <option value="">Activos e inactivos</option>
+            <option value="true">Solo activos</option>
+            <option value="false">Solo inactivos (ocultos)</option>
           </select>
         </Field>
         <div className="filter-actions">
-          <Button type="submit">Aplicar</Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setSearch("");
-              filters.clear();
-            }}
-          >
-            Limpiar
-          </Button>
+          <Button type="submit">Buscar</Button>
+          {hasActiveFilters ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setSearch("");
+                filters.clear();
+              }}
+            >
+              Limpiar filtros
+            </Button>
+          ) : null}
         </div>
       </form>
       <section className="panel">
@@ -150,7 +178,46 @@ export function SuppliersPage() {
           loading={list.isLoading}
           error={list.error ? apiErrorMessage(list.error) : undefined}
           onRetry={() => void list.refetch()}
-          emptyTitle="No se encontraron proveedores"
+          emptyState={
+            hasActiveFilters ? (
+              <EmptyState
+                tone="search"
+                title="Ningún proveedor coincide"
+                action={
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      filters.clear();
+                    }}
+                  >
+                    Ver todos los proveedores
+                  </Button>
+                }
+              >
+                {filters.values.search
+                  ? `No hay ningún proveedor con «${filters.values.search}».`
+                  : "No hay proveedores con ese estado."}
+              </EmptyState>
+            ) : (
+              <EmptyState
+                title="Todavía no registraste proveedores"
+                action={
+                  hasPermission("suppliers.create") ? (
+                    <Link
+                      className="button button--primary"
+                      to="/app/purchasing/suppliers/new"
+                    >
+                      Registrar un proveedor
+                    </Link>
+                  ) : undefined
+                }
+              >
+                Registrá a quienes les comprás mercadería. Los vas a poder elegir
+                al cargar una factura.
+              </EmptyState>
+            )
+          }
         />
         <Pagination
           meta={list.data?.meta}
@@ -228,16 +295,38 @@ function SupplierFormEditor({
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Compras"
+        eyebrow="Comprar"
         title={id ? "Editar proveedor" : "Nuevo proveedor"}
-        description="Los datos históricos permanecen asociados aunque el proveedor se desactive."
+        description={
+          id
+            ? "Cambiá los datos de contacto e identificación de este proveedor."
+            : "Registrá a quien le comprás mercadería. Sus datos, tu historial de compras y lo que le debés quedan guardados aunque después lo desactives."
+        }
       />
       <form className="panel erp-form" onSubmit={submit}>
         <FormFeedback
           error={mutation.error ? apiErrorMessage(mutation.error) : null}
         />
         <div className="form-grid">
-          <Field label="Código" htmlFor="supplier-code" required>
+          <Field label="Razón social" htmlFor="supplier-name" required>
+            <input
+              id="supplier-name"
+              required
+              minLength={2}
+              maxLength={160}
+              placeholder="Repuestos del Sur S.A."
+              value={form.businessName}
+              onChange={(event) =>
+                setForm({ ...form, businessName: event.target.value })
+              }
+            />
+          </Field>
+          <Field
+            label="Código"
+            htmlFor="supplier-code"
+            required
+            hint="Identificador corto y único para encontrarlo rápido (ej.: REP-SUR). Si no usás códigos, algo simple sirve."
+          >
             <input
               id="supplier-code"
               required
@@ -249,18 +338,6 @@ function SupplierFormEditor({
               }
             />
           </Field>
-          <Field label="Razón social" htmlFor="supplier-name" required>
-            <input
-              id="supplier-name"
-              required
-              minLength={2}
-              maxLength={160}
-              value={form.businessName}
-              onChange={(event) =>
-                setForm({ ...form, businessName: event.target.value })
-              }
-            />
-          </Field>
           <Field label="RTN / identificación" htmlFor="supplier-tax">
             <input
               id="supplier-tax"
@@ -269,7 +346,7 @@ function SupplierFormEditor({
               onChange={(e) => setForm({ ...form, taxId: e.target.value })}
             />
           </Field>
-          <Field label="Contacto" htmlFor="supplier-contact">
+          <Field label="Persona de contacto" htmlFor="supplier-contact">
             <input
               id="supplier-contact"
               maxLength={120}
@@ -393,7 +470,7 @@ export function SupplierDetailPage() {
     },
     {
       key: "net",
-      header: "Obligación neta",
+      header: "A pagar",
       cell: (item) => formatMoney(item.netPurchaseObligation),
     },
     {
@@ -408,7 +485,7 @@ export function SupplierDetailPage() {
     },
     {
       key: "credit",
-      header: "Crédito",
+      header: "A favor",
       cell: (item) => formatMoney(item.supplierCreditAmount),
     },
     {
@@ -429,37 +506,53 @@ export function SupplierDetailPage() {
     },
     {
       key: "status",
-      header: "Liquidación",
+      header: "Estado del pago",
       cell: (item) => <CommercialStatusBadge status={item.settlementStatus} />,
     },
   ];
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Proveedor"
+        eyebrow="Comprar"
         title={`${row.code} · ${row.businessName}`}
-        description={row.contactName || "Sin contacto principal"}
+        description={
+          row._count?.purchases
+            ? `${row._count.purchases} ${
+                row._count.purchases === 1 ? "compra" : "compras"
+              } registradas`
+            : "Todavía sin compras"
+        }
         actions={
-          hasPermission("suppliers.update") ? (
-            <div className="row-actions">
+          <div className="row-actions">
+            {hasPermission("purchases.create") && row.active ? (
               <Link
-                className="button button--secondary"
-                to={`/app/purchasing/suppliers/${id}/edit`}
+                className="button button--primary"
+                to={`/app/purchasing/purchases/new?supplierId=${id}`}
               >
-                Editar
+                Registrar una factura
               </Link>
-              <Button
-                variant={row.active ? "danger" : "primary"}
-                onClick={() => setConfirm(true)}
-              >
-                {row.active ? "Desactivar" : "Activar"}
-              </Button>
-            </div>
-          ) : undefined
+            ) : null}
+            {hasPermission("suppliers.update") ? (
+              <>
+                <Link
+                  className="button button--secondary"
+                  to={`/app/purchasing/suppliers/${id}/edit`}
+                >
+                  Editar
+                </Link>
+                <Button
+                  variant={row.active ? "danger" : "primary"}
+                  onClick={() => setConfirm(true)}
+                >
+                  {row.active ? "Desactivar" : "Activar"}
+                </Button>
+              </>
+            ) : null}
+          </div>
         }
       />
       <section className="panel detail-card">
-        <h2>Datos comerciales</h2>
+        <h2>Datos del proveedor</h2>
         <dl>
           <div>
             <dt>Estado</dt>
@@ -493,73 +586,43 @@ export function SupplierDetailPage() {
         <section className="panel">
           <div className="section-heading">
             <div>
-              <h2>Cuenta por pagar</h2>
-              <p>Resumen operacional derivado por el servidor.</p>
+              <h2>Cuánto le debés</h2>
+              <p>Compras de este proveedor y lo que queda pendiente de pago.</p>
             </div>
             <Link
               className="button button--ghost"
               to={`/app/commercial/payables?supplierId=${id}`}
             >
-              Abrir Cuentas por pagar
+              Abrir cuentas por pagar
             </Link>
           </div>
           {account.data ? (
-            <div className="commercial-summary-grid">
-              <span>
-                Compra bruta{" "}
-                <strong>{formatMoney(account.data.summary.grossAmount)}</strong>
-              </span>
-              <span>
-                Devoluciones{" "}
-                <strong>
-                  {formatMoney(account.data.summary.returnAmount)}
-                </strong>
-              </span>
-              <span>
-                Obligación neta{" "}
-                <strong>{formatMoney(account.data.summary.netAmount)}</strong>
-              </span>
-              <span>
-                Pagado{" "}
-                <strong>{formatMoney(account.data.summary.paidAmount)}</strong>
-              </span>
-              <span>
-                Reembolsado por proveedor{" "}
-                <strong>
-                  {formatMoney(account.data.summary.refundedAmount)}
-                </strong>
-              </span>
-              <span>
-                Pendiente{" "}
+            <div className="metrics-grid">
+              <article className="metric-card">
+                <span>Le debés</span>
                 <strong>
                   {formatMoney(account.data.summary.outstandingAmount)}
                 </strong>
-              </span>
-              <span>
-                Crédito proveedor{" "}
-                <strong>
-                  {formatMoney(account.data.summary.creditAmount)}
-                </strong>
-              </span>
-              <span>
-                Sin pagar <strong>{account.data.summary.unpaidCount}</strong>
-              </span>
-              <span>
-                Pago parcial{" "}
-                <strong>{account.data.summary.partiallyPaidCount}</strong>
-              </span>
-              <span>
-                Pagadas <strong>{account.data.summary.paidCount}</strong>
-              </span>
-              <span>
-                Vencidas <strong>{account.data.summary.overdueCount}</strong>
-              </span>
-              <span>
-                Monto vencido{" "}
+              </article>
+              <article className="metric-card">
+                <span>Vencido</span>
                 <strong>
                   {formatMoney(account.data.summary.overdueAmount)}
                 </strong>
-              </span>
+                <small>
+                  {account.data.summary.overdueCount} compras atrasadas
+                </small>
+              </article>
+              <article className="metric-card">
+                <span>Compras</span>
+                <strong>{account.data.summary.documentCount}</strong>
+              </article>
+              <article className="metric-card">
+                <span>A tu favor (crédito)</span>
+                <strong>
+                  {formatMoney(account.data.summary.creditAmount)}
+                </strong>
+              </article>
             </div>
           ) : null}
           <ErpTable
@@ -568,7 +631,7 @@ export function SupplierDetailPage() {
             rowKey={(item) => item.id}
             loading={account.isLoading}
             error={account.error ? apiErrorMessage(account.error) : undefined}
-            emptyTitle="Sin documentos en la cuenta"
+            emptyTitle="Este proveedor todavía no tiene compras"
           />
           <Pagination meta={account.data?.meta} onPageChange={setAccountPage} />
         </section>
@@ -576,7 +639,7 @@ export function SupplierDetailPage() {
       <ConfirmDialog
         open={confirm}
         title={`${row.active ? "Desactivar" : "Activar"} proveedor`}
-        description="El historial de compras se conservará. Un proveedor inactivo no podrá utilizarse en compras nuevas."
+        description="El historial de compras se conserva. Un proveedor inactivo no aparece al registrar compras nuevas."
         dangerous={row.active}
         loading={lifecycle.isPending}
         onCancel={() => setConfirm(false)}

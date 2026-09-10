@@ -194,4 +194,79 @@ describe("high-cardinality entity selectors", () => {
       ).toBe(true),
     );
   });
+
+  it("says so when a product code matches nothing, instead of a mute dropdown", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL | Request) => {
+        const url = new URL(
+          input instanceof Request ? input.url : input.toString(),
+        );
+        const term = url.searchParams.get("search");
+        return Promise.resolve(
+          jsonResponse({
+            data:
+              term === "ZZZ"
+                ? []
+                : [{ id: "p1", code: "AAA-1", name: "Uno" }],
+            meta: pageMeta(1, term === "ZZZ" ? 0 : 1, 1),
+          }),
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithQueryClient(
+      <ProductSelector
+        id="p"
+        label="Producto"
+        value=""
+        onChange={() => undefined}
+      />,
+    );
+    await screen.findByRole("option", { name: /AAA-1/ });
+    await user.type(screen.getByRole("searchbox"), "ZZZ");
+    expect(
+      await screen.findByText(/No se encontró ningún producto con «ZZZ»/),
+    ).toBeVisible();
+  });
+
+  it("auto-selects the product whose exact code is typed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL | Request) => {
+        const url = new URL(
+          input instanceof Request ? input.url : input.toString(),
+        );
+        const term = url.searchParams.get("search");
+        return Promise.resolve(
+          jsonResponse({
+            data:
+              term === "FILT-001"
+                ? [{ id: "p9", code: "FILT-001", name: "Filtro de aceite" }]
+                : [],
+            meta: pageMeta(1, term === "FILT-001" ? 1 : 0, 1),
+          }),
+        );
+      }),
+    );
+    function Harness() {
+      const [value, setValue] = useState("");
+      return (
+        <>
+          <ProductSelector
+            id="p"
+            label="Producto"
+            value={value}
+            onChange={setValue}
+          />
+          <output>{value}</output>
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    renderWithQueryClient(<Harness />);
+    await user.type(screen.getByRole("searchbox"), "FILT-001");
+    expect(await screen.findByText("p9")).toBeVisible();
+    expect(screen.getByText(/Elegido:/)).toBeVisible();
+  });
 });

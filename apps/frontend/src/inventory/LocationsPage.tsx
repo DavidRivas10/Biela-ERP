@@ -5,10 +5,10 @@ import { inventoryApi, type LocationInput } from "../api/inventory-api";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EmptyState } from "../components/EmptyState";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
-import { HelpNote } from "../components/HelpNote";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
@@ -98,6 +98,20 @@ export function LocationsPage() {
         "—",
     },
     {
+      key: "products",
+      header: "Productos aquí",
+      cell: (row) =>
+        row._count?.inventories === undefined ? (
+          "—"
+        ) : row._count.inventories === 0 ? (
+          <span className="muted">Vacía</span>
+        ) : (
+          `${row._count.inventories} ${
+            row._count.inventories === 1 ? "producto" : "productos"
+          }`
+        ),
+    },
+    {
       key: "status",
       header: "Estado",
       cell: (row) => <StatusBadge active={row.active} />,
@@ -144,9 +158,9 @@ export function LocationsPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Almacén"
+        eyebrow="Mantenimientos"
         title="Ubicaciones"
-        description="Estructura física de almacenamiento con historial preservado."
+        description="El lugar físico de tu bodega o mostrador donde está guardada una pieza. Le ponés un código corto (BOD-01, MOS-01) y lo usás en el inventario para saber dónde buscarla."
         actions={
           hasPermission("locations.create") && !editor ? (
             <Button onClick={() => setEditor(emptyLocation)}>
@@ -155,12 +169,6 @@ export function LocationsPage() {
           ) : undefined
         }
       />
-      <HelpNote title="Cómo llenarlo">
-        Registra aquí los pasillos y estantes de tu bodega tal como los tienes
-        rotulados. Los rótulos son texto libre —pueden ser palabras, no hace
-        falta que sean números—. El código es un identificador corto para elegir
-        la ubicación en las operaciones (por ejemplo BOD-01 o MOS-01).
-      </HelpNote>
       <FormFeedback success={success} />
       <form
         className="panel filter-bar"
@@ -169,10 +177,10 @@ export function LocationsPage() {
           filters.update({ search });
         }}
       >
-        <Field label="Buscar" htmlFor="location-search">
+        <Field label="Buscar por código o nombre" htmlFor="location-search">
           <input
             id="location-search"
-            placeholder="Código, nombre o rótulo"
+            placeholder="Ej.: BOD-01 o «bodega principal»"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -183,23 +191,25 @@ export function LocationsPage() {
             value={filters.values.active ?? ""}
             onChange={(e) => filters.update({ active: e.target.value })}
           >
-            <option value="">Todos</option>
-            <option value="true">Activas</option>
-            <option value="false">Inactivas</option>
+            <option value="">Activas e inactivas</option>
+            <option value="true">Solo activas</option>
+            <option value="false">Solo inactivas (ocultas)</option>
           </select>
         </Field>
         <div className="filter-actions">
-          <Button type="submit">Aplicar</Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setSearch("");
-              filters.clear();
-            }}
-          >
-            Limpiar
-          </Button>
+          <Button type="submit">Buscar</Button>
+          {filters.values.search || filters.values.active ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setSearch("");
+                filters.clear();
+              }}
+            >
+              Limpiar filtros
+            </Button>
+          ) : null}
         </div>
       </form>
       {editor ? (
@@ -209,7 +219,12 @@ export function LocationsPage() {
             error={save.error ? apiErrorMessage(save.error) : null}
           />
           <div className="form-grid">
-            <Field label="Código" htmlFor="location-code" required>
+            <Field
+              label="Código"
+              htmlFor="location-code"
+              required
+              hint="Identificador corto que vas a elegir en el inventario y los movimientos. Ej.: BOD-01, MOS-01."
+            >
               <input
                 id="location-code"
                 required
@@ -219,7 +234,12 @@ export function LocationsPage() {
                 onChange={(e) => setEditor({ ...editor, code: e.target.value })}
               />
             </Field>
-            <Field label="Nombre" htmlFor="location-name" required>
+            <Field
+              label="Nombre"
+              htmlFor="location-name"
+              required
+              hint="Nombre en palabras, como lo llamás vos. Ej.: «Bodega principal», «Mostrador»."
+            >
               <input
                 id="location-name"
                 required
@@ -300,6 +320,43 @@ export function LocationsPage() {
           loading={list.isLoading}
           error={list.error ? apiErrorMessage(list.error) : undefined}
           onRetry={() => void list.refetch()}
+          emptyState={
+            filters.values.search || filters.values.active ? (
+              <EmptyState
+                tone="search"
+                title="Ninguna ubicación coincide"
+                action={
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      filters.clear();
+                    }}
+                  >
+                    Ver todas las ubicaciones
+                  </Button>
+                }
+              >
+                {filters.values.search
+                  ? `No hay ninguna ubicación con «${filters.values.search}».`
+                  : "No hay ubicaciones con ese estado."}
+              </EmptyState>
+            ) : (
+              <EmptyState
+                title="Todavía no hay ubicaciones"
+                action={
+                  hasPermission("locations.create") ? (
+                    <Button onClick={() => setEditor(emptyLocation)}>
+                      Crear la primera ubicación
+                    </Button>
+                  ) : undefined
+                }
+              >
+                Creá al menos una (por ejemplo <strong>BOD-01</strong> = bodega
+                principal) para poder registrar inventario y hacer ventas.
+              </EmptyState>
+            )
+          }
         />
         <Pagination
           meta={list.data?.meta}

@@ -18,6 +18,8 @@ export function ErpTable<T>({
   onRetry,
   emptyTitle = "Sin resultados",
   emptyDescription = "No hay registros que coincidan con los filtros actuales.",
+  emptyState,
+  rowClassName,
 }: {
   columns: ErpColumn<T>[];
   rows?: T[];
@@ -27,6 +29,10 @@ export function ErpTable<T>({
   onRetry?: () => void;
   emptyTitle?: string;
   emptyDescription?: string;
+  /** Overrides the default EmptyState when there are no rows (not loading, no error). */
+  emptyState?: ReactNode;
+  /** Optional per-row class, e.g. to tint overdue rows. */
+  rowClassName?: (row: T) => string | undefined;
 }) {
   if (loading) return <LoadingState label="Cargando registros…" />;
   if (error)
@@ -38,7 +44,11 @@ export function ErpTable<T>({
       />
     );
   if (!rows?.length)
-    return <EmptyState title={emptyTitle}>{emptyDescription}</EmptyState>;
+    return (
+      emptyState ?? (
+        <EmptyState title={emptyTitle}>{emptyDescription}</EmptyState>
+      )
+    );
   return (
     <div
       className="table-scroll"
@@ -58,7 +68,7 @@ export function ErpTable<T>({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={rowKey(row)}>
+            <tr key={rowKey(row)} className={rowClassName?.(row)}>
               {columns.map((column) => (
                 <td key={column.key}>{column.cell(row)}</td>
               ))}

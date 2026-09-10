@@ -13,7 +13,7 @@ export function CustomerSelector({
   value,
   onChange,
   required,
-  emptyLabel = "Venta de mostrador",
+  emptyLabel = "Sin cliente (venta de mostrador)",
 }: {
   id: string;
   label: string;
@@ -39,17 +39,18 @@ export function CustomerSelector({
   const rows = selected.data && !inPage
     ? [selected.data, ...(list.data?.data ?? [])]
     : (list.data?.data ?? []);
+  const total = list.data?.meta.total ?? rows.length;
 
   return (
     <div className="entity-selector">
       <Field
-        label={`Buscar ${label.toLowerCase()}`}
+        label={`Buscar ${label.toLowerCase()} por código o nombre`}
         htmlFor={`${id}-search`}
-        hint="Búsqueda paginada del servidor por código, nombre o razón social."
       >
         <input
           id={`${id}-search`}
           type="search"
+          placeholder="Ej.: TALLER-PROGRESO o «Taller El Progreso»"
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
@@ -57,6 +58,22 @@ export function CustomerSelector({
           }}
         />
       </Field>
+      <p
+        className={`entity-selector__status${
+          debounced && !list.isFetching && total === 0
+            ? " entity-selector__status--empty"
+            : ""
+        }`}
+        aria-live="polite"
+      >
+        {!debounced
+          ? "Dejalo vacío para una venta de mostrador, o buscá un cliente registrado."
+          : list.isFetching
+            ? "Buscando…"
+            : total === 0
+              ? `No hay ningún cliente registrado con «${debounced}». Podés vender de mostrador o registrarlo primero.`
+              : `${total} ${total === 1 ? "cliente" : "clientes"}. Elegilo abajo.`}
+      </p>
       <Field label={label} htmlFor={id} required={required}>
         <select
           id={id}

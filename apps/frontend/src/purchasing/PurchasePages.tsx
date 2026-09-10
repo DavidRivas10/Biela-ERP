@@ -1,12 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { purchasingApi, type PurchaseInput } from "../api/purchasing-api";
 import { useAuth } from "../auth/AuthContext";
 import { BarcodeScanButton } from "../components/BarcodeScanButton";
 import { Button } from "../components/Button";
 import { CommercialStatusBadge } from "../components/CommercialStatusBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EmptyState } from "../components/EmptyState";
 import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
@@ -18,6 +24,7 @@ import { useKeyboardWedge } from "../hooks/use-keyboard-wedge";
 import { useScanToProduct } from "../hooks/use-scan-to-product";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { PurchaseAttachmentManager } from "./PurchaseAttachmentManager";
+import { PurchaseChain, purchaseStep } from "./PurchaseChain";
 import { queryKeys } from "../query/query-keys";
 import { invalidateCommercialSummary } from "../query/invalidation";
 import type { Product } from "../types/erp";
@@ -41,6 +48,13 @@ const purchaseStatuses: PurchaseStatus[] = [
   "RECEIVED",
   "CANCELLED",
 ];
+const PURCHASE_STATUS_LABELS: Record<PurchaseStatus, string> = {
+  DRAFT: "Borrador (sin confirmar)",
+  CONFIRMED: "Confirmada (falta recibir)",
+  PARTIALLY_RECEIVED: "Recibida en parte",
+  RECEIVED: "Recibida completa",
+  CANCELLED: "Cancelada",
+};
 
 export function PurchasesPage() {
   const { hasPermission } = useAuth();
@@ -67,7 +81,9 @@ export function PurchasesPage() {
         <Link className="table-link" to={`/app/purchasing/purchases/${row.id}`}>
           <strong>#{row.number}</strong>
           <small>
-            {row.supplierDocumentNumber || "Sin documento proveedor"}
+            {row.supplierDocumentNumber
+              ? `Factura ${row.supplierDocumentNumber}`
+              : "Sin número de factura"}
           </small>
         </Link>
       ),
@@ -103,20 +119,21 @@ export function PurchasesPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Compras"
+        eyebrow="Comprar"
         title="Compras"
-        description="Órdenes de compra y su ciclo de confirmación, recepción y liquidación."
+        description="Cada compra es una factura o remisión de un proveedor. La registrás, la confirmás, marcás la mercadería como recibida y la pagás."
         actions={
           hasPermission("purchases.create") ? (
             <Link
               className="button button--primary"
               to="/app/purchasing/purchases/new"
             >
-              Nueva compra
+              Registrar una factura
             </Link>
           ) : undefined
         }
       />
+      <PurchaseChain />
       <section className="panel filter-bar">
         <SupplierSelector
           id="purchase-supplier-filter"
@@ -131,15 +148,15 @@ export function PurchasesPage() {
             value={filters.values.status ?? ""}
             onChange={(e) => filters.update({ status: e.target.value })}
           >
-            <option value="">Todos</option>
+            <option value="">Cualquier estado</option>
             {purchaseStatuses.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {PURCHASE_STATUS_LABELS[status]}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Número" htmlFor="purchase-number-filter">
+        <Field label="Número de compra" htmlFor="purchase-number-filter">
           <input
             id="purchase-number-filter"
             type="number"
@@ -175,7 +192,7 @@ export function PurchasesPage() {
         </Field>
         <div className="filter-actions">
           <Button variant="ghost" onClick={filters.clear}>
-            Limpiar
+            Limpiar filtros
           </Button>
         </div>
       </section>
@@ -187,7 +204,24 @@ export function PurchasesPage() {
           loading={list.isLoading}
           error={list.error ? apiErrorMessage(list.error) : undefined}
           onRetry={() => void list.refetch()}
-          emptyTitle="No se encontraron compras"
+          emptyState={
+            <EmptyState
+              title="Todavía no registraste compras"
+              action={
+                hasPermission("purchases.create") ? (
+                  <Link
+                    className="button button--primary"
+                    to="/app/purchasing/purchases/new"
+                  >
+                    Registrar la primera factura
+                  </Link>
+                ) : undefined
+              }
+            >
+              Cuando te llegue una factura de un proveedor, registrala acá con
+              su número, la fecha y los productos que trae.
+            </EmptyState>
+          }
         />
         <Pagination
           meta={list.data?.meta}
@@ -217,6 +251,7 @@ const newLine = (key: number): PurchaseLineForm => ({
 
 export function PurchaseFormPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const detail = useQuery({
     queryKey: queryKeys.purchase(id ?? "new"),
     queryFn: () => purchasingApi.purchase(id!),
@@ -228,19 +263,31 @@ export function PurchaseFormPage() {
     return <FormFeedback error={apiErrorMessage(detail.error)} />;
   if (id && detail.data?.status !== "DRAFT")
     return <FormFeedback error="Solo las compras DRAFT pueden editarse." />;
-  return <PurchaseFormEditor id={id} initial={detail.data} />;
+  return (
+    <PurchaseFormEditor
+      id={id}
+      initial={detail.data}
+      requestedSupplierId={
+        id ? undefined : (searchParams.get("supplierId") ?? undefined)
+      }
+    />
+  );
 }
 
 function PurchaseFormEditor({
   id,
   initial,
+  requestedSupplierId,
 }: {
   id?: string;
   initial?: Purchase;
+  requestedSupplierId?: string;
 }) {
   const navigate = useNavigate();
   const client = useQueryClient();
-  const [supplierId, setSupplierId] = useState(initial?.supplierId ?? "");
+  const [supplierId, setSupplierId] = useState(
+    initial?.supplierId ?? requestedSupplierId ?? "",
+  );
   const [supplierDocumentNumber, setSupplierDocumentNumber] = useState(
     initial?.supplierDocumentNumber ?? "",
   );
@@ -327,10 +374,11 @@ function PurchaseFormEditor({
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Compras"
-        title={id ? "Editar compra" : "Nueva compra"}
-        description="El total definitivo será calculado y devuelto por el servidor con precisión decimal."
+        eyebrow="Comprar"
+        title={id ? "Editar la factura" : "Registrar una factura de proveedor"}
+        description="Cargá acá la factura o remisión que te manda el proveedor: su número, la fecha y los productos que trae con su costo. Todavía no entra al inventario — eso pasa cuando marcás la mercadería como recibida."
       />
+      <PurchaseChain current="register" purchaseId={id} />
       <form className="panel erp-form" onSubmit={submit}>
         <FormFeedback
           error={
@@ -347,9 +395,9 @@ function PurchaseFormEditor({
             onChange={setSupplierId}
           />
           <Field
-            label="Documento del proveedor"
+            label="Número de la factura o remisión"
             htmlFor="purchase-document"
-            hint="Solo el número de la factura o remisión, como referencia. El archivo de la factura se adjunta desde la ficha de la compra, después de guardarla."
+            hint="El que trae impreso el documento del proveedor. El PDF o la foto se adjuntan desde la ficha de la compra, después de guardarla."
           >
             <input
               id="purchase-document"
@@ -386,10 +434,10 @@ function PurchaseFormEditor({
           </Field>
         </div>
         <fieldset className="form-section purchase-lines">
-          <legend>Productos</legend>
+          <legend>Productos que trae la factura</legend>
           <p>
-            La vista no suma importes como fuente de verdad; el total exacto
-            aparecerá después de guardar.
+            Cargá cada producto con la cantidad y el costo que figura en la
+            factura. El total lo calcula el sistema al guardar.
           </p>
           <div className="scan-row">
             <BarcodeScanButton
@@ -622,9 +670,13 @@ export function PurchaseDetailPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Compra"
+        eyebrow="Comprar"
         title={`Compra #${row.number}`}
-        description={`${row.supplier.code} · ${row.supplier.businessName}`}
+        description={
+          row.supplierDocumentNumber
+            ? `${row.supplier.businessName} · Factura ${row.supplierDocumentNumber}`
+            : `${row.supplier.businessName} · sin número de factura`
+        }
         actions={
           <div className="row-actions">
             {row.status === "DRAFT" && hasPermission("purchases.update") ? (
@@ -652,7 +704,7 @@ export function PurchaseDetailPage() {
                 className="button button--primary"
                 to={`/app/purchasing/purchases/${id}/receipts`}
               >
-                Recibir
+                Recibir mercadería
               </Link>
             ) : null}
             {(["PARTIALLY_RECEIVED", "RECEIVED"] as PurchaseStatus[]).includes(
@@ -676,12 +728,15 @@ export function PurchaseDetailPage() {
                 className="button button--secondary"
                 to={`/app/purchasing/purchases/${id}/payments`}
               >
-                Pagos
+                Pagar
               </Link>
             ) : null}
           </div>
         }
       />
+      {purchaseStep(row.status) ? (
+        <PurchaseChain current={purchaseStep(row.status)!} purchaseId={id} />
+      ) : null}
       <FormFeedback
         error={lifecycle.error ? apiErrorMessage(lifecycle.error) : null}
       />
@@ -718,7 +773,7 @@ export function PurchaseDetailPage() {
           </dl>
         </article>
         <article className="panel detail-card">
-          <h2>Importes exactos</h2>
+          <h2>Importes</h2>
           <dl>
             <div>
               <dt>Subtotal</dt>
@@ -749,8 +804,8 @@ export function PurchaseDetailPage() {
         <section className="panel">
           <div className="section-heading">
             <div>
-              <h2>Liquidación financiera</h2>
-              <p>Valores derivados por el backend.</p>
+              <h2>Cuánto se le debe al proveedor</h2>
+              <p>Lo calcula el sistema a partir de la factura, las recepciones y los pagos.</p>
             </div>
             <CommercialStatusBadge
               status={row.paymentSummary.settlementStatus}
@@ -795,16 +850,16 @@ export function PurchaseDetailPage() {
         </section>
       ) : null}
       <section className="panel">
-        <h2>Líneas de compra</h2>
+        <h2>Productos de la factura</h2>
         <div className="table-scroll" tabIndex={0}>
           <table className="erp-table">
             <thead>
               <tr>
                 <th>Producto</th>
-                <th>Ordenado</th>
+                <th>En la factura</th>
                 <th>Recibido</th>
                 <th>Devuelto</th>
-                <th>Pendiente recepción</th>
+                <th>Falta recibir</th>
                 <th>Costo</th>
                 <th>Total</th>
               </tr>
@@ -832,7 +887,7 @@ export function PurchaseDetailPage() {
         <div className="section-heading">
           <div>
             <h2>Recepciones</h2>
-            <p>Inventario cambia únicamente al publicar.</p>
+            <p>El inventario sube cuando confirmás cada recepción, no antes.</p>
           </div>
         </div>
         <ErpTable
@@ -848,11 +903,8 @@ export function PurchaseDetailPage() {
       <section className="panel">
         <div className="section-heading">
           <div>
-            <h2>Devoluciones a proveedor</h2>
-            <p>
-              Mercadería e importe financiero permanecen como operaciones
-              separadas.
-            </p>
+            <h2>Devoluciones al proveedor</h2>
+            <p>Si le devolvés mercadería al proveedor, se registra acá. El ajuste del dinero es aparte.</p>
           </div>
         </div>
         <ErpTable
@@ -870,8 +922,8 @@ export function PurchaseDetailPage() {
         title={action === "confirm" ? "Confirmar compra" : "Cancelar compra"}
         description={
           action === "confirm"
-            ? "La compra avanzará a CONFIRMED. Esta acción no modifica Inventario."
-            : "La compra se cancelará sin borrar su historial."
+            ? "La compra queda confirmada. Todavía no toca el inventario: eso pasa al recibir la mercadería."
+            : "La compra se cancela. Su historial se conserva."
         }
         dangerous={action === "cancel"}
         loading={lifecycle.isPending}
