@@ -58,6 +58,9 @@ export function SearchPage() {
     queryKey: queryKeys.search(params),
     queryFn: () => searchApi.products(params),
     enabled: hasCriteria,
+    // Same reasoning as Inventario: this is where someone checks stock
+    // before promising a customer a part, so keep it fresh on its own.
+    refetchInterval: 20_000,
   });
   const categories = useQuery({
     queryKey: queryKeys.productCategories,

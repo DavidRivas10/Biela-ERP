@@ -41,6 +41,10 @@ export function InventoryPage() {
   const list = useQuery({
     queryKey: queryKeys.inventory(params),
     queryFn: () => inventoryApi.balances(params),
+    // This is the screen where "¿tenemos esto?" gets answered while a
+    // customer waits — refresh it on a short interval so a sale confirmed
+    // from another terminal shows up here without anyone hitting reload.
+    refetchInterval: 20_000,
   });
   const hasActiveFilters = Boolean(
     filters.values.productId ||

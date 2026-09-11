@@ -47,7 +47,9 @@ confirmaron 3 decisiones:
    completos) — **no hizo falta ninguna migración**. Era un vacío de
    frontend. Ver detalle abajo. Commit `2.5-pasillo-estante-nivel`.
 4. ⬜ **2.3 — Recepción: reconocido/nuevo explícito + revisar wizard.**
-5. ⬜ **2.4 — Auditoría del descuento atómico de inventario al confirmar venta.**
+5. ✅ **2.4 — Auditoría del descuento atómico de inventario al confirmar
+   venta.** El backend YA es atómico (probado); el hallazgo real fue de
+   caché en el frontend. Ver detalle abajo. Commit `2.4-stock-al-dia`.
 6. ⬜ **Fase 1 — Pulido de identidad visual** sobre el sistema propio (no
    shadcn), aplicado a todas las pantallas.
 7. ⬜ **Fase 3 — Verificación final** (recorrido "perro guardián" + capturas +
@@ -179,3 +181,54 @@ terminar.
 
 Técnica: `tsc -b` OK · `eslint` OK · `vitest` 174/174 (+2 nuevos) ·
 `vite build` OK.
+
+## Detalle — 2.4 Auditoría: stock que se ve disponible pero ya se vendió
+
+**Auditoría del backend (sin tocar código, solo lectura):**
+- `SalesService.post()` corre dentro de `prisma.runSerializable(...)` (aislamiento
+  SERIALIZABLE): bloquea la venta, resuelve los productos/ubicaciones, crea un
+  movimiento `OUT` por línea, y solo entonces pasa la venta a POSTED con un
+  `updateMany` condicionado a `status: DRAFT` (compara-y-cambia, evita doble
+  confirmación por carrera). Si cualquier línea falla, **toda la transacción
+  se revierte** — nada queda a medias.
+- `InventoryService.applyOut()` decrementa con `updateMany({ where: { id,
+  quantity: { gte: cantidad } } })` — un compare-and-swap real a nivel de
+  fila, no solo el aislamiento de la transacción. Si no alcanza el stock,
+  lanza `ConflictException("Insufficient stock")`.
+- Ya existe un test e2e que prueba exactamente esto:
+  `sales.e2e-spec.ts` → **"rolls back every line when one Product has
+  insufficient stock"** — dos productos en una venta, uno sin stock
+  suficiente, confirma que **ninguno** de los dos se descuenta y la venta
+  queda DRAFT. Lo corrí de nuevo ahora mismo: **pasa.**
+- Guardar como DRAFT (`create`/`update`) no toca inventario en absoluto —
+  confirmado leyendo el código, no solo la descripción de la pantalla.
+- **Conclusión: el backend nunca deja un descuento a medias.** No hacía
+  falta ni se tocó ninguna lógica de negocio ahí.
+
+**El hallazgo real — caché del frontend entre pestañas/terminales:**
+`App.tsx` tenía `refetchOnWindowFocus: false` con `staleTime: 30_000`.
+React Query invalida la caché **solo en el navegador donde ocurrió la
+venta**. Si el mostrador tiene dos terminales (o el mismo vendedor con dos
+pestañas), la pantalla de Inventario o Búsqueda abierta en la OTRA terminal
+no se entera de que el stock cambió — ni al volver a esa pestaña (estaba
+apagado el refetch-on-focus), ni sola (no había sondeo). Ahí es donde
+"se ve disponible algo que ya se vendió" puede pasar de verdad, sin que el
+dato en la base esté mal.
+
+**Corrección (frontend, sin tocar el backend):**
+- `App.tsx`: `refetchOnWindowFocus: true` — al volver a mirar una pantalla,
+  se refresca si hace falta. Es el arreglo estándar y de menor riesgo para
+  esta clase de problema.
+- `InventoryPages.tsx` y `SearchPage.tsx` (las dos pantallas donde alguien
+  decide "sí hay" antes de prometerle algo a un cliente): `refetchInterval:
+  20_000` — se refrescan solas cada 20 s mientras están abiertas, sin
+  necesidad de que alguien cambie de pestaña. No se agregó sondeo al resto
+  de la app (catálogo, vehículos, roles, etc.) para no generar tráfico de
+  más donde no hace falta.
+
+**Archivos:** `src/app/App.tsx`, `src/inventory/InventoryPages.tsx`,
+`src/search/SearchPage.tsx`.
+
+Técnica: `tsc -b` OK · `eslint` OK · `vitest` 174/174 (sin tests nuevos —
+cambio de configuración, cubierto por la suite existente) · `vite build` OK ·
+e2e `sales.e2e-spec.ts` (rollback atómico) re-corrido y en verde.
