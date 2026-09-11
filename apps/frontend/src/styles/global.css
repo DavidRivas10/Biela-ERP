@@ -1552,6 +1552,40 @@ b {
 .mode-select__option small {
   color: var(--muted);
 }
+.account-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.account-tabs__tab {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 9rem;
+  border: 1px solid var(--line-strong);
+  border-bottom: 3px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 0.5rem 0.85rem;
+  color: var(--ink-strong);
+  text-decoration: none;
+}
+.account-tabs__tab:hover {
+  border-color: var(--primary);
+}
+.account-tabs__tab small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.account-tabs__tab--active {
+  border-bottom-color: var(--primary);
+  background: var(--petrol-050);
+}
+.account-tabs__tab--new {
+  color: var(--primary);
+  font-weight: 700;
+  justify-content: center;
+}
 .open-accounts__list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));

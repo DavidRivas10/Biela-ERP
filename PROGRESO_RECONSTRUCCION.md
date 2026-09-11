@@ -1,0 +1,100 @@
+# Progreso — Fase 14.2 (flujos de negocio reales + identidad visual)
+
+Este archivo es el registro vivo pedido en el prompt raíz de esta fase. Para el
+detalle de la reconstrucción de UX de los 12 módulos anteriores (ya completa y
+pusheada) ver **`docs/RECONSTRUCCION-UX.md`** — no se duplica acá.
+
+## Decisiones tomadas con el dueño (2026-09-10)
+
+Antes de escribir código se hizo Fase 0 (recorrido + inventario) y se
+confirmaron 3 decisiones:
+
+1. **Base visual: pulir el sistema propio actual — NO migrar a shadcn-admin.**
+   El frontend ya tiene identidad (petróleo/latón, IBM Plex, login temático,
+   165 tests atados a la estructura actual). Migrar a Tailwind+shadcn/ui+Radix
+   habría significado reescribir ~20 pantallas y ~165 tests días antes de la
+   presentación. Se descartó por riesgo/tiempo.
+2. **Prioridad: flujos de negocio nuevos primero, identidad visual después.**
+3. **Pasillo/Estante (2.5): migración Prisma aditiva `phase_14_...` + UI**, no
+   solo mock de frontend.
+
+## Hallazgos de Fase 0 (qué ya existía antes de este prompt)
+
+- `PosPage.tsx` ya separa "Punto de venta" (turno de caja, pendientes de
+  cobro, cuentas abiertas) de "Ventas" (listado administrativo). **Pero** la
+  edición de líneas de una venta (todos los modos, incluida "mostrador") vive
+  en `SaleEditor` dentro de `SalesPages.tsx`, y ahí Ubicación/Cantidad/Precio/
+  Descuento/Impuesto están **todos visibles por línea siempre** → 2.1 sigue
+  pendiente de verdad, no es solo una percepción vieja del dueño.
+- El backend **ya soporta** `GET /api/sales?status=DRAFT&hasAccountLabel=true`
+  (para listar cuentas abiertas) — no hace falta tocar el backend para 2.2.
+- `PurchaseChain.tsx` + `PurchaseInboxPage.tsx` ya dan la recepción como línea
+  de tiempo (2.3 parcialmente hecho) — falta confirmar el mensaje explícito
+  "producto reconocido / producto nuevo" en el escaneo de recepción.
+- El escáner de cámara (`BarcodeCameraModal.tsx`) ya quedó corregido y probado
+  en teléfono real la sesión pasada.
+
+## Plan de ejecución (orden acordado)
+
+1. ✅ **2.2 — Cuentas simultáneas por vehículo + autosave.** Hecho, verificado
+   en navegador (con datos reales sembrados y luego desactivados/cancelados,
+   no en la base final) y con tests nuevos. Ver detalle abajo. Commit
+   `2.2-cuentas-simultaneas`.
+2. ⬜ **2.1 — Venta rápida de mostrador: colapsar campos secundarios por línea.**
+3. ⬜ **2.5 — Pasillo → Estante → Nivel** (migración aditiva + endpoints + UI).
+4. ⬜ **2.3 — Recepción: reconocido/nuevo explícito + revisar wizard.**
+5. ⬜ **2.4 — Auditoría del descuento atómico de inventario al confirmar venta.**
+6. ⬜ **Fase 1 — Pulido de identidad visual** sobre el sistema propio (no
+   shadcn), aplicado a todas las pantallas.
+7. ⬜ **Fase 3 — Verificación final** (recorrido "perro guardián" + capturas +
+   cierre de este archivo).
+
+Reglas de datos que se respetan en todo momento: nada de borrado físico de
+historial real; cualquier cambio de esquema es aditivo y prefijado
+`phase_14_`; permisos siguen siendo por permiso, nunca por nombre de rol.
+
+## Detalle — 2.2 Cuentas simultáneas + autosave
+
+**Problema real (confirmado en el código, no solo dicho por el dueño):** para
+seguir sumando piezas a una cuenta abierta ya existente, el flujo era Detalle
+→ "Editar" → agregar → Guardar → vuelve a Detalle → "Editar" de nuevo. Para
+alternar entre dos vehículos en reparación había que volver a Punto de venta
+cada vez y no había ningún respaldo si el navegador se cerraba a mitad de
+carga de productos.
+
+**Cambios:**
+- `SaleEditor` ahora se remonta por `id`/modo (bug latente de antes: sin
+  `key`, cambiar de `:id` en la misma ruta no reseteaba el estado local —
+  React Router no remonta el componente solo porque cambie el param).
+- Guardar una **cuenta** existente ya no navega al detalle: se queda en el
+  formulario de edición (para seguir sumando piezas o saltar a otra cuenta).
+  Crear una cuenta nueva navega a su edición (no al detalle). Mostrador y
+  cliente registrado se comportan igual que antes (van al detalle, para
+  cobrar).
+- Nueva franja de pestañas de **cuentas abiertas** dentro del formulario
+  cuando el modo es "cuenta": lista las demás cuentas DRAFT con etiqueta,
+  resaltando la actual, con una pestaña "+ Nueva cuenta". Un clic alterna sin
+  salir de la pantalla de venta.
+- `PosPage`: el enlace "Abrir" de cada cuenta abierta ahora va directo a
+  edición (antes iba al detalle de solo lectura).
+- **Autosave a `localStorage`**, debounced (~600 ms), de todo el formulario
+  mientras se edita (clave por `id` si es una cuenta existente; una clave fija
+  para una cuenta nueva sin guardar todavía). Al detectar un borrador guardado
+  al montar, se ofrece restaurar o descartar con un aviso simple (no bloquea
+  la pantalla). Se borra el borrador local al guardar con éxito.
+
+**Archivos:** `src/sales/SalesPages.tsx`, `src/pos/PosPage.tsx`,
+`src/hooks/use-draft-autosave.ts` (nuevo), `src/components/OpenAccountsBar.tsx`
+(nuevo), `src/sales/SaleEditor.test.tsx` (nuevo, 4 tests), CSS en `global.css`.
+
+**Verificado en navegador (perro guardián):** sembré 2 cuentas reales por API
+(Corolla azul – Juan / Sentra gris – María, mismo producto/ubicación) →
+Punto de venta las muestra → "Seguir cargando" entra directo a edición → la
+franja de pestañas muestra ambas, resaltando la activa → cambiar de pestaña
+carga la otra cuenta sin arrastrar el estado de la anterior (el bug latente de
+`SaleEditor` sin `key` ya no existe) → "Guardar cuenta" se queda en edición →
+recargar la página con cambios sin guardar muestra el aviso de recuperación →
+"Restaurar" repuebla el formulario. Datos de prueba cancelados/desactivados al
+terminar (no quedan en la base para el demo real).
+Técnica: `tsc -b` OK · `eslint` OK · `vitest` 169/169 (169 = 165 + 4 nuevos) ·
+`vite build` OK.

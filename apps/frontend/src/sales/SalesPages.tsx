@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { salesApi, type SaleInput } from "../api/sales-api";
 import { useAuth } from "../auth/AuthContext";
+import { Alert } from "../components/Alert";
 import { BarcodeScanButton } from "../components/BarcodeScanButton";
 import { Button } from "../components/Button";
 import { CommercialStatusBadge } from "../components/CommercialStatusBadge";
@@ -17,9 +18,11 @@ import { ErpTable, type ErpColumn } from "../components/ErpTable";
 import { LocationSelector, ProductSelector } from "../components/EntitySelectors";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
+import { OpenAccountsBar } from "../components/OpenAccountsBar";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { CustomerSelector } from "../components/SalesSelectors";
+import { clearDraft, readDraft, useAutosaveDraft } from "../hooks/use-draft-autosave";
 import { useKeyboardWedge } from "../hooks/use-keyboard-wedge";
 import { useScanToProduct } from "../hooks/use-scan-to-product";
 import { useUrlFilters } from "../hooks/use-url-filters";
@@ -371,6 +374,17 @@ const newLine = (key: number): Line => ({
   taxAmount: "0.00",
 });
 
+/** Everything the form autosaves locally so a crash mid-scan isn't a loss. */
+interface SaleDraftData {
+  mode: SaleMode;
+  customerId: string;
+  accountLabel: string;
+  documentDate: string;
+  paymentDueDate: string;
+  notes: string;
+  lines: Line[];
+}
+
 export function SaleFormPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -387,6 +401,11 @@ export function SaleFormPage() {
     return <FormFeedback error="Solo las ventas DRAFT pueden editarse." />;
   return (
     <SaleEditor
+      // Force a full remount on navigation between sales (e.g. switching
+      // open-account tabs): React Router reuses this component instance
+      // across `:id` changes on the same route, so without a key the local
+      // form state from the previous sale would stick around.
+      key={`${id ?? "new"}:${searchParams.get("mode") ?? ""}:${searchParams.get("customerId") ?? ""}`}
       id={id}
       initial={detail.data}
       requestedMode={searchParams.get("mode") === "cuenta" ? "cuenta" : undefined}
@@ -445,13 +464,50 @@ function SaleEditor({
       .map((line) => `${line.productId}:${line.sourceLocationId}`);
     return new Set(keys).size !== keys.length;
   }, [lines]);
+
+  // Local recovery net: while this sale is being edited, keep saving it to
+  // this browser so a crash or an accidentally closed tab doesn't lose a
+  // half-scanned account. Not a sync mechanism — just a safety net.
+  const draftKey = `sale-draft:${id ? `edit:${id}` : "new"}`;
+  const [restorableDraft] = useState(() => readDraft<SaleDraftData>(draftKey));
+  const [draftResolved, setDraftResolved] = useState(!restorableDraft);
+  function restoreDraft() {
+    if (!restorableDraft) return;
+    const d = restorableDraft.data;
+    setMode(d.mode);
+    setCustomerId(d.customerId);
+    setAccountLabel(d.accountLabel);
+    setDocumentDate(d.documentDate);
+    setPaymentDueDate(d.paymentDueDate);
+    setNotes(d.notes);
+    setLines(d.lines);
+    setDraftResolved(true);
+  }
+  function discardDraft() {
+    clearDraft(draftKey);
+    setDraftResolved(true);
+  }
+  const cancelAutosave = useAutosaveDraft(
+    draftKey,
+    { mode, customerId, accountLabel, documentDate, paymentDueDate, notes, lines },
+    draftResolved,
+  );
+
   const mutation = useMutation({
     mutationFn: (body: SaleInput) =>
       id ? salesApi.update(id, body) : salesApi.create(body),
     onSuccess: async (sale) => {
       client.setQueryData(queryKeys.sale(sale.id), sale);
       await client.invalidateQueries({ queryKey: queryKeys.salesRoot });
-      void navigate(`/app/sales/${sale.id}`, { replace: true });
+      cancelAutosave();
+      clearDraft(draftKey);
+      // Mostrador/cliente: off to the detail page to collect payment. Cuenta:
+      // stay in the editor — the vendor is very likely about to keep adding
+      // pieces to this vehicle, or hop to another open account's tab.
+      void navigate(
+        mode === "cuenta" ? `/app/sales/${sale.id}/edit` : `/app/sales/${sale.id}`,
+        { replace: true },
+      );
     },
   });
   const updateLine = (key: number, changes: Partial<Line>) =>
@@ -530,6 +586,23 @@ function SaleEditor({
         title={modeTitle}
         description="Al guardar queda como borrador y todavía no toca el inventario. El inventario se descuenta cuando confirmás la venta."
       />
+      {mode === "cuenta" ? <OpenAccountsBar activeSaleId={id} /> : null}
+      {!draftResolved && restorableDraft ? (
+        <Alert tone="warning" title="Hay cambios sin guardar de antes">
+          <p>
+            Parece que se cerró la pestaña o hubo un corte antes de guardar.
+            Podés seguir con lo que tenías o descartarlo.
+          </p>
+          <div className="dialog-actions">
+            <Button type="button" variant="secondary" onClick={discardDraft}>
+              Descartar
+            </Button>
+            <Button type="button" onClick={restoreDraft}>
+              Restaurar
+            </Button>
+          </div>
+        </Alert>
+      ) : null}
       <form className="panel erp-form" onSubmit={submit}>
         <FormFeedback
           error={formError ?? (mutation.error ? apiErrorMessage(mutation.error) : null)}

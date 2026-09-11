@@ -427,9 +427,9 @@ export function PosPage() {
                   </div>
                   <Link
                     className="button button--secondary"
-                    to={`/app/sales/${sale.id}`}
+                    to={`/app/sales/${sale.id}/edit`}
                   >
-                    Abrir
+                    Seguir cargando
                   </Link>
                 </li>
               ))}
