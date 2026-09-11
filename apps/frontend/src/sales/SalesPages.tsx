@@ -364,15 +364,32 @@ type Line = {
   discountAmount: string;
   taxAmount: string;
 };
-const newLine = (key: number): Line => ({
+const newLine = (key: number, sourceLocationId = ""): Line => ({
   key,
   productId: "",
-  sourceLocationId: "",
+  sourceLocationId,
   quantity: "1",
   unitPrice: "",
   discountAmount: "0.00",
   taxAmount: "0.00",
 });
+
+/**
+ * Most sales pull every line from the same shelf. Default a new line to
+ * whichever location the last one used, so "Ubicación origen" is rarely
+ * something the vendor has to touch while scanning.
+ */
+function lastUsedLocation(lines: Line[]): string {
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (lines[i].sourceLocationId) return lines[i].sourceLocationId;
+  }
+  return "";
+}
+
+function hasMoneyAdjustment(line: Line): boolean {
+  const isZero = (value: string) => !value || Number(value) === 0;
+  return !isZero(line.discountAmount) || !isZero(line.taxAmount);
+}
 
 /** Everything the form autosaves locally so a crash mid-scan isn't a loss. */
 interface SaleDraftData {
@@ -528,7 +545,11 @@ function SaleEditor({
       const nextKey = Math.max(...current.map((line) => line.key)) + 1;
       return [
         ...current,
-        { ...newLine(nextKey), productId: product.id, unitPrice: price },
+        {
+          ...newLine(nextKey, lastUsedLocation(current)),
+          productId: product.id,
+          unitPrice: price,
+        },
       ];
     });
   }, []);
@@ -799,44 +820,53 @@ function SaleEditor({
                   }
                 />
               </Field>
-              <Field
-                label="Precio unitario"
-                htmlFor={`sale-price-${line.key}`}
-                required
-              >
-                <input
-                  id={`sale-price-${line.key}`}
-                  required
-                  inputMode="decimal"
-                  pattern="\d+(\.\d{1,4})?"
-                  value={line.unitPrice}
-                  onChange={(e) =>
-                    updateLine(line.key, { unitPrice: e.target.value })
-                  }
-                />
-              </Field>
-              <Field label="Descuento" htmlFor={`sale-discount-${line.key}`}>
-                <input
-                  id={`sale-discount-${line.key}`}
-                  inputMode="decimal"
-                  pattern="\d+(\.\d{1,2})?"
-                  value={line.discountAmount}
-                  onChange={(e) =>
-                    updateLine(line.key, { discountAmount: e.target.value })
-                  }
-                />
-              </Field>
-              <Field label="Impuesto" htmlFor={`sale-tax-${line.key}`}>
-                <input
-                  id={`sale-tax-${line.key}`}
-                  inputMode="decimal"
-                  pattern="\d+(\.\d{1,2})?"
-                  value={line.taxAmount}
-                  onChange={(e) =>
-                    updateLine(line.key, { taxAmount: e.target.value })
-                  }
-                />
-              </Field>
+              <details className="line-price" open={!line.unitPrice}>
+                <summary>
+                  Precio unitario
+                  <strong>
+                    {line.unitPrice ? formatMoney(line.unitPrice) : "Elegí uno"}
+                  </strong>
+                </summary>
+                <Field label="Precio unitario" htmlFor={`sale-price-${line.key}`} required>
+                  <input
+                    id={`sale-price-${line.key}`}
+                    required
+                    inputMode="decimal"
+                    pattern="\d+(\.\d{1,4})?"
+                    value={line.unitPrice}
+                    onChange={(e) =>
+                      updateLine(line.key, { unitPrice: e.target.value })
+                    }
+                  />
+                </Field>
+              </details>
+              <details className="line-more" open={hasMoneyAdjustment(line)}>
+                <summary>Descuento / impuesto</summary>
+                <div className="line-more__fields">
+                  <Field label="Descuento" htmlFor={`sale-discount-${line.key}`}>
+                    <input
+                      id={`sale-discount-${line.key}`}
+                      inputMode="decimal"
+                      pattern="\d+(\.\d{1,2})?"
+                      value={line.discountAmount}
+                      onChange={(e) =>
+                        updateLine(line.key, { discountAmount: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Impuesto" htmlFor={`sale-tax-${line.key}`}>
+                    <input
+                      id={`sale-tax-${line.key}`}
+                      inputMode="decimal"
+                      pattern="\d+(\.\d{1,2})?"
+                      value={line.taxAmount}
+                      onChange={(e) =>
+                        updateLine(line.key, { taxAmount: e.target.value })
+                      }
+                    />
+                  </Field>
+                </div>
+              </details>
               {lines.length > 1 && (
                 <Button
                   type="button"
@@ -858,7 +888,10 @@ function SaleEditor({
             onClick={() =>
               setLines((current) => [
                 ...current,
-                newLine(Math.max(...current.map((line) => line.key)) + 1),
+                newLine(
+                  Math.max(...current.map((line) => line.key)) + 1,
+                  lastUsedLocation(current),
+                ),
               ])
             }
           >

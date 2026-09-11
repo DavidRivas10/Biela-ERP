@@ -40,7 +40,8 @@ confirmaron 3 decisiones:
    en navegador (con datos reales sembrados y luego desactivados/cancelados,
    no en la base final) y con tests nuevos. Ver detalle abajo. Commit
    `2.2-cuentas-simultaneas`.
-2. ⬜ **2.1 — Venta rápida de mostrador: colapsar campos secundarios por línea.**
+2. ✅ **2.1 — Venta rápida de mostrador: colapsar campos secundarios por línea.**
+   Ver detalle abajo. Commit `2.1-linea-colapsada`.
 3. ⬜ **2.5 — Pasillo → Estante → Nivel** (migración aditiva + endpoints + UI).
 4. ⬜ **2.3 — Recepción: reconocido/nuevo explícito + revisar wizard.**
 5. ⬜ **2.4 — Auditoría del descuento atómico de inventario al confirmar venta.**
@@ -98,3 +99,40 @@ recargar la página con cambios sin guardar muestra el aviso de recuperación �
 terminar (no quedan en la base para el demo real).
 Técnica: `tsc -b` OK · `eslint` OK · `vitest` 169/169 (169 = 165 + 4 nuevos) ·
 `vite build` OK.
+
+## Detalle — 2.1 Venta rápida: campos secundarios de línea colapsados
+
+**Problema real (confirmado en el código):** `SaleEditor` es el mismo
+formulario para mostrador/cliente/cuenta, y cada línea de producto mostraba
+siempre editables Ubicación origen, Cantidad, Precio unitario, Descuento e
+Impuesto — inviable para un vendedor escaneando rápido en el mostrador.
+
+**Cambios (en `SalesPages.tsx`, todas las modalidades de venta):**
+- **Ubicación origen**: una línea nueva hereda automáticamente la ubicación de
+  la última línea usada (`lastUsedLocation`), tanto al escanear un producto
+  como al presionar "Agregar producto". La mayoría de las ventas sale de la
+  misma ubicación/estante, así que rara vez hay que tocarlo — sigue siendo
+  editable si hace falta.
+- **Precio unitario**: pasa a un `<details>` compacto que muestra el precio ya
+  elegido (`L 85.00`) y se abre solo si hace falta decidir uno (`elegí uno`)
+  o si el usuario quiere cambiarlo. Se cierra solo apenas el producto trae un
+  precio sugerido.
+- **Descuento / Impuesto**: colapsados detrás de un `<details>` "Descuento /
+  impuesto", cerrado por defecto en una línea nueva. Si la línea ya trae un
+  descuento o impuesto distinto de cero (editando una venta existente), se
+  abre solo — nunca esconde un ajuste de dinero que ya existía.
+- Nada de esto cambia lo que se envía al backend ni las reglas de validación;
+  es solo qué tan visible/editable es cada campo por defecto.
+
+**Archivos:** `src/sales/SalesPages.tsx` (`newLine`, `lastUsedLocation`,
+`hasMoneyAdjustment`, JSX de la línea), CSS `.line-price`/`.line-more` en
+`global.css`. Tests nuevos en `SaleEditor.test.tsx` (3): cierre automático del
+precio al llegar el sugerido y descuento/impuesto colapsado en una línea
+nueva; una línea nueva hereda la ubicación de la anterior; una línea existente
+con descuento no lo esconde.
+
+Técnica: `tsc -b` OK · `eslint` OK · `vitest` 172/172 (+3 nuevos) ·
+`vite build` OK. (La verificación interactiva en Chrome real, vía inyección
+de eventos de bajo nivel en el DOM, resultó poco confiable para un `<select>`
+controlado por React — se cambió a los tests de arriba, que ejercitan la
+misma ruta que un usuario real mediante `@testing-library/user-event`.)

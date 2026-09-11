@@ -1297,6 +1297,46 @@ b {
   border-bottom: 1px solid var(--line);
   padding-bottom: 1rem;
 }
+/* Sale line: price/discount/tax stay out of the way until touched, so a
+   vendor scanning products for a walk-in sale sees just product + quantity. */
+.line-price,
+.line-more {
+  font-size: 0.85rem;
+}
+.line-price summary,
+.line-more summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 600;
+  list-style: none;
+}
+.line-price summary::-webkit-details-marker,
+.line-more summary::-webkit-details-marker {
+  display: none;
+}
+.line-price summary strong {
+  color: var(--ink-strong);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+}
+.line-price[open] summary strong,
+.line-more[open] summary {
+  color: var(--primary);
+}
+.line-price .field,
+.line-more .field {
+  margin-top: 0.4rem;
+}
+.line-more__fields {
+  display: flex;
+  gap: 0.6rem;
+}
+.line-more__fields .field {
+  flex: 1;
+}
 .return-line {
   display: grid;
   grid-template-columns: minmax(13rem, 1fr) minmax(15rem, 2fr) minmax(8rem, 1fr);
