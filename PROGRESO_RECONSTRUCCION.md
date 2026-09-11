@@ -42,7 +42,10 @@ confirmaron 3 decisiones:
    `2.2-cuentas-simultaneas`.
 2. ✅ **2.1 — Venta rápida de mostrador: colapsar campos secundarios por línea.**
    Ver detalle abajo. Commit `2.1-linea-colapsada`.
-3. ⬜ **2.5 — Pasillo → Estante → Nivel** (migración aditiva + endpoints + UI).
+3. ✅ **2.5 — Pasillo → Estante → Nivel.** Hallazgo clave: el backend YA
+   soportaba esto desde la Fase 3 (`Location.aisle/rack/shelf/bin`, DTOs
+   completos) — **no hizo falta ninguna migración**. Era un vacío de
+   frontend. Ver detalle abajo. Commit `2.5-pasillo-estante-nivel`.
 4. ⬜ **2.3 — Recepción: reconocido/nuevo explícito + revisar wizard.**
 5. ⬜ **2.4 — Auditoría del descuento atómico de inventario al confirmar venta.**
 6. ⬜ **Fase 1 — Pulido de identidad visual** sobre el sistema propio (no
@@ -136,3 +139,43 @@ Técnica: `tsc -b` OK · `eslint` OK · `vitest` 172/172 (+3 nuevos) ·
 de eventos de bajo nivel en el DOM, resultó poco confiable para un `<select>`
 controlado por React — se cambió a los tests de arriba, que ejercitan la
 misma ruta que un usuario real mediante `@testing-library/user-event`.)
+
+## Detalle — 2.5 Pasillo → Estante → Nivel
+
+**Hallazgo antes de escribir nada:** el modelo `Location` de Prisma ya tiene
+`zone/aisle/rack/shelf/bin` desde la Fase 3, y `CreateLocationDto`/
+`UpdateLocationDto` ya los validan y exponen — confirmado leyendo
+`schema.prisma` y el DTO, no solo la respuesta HTTP. **No hizo falta ninguna
+migración.** El vacío real estaba en el frontend: `LocationsPage.tsx` ya
+mostraba Pasillo/Estante en el form y la lista (de un módulo anterior), pero
+esa etiqueta física no aparecía en ningún otro lado — ni al elegir una
+ubicación en una venta/compra, ni en el listado de Inventario, que es
+justamente donde más importa para encontrar la pieza físicamente.
+
+**Cambios:**
+- `utils/formatters.ts`: nuevo `locationPhysicalHint(location)` → "Pasillo de
+  filtros · Estante 2 · Nivel 3" (o `null` si no hay nada cargado). Un solo
+  lugar para el formato, reusado en los tres puntos de abajo.
+- `LocationsPage.tsx`: se agrega el campo **"Nivel / posición (opcional)"**
+  (mapeado a `bin`) al formulario, completando el tercer nivel que pedía el
+  dueño; la columna de lista pasa a usar el helper (incluye el nivel).
+- `EntitySelectors.tsx` (`LocationSelector`, usado en Ventas/Compras/
+  Transferencias): cada opción y la línea "Elegida" ahora muestran el pasillo/
+  estante/nivel junto al código y nombre.
+- `InventoryPages.tsx`: la columna "Ubicación" del listado de Inventario
+  ahora incluye la pista física — es la pantalla donde de verdad hace falta
+  para no tener que buscar a ciegas.
+- Sin tocar `schema.prisma`, sin migraciones, sin cambios de backend.
+
+**Archivos:** `src/utils/formatters.ts` (+test), `src/inventory/LocationsPage.tsx`,
+`src/components/EntitySelectors.tsx`, `src/inventory/InventoryPages.tsx`.
+
+**Verificado en navegador:** creé una ubicación real (MOS-02 · Mostrador
+trasero · Pasillo de filtros · Estante 2 · Nivel 3) desde el formulario →
+aparece en la lista de Ubicaciones con los tres niveles → al elegir ubicación
+en "Nueva venta" la opción del selector ya trae "MOS-02 · Mostrador trasero —
+Pasillo de filtros · Estante 2 · Nivel 3". Ubicación de prueba desactivada al
+terminar.
+
+Técnica: `tsc -b` OK · `eslint` OK · `vitest` 174/174 (+2 nuevos) ·
+`vite build` OK.

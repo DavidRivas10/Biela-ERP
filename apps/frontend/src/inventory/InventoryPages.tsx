@@ -27,7 +27,7 @@ import type {
   Product,
 } from "../types/erp";
 import { apiErrorMessage } from "../utils/api-error";
-import { formatDateTime } from "../utils/formatters";
+import { formatDateTime, locationPhysicalHint } from "../utils/formatters";
 
 export function InventoryPage() {
   const filters = useUrlFilters();
@@ -64,12 +64,16 @@ export function InventoryPage() {
     {
       key: "location",
       header: "Ubicación",
-      cell: (row) => (
-        <>
-          <strong>{row.location.code}</strong>
-          <small>{row.location.name}</small>
-        </>
-      ),
+      cell: (row) => {
+        const hint = locationPhysicalHint(row.location);
+        return (
+          <>
+            <strong>{row.location.code}</strong>
+            <small>{row.location.name}</small>
+            {hint ? <small className="muted">{hint}</small> : null}
+          </>
+        );
+      },
     },
     {
       key: "quantity",

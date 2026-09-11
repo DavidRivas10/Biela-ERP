@@ -6,6 +6,7 @@ import { vehiclesApi } from "../api/vehicles-api";
 import { useDebouncedValue } from "../hooks/use-debounced-value";
 import { queryKeys } from "../query/query-keys";
 import type { Location, PaginationMeta, Product, Vehicle } from "../types/erp";
+import { locationPhysicalHint } from "../utils/formatters";
 import { Field } from "./Field";
 import { Pagination } from "./Pagination";
 
@@ -267,16 +268,21 @@ export function LocationSelector({
           }}
         >
           <option value="">{emptyLabel}</option>
-          {rows.map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.code} · {row.name}
-            </option>
-          ))}
+          {rows.map((row) => {
+            const hint = locationPhysicalHint(row);
+            return (
+              <option key={row.id} value={row.id}>
+                {row.code} · {row.name}
+                {hint ? ` — ${hint}` : ""}
+              </option>
+            );
+          })}
         </select>
       </Field>
       {chosen ? (
         <p className="entity-selector__chosen">
           Elegida: <strong>{chosen.code}</strong> · {chosen.name}
+          {locationPhysicalHint(chosen) ? ` — ${locationPhysicalHint(chosen)}` : ""}
         </p>
       ) : null}
       <SelectorPagination

@@ -34,6 +34,22 @@ export function pluralize(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+/**
+ * "Pasillo de filtros · Estante 2 · Nivel 3" from a Location's physical
+ * fields — wherever a location is shown, so finding the part on the shelf
+ * doesn't need a separate lookup. `null` when none of it was filled in.
+ */
+export function locationPhysicalHint(location: {
+  aisle?: string | null;
+  shelf?: string | null;
+  bin?: string | null;
+}): string | null {
+  const parts = [location.aisle, location.shelf, location.bin].filter(
+    (part): part is string => Boolean(part && part.trim()),
+  );
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 export function formatMoney(value: string): string {
   const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(value);
   if (!match) return value;

@@ -7,6 +7,8 @@ import {
   formatPaymentMethodKind,
   formatPaymentType,
   isPositiveMoneyAtMost,
+  locationPhysicalHint,
+  pluralize,
 } from "./formatters";
 
 describe("display formatters", () => {
@@ -37,5 +39,24 @@ describe("display formatters", () => {
     expect(formatPaymentMethodKind("BANK_TRANSFER")).toBe(
       "Transferencia bancaria",
     );
+  });
+
+  it("pluralizes a count without repeating ugly ternaries", () => {
+    expect(pluralize(1, "venta atrasada", "ventas atrasadas")).toBe(
+      "1 venta atrasada",
+    );
+    expect(pluralize(0, "venta atrasada", "ventas atrasadas")).toBe(
+      "0 ventas atrasadas",
+    );
+    expect(pluralize(5, "día", "días")).toBe("5 días");
+  });
+
+  it("builds a pasillo/estante/nivel hint from whatever a location has set", () => {
+    expect(
+      locationPhysicalHint({ aisle: "Filtros", shelf: "2", bin: "B" }),
+    ).toBe("Filtros · 2 · B");
+    expect(locationPhysicalHint({ aisle: "Filtros" })).toBe("Filtros");
+    expect(locationPhysicalHint({ aisle: "  ", shelf: null })).toBeNull();
+    expect(locationPhysicalHint({})).toBeNull();
   });
 });

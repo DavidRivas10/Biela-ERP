@@ -17,6 +17,7 @@ import { queryKeys } from "../query/query-keys";
 import { invalidateLocationReferenceIntegration } from "../query/invalidation";
 import type { Location } from "../types/erp";
 import { apiErrorMessage } from "../utils/api-error";
+import { locationPhysicalHint } from "../utils/formatters";
 
 type LocationEditor = LocationInput & { id?: string };
 const emptyLocation: LocationEditor = {
@@ -91,11 +92,8 @@ export function LocationsPage() {
     { key: "name", header: "Nombre", cell: (row) => row.name },
     {
       key: "physical",
-      header: "Pasillo / estante",
-      cell: (row) =>
-        [row.aisle, row.shelf].filter(Boolean).join(" · ") ||
-        [row.zone, row.rack, row.bin].filter(Boolean).join(" · ") ||
-        "—",
+      header: "Pasillo / estante / nivel",
+      cell: (row) => locationPhysicalHint(row) ?? "—",
     },
     {
       key: "products",
@@ -275,6 +273,18 @@ export function LocationsPage() {
                 onChange={(e) =>
                   setEditor({ ...editor, shelf: e.target.value })
                 }
+              />
+            </Field>
+            <Field
+              label="Nivel / posición (opcional)"
+              htmlFor="location-bin"
+              hint="Si el estante tiene niveles o casilleros, cuál es. Ej.: «Nivel 2», «Casillero B»."
+            >
+              <input
+                id="location-bin"
+                maxLength={40}
+                value={editor.bin}
+                onChange={(e) => setEditor({ ...editor, bin: e.target.value })}
               />
             </Field>
             <Field label="Descripción" htmlFor="location-description">
