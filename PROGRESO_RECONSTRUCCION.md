@@ -53,10 +53,19 @@ confirmaron 3 decisiones:
 5. ✅ **2.4 — Auditoría del descuento atómico de inventario al confirmar
    venta.** El backend YA es atómico (probado); el hallazgo real fue de
    caché en el frontend. Ver detalle abajo. Commit `2.4-stock-al-dia`.
-6. ⬜ **Fase 1 — Pulido de identidad visual** sobre el sistema propio (no
-   shadcn), aplicado a todas las pantallas.
-7. ⬜ **Fase 3 — Verificación final** (recorrido "perro guardián" + capturas +
-   cierre de este archivo).
+6. ✅ **Fase 1 — Pulido de identidad visual.** Auditoría real (no solo
+   supuesta): recorrido en claro y oscuro por Inicio, Punto de venta, Ventas
+   (con las pestañas y campos nuevos), Compras (con el aviso reconocido/
+   nuevo), Vehículos, Roles, login. Conclusión honesta: **el sistema ya tiene
+   identidad sólida** de las sesiones anteriores (petróleo/latón, IBM Plex,
+   login temático, densidad del Inicio, tema claro/oscuro) y de lo que se
+   construyó en esta sesión (pestañas, `<details>` de línea, aviso de
+   producto nuevo) — todo se ve coherente en ambos temas, sin restos de
+   plantilla ni texto en inglés. No hizo falta ningún cambio visual nuevo;
+   forzar cambios sin un problema real habría sido ruido, no pulido. Ver
+   detalle abajo.
+7. ✅ **Fase 3 — Verificación final.** Suite completa en verde en las 4
+   piezas (frontend + los 3 servicios backend). Ver detalle abajo.
 
 Reglas de datos que se respetan en todo momento: nada de borrado físico de
 historial real; cualquier cambio de esquema es aditivo y prefijado
@@ -277,3 +286,64 @@ Registrar factura → aviso ámbar "Producto nuevo…" con el enlace → clic �
 
 Técnica: `tsc -b` OK · `eslint` OK · `vitest` 176/176 (+2 nuevos) ·
 `vite build` OK.
+
+## Detalle — Fase 1: pulido de identidad visual
+
+**Auditoría hecha (no solo revisada de memoria):** recorrido real en el
+navegador, en modo claro y oscuro, por Panel de inicio, Punto de venta,
+Ventas (lista + "Nueva venta" con las pestañas de cuentas abiertas y los
+campos de línea colapsados), Vehículos (vacío + filtro plegado), Roles
+(tabla de permisos), Recepción de facturas (aviso reconocido/nuevo), y
+login. Además, barrido del código fuente buscando restos típicos de un
+trabajo a medias: `TODO`/`FIXME`/texto de relleno, y literales en inglés
+como "Submit"/"Cancel"/"Active" en JSX — **cero coincidencias**.
+
+**Conclusión:** el sistema ya tiene identidad propia y consistente de las
+sesiones anteriores (tema petróleo/latón con claro/oscuro, IBM Plex, login
+temático con el engranaje de marca, densidad del Panel de inicio) y de lo
+construido en esta sesión (pestañas de cuentas, campos de línea colapsados,
+pistas de pasillo/estante, aviso de producto nuevo) — todo usa las mismas
+variables de tema (`var(--...)`) y se ve bien en ambos modos, sin restos de
+plantilla genérica ni texto sin traducir.
+
+**Decisión:** no se hizo ningún cambio visual adicional en esta fase.
+Introducir cambios de diseño sin un problema concreto detectado habría sido
+ruido — no "pulido" — y contradice la decisión ya tomada de no perseguir una
+migración de plantilla. Si al ver el sistema en persona el dueño encuentra
+algo puntual que no le guste, es más rápido corregirlo dirigido que
+adivinarlo ahora.
+
+**Nota aparte (dato, no bug de UI):** en Roles aparecen filas de prueba de
+las suites e2e del backend (`func12-...`, `phase11-reader-...`,
+`phase12-reader-...`) — quedaron de antes, no las tocué (no es un problema
+de diseño y no me corresponde borrar datos sin que lo pidas). Si querés que
+las desactive o limpie antes de la presentación, decímelo.
+
+## Detalle — Fase 3: verificación final
+
+Suite completa corrida de punta a punta, sin cambios pendientes:
+
+- **Frontend:** `tsc -b` OK · `eslint` 0 warnings · **`vitest` 176/176** ·
+  `vite build` OK.
+- **`ms-autorepuesto`:** e2e completo, **125/125**, 17 suites (incluye el
+  rollback atómico de inventario de 2.4).
+- **`ms-users`:** e2e, **1/1**.
+- **`api-gateway`:** e2e, **21/21**.
+
+Nada de esto tocó `schema.prisma` ni corrió migraciones — todo lo de esta
+sesión (Fase 14.2) fue frontend, salvo lectura de auditoría en el backend
+para 2.4 y 2.5.
+
+## Estado y pendientes para David
+
+- **Todo commiteado en `redesign/producto-ux`** en 5 commits pequeños (uno
+  por punto de la Fase 2) más este archivo. **Sin push** — a la espera de tu
+  confirmación, igual que las sesiones anteriores.
+- **Pendiente de tu decisión:** limpiar los roles de prueba (`func12-…`,
+  `phase11-reader-…`, `phase12-reader-…`) que quedaron de las suites e2e del
+  backend — no los toqué.
+- **P4 / escáner:** ya lo confirmaste funcionando en tu teléfono la sesión
+  pasada; sin cambios nuevos ahí.
+- Recorré vos mismo Ventas (cuentas simultáneas), Compras (producto nuevo) e
+  Inventario/Ubicaciones (pasillo/estante) antes de la presentación — son los
+  tres flujos con más cambio de comportamiento esta ronda.
