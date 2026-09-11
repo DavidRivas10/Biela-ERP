@@ -219,6 +219,57 @@ describe("Frontend Phase 10.C purchasing screens", () => {
     );
   });
 
+  it("tells a new part apart from a recognized one when scanning to build a Purchase", async () => {
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = new URL(
+        input instanceof Request ? input.url : input.toString(),
+      );
+      if (url.pathname === "/api/suppliers")
+        return Promise.resolve(
+          jsonResponse({ data: [supplier], meta: emptyMeta }),
+        );
+      if (url.pathname === "/api/products") {
+        const search = url.searchParams.get("search");
+        const data = search === "PROD-001" ? [product("product-1", "PROD-001")] : [];
+        return Promise.resolve(jsonResponse({ data, meta: emptyMeta }));
+      }
+      return Promise.resolve(jsonResponse({}));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage(
+      "/app/purchasing/purchases/new",
+      "/app/purchasing/purchases/new",
+      <PurchaseFormPage />,
+    );
+
+    const scanButton = await screen.findByRole("button", {
+      name: /Escanear producto/,
+    });
+    scanButton.click();
+    const manualInput = await screen.findByLabelText(
+      /Escribe el código del producto/i,
+    );
+    fireEvent.change(manualInput, { target: { value: "PROD-001" } });
+    fireEvent.click(screen.getByRole("button", { name: "Usar código" }));
+    expect(await screen.findByText(/Reconocido: PROD-001/)).toBeVisible();
+
+    scanButton.click();
+    const secondManualInput = await screen.findByLabelText(
+      /Escribe el código del producto/i,
+    );
+    fireEvent.change(secondManualInput, { target: { value: "NEW-999" } });
+    fireEvent.click(screen.getByRole("button", { name: "Usar código" }));
+    expect(
+      await screen.findByText(/Producto nuevo: «NEW-999»/),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: /Registrar producto nuevo/ }),
+    ).toHaveAttribute(
+      "href",
+      "/app/catalog/products/new?code=NEW-999",
+    );
+  });
+
   it("shows exact server totals, status and a confirmed lifecycle dialog", async () => {
     auth = {
       ...auth,

@@ -346,8 +346,10 @@ function PurchaseFormEditor({
       return [...current, { ...newLine(nextKey), productId: product.id }];
     });
   }, []);
-  const { handleScan, feedback: scanFeedback } =
-    useScanToProduct(addScannedProduct);
+  const { handleScan, feedback: scanFeedback } = useScanToProduct(
+    addScannedProduct,
+    { allowNew: true },
+  );
   useKeyboardWedge(handleScan);
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -454,6 +456,15 @@ function PurchaseFormEditor({
                 className={`scan-row__feedback scan-row__feedback--${scanFeedback.tone}`}
               >
                 {scanFeedback.text}
+                {scanFeedback.tone === "new" ? (
+                  <Link
+                    className="table-link"
+                    to={`/app/catalog/products/new?code=${encodeURIComponent(scanFeedback.code ?? "")}`}
+                  >
+                    {" "}
+                    Registrar producto nuevo →
+                  </Link>
+                ) : null}
               </span>
             ) : null}
           </div>

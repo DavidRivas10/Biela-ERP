@@ -46,7 +46,10 @@ confirmaron 3 decisiones:
    soportaba esto desde la Fase 3 (`Location.aisle/rack/shelf/bin`, DTOs
    completos) — **no hizo falta ninguna migración**. Era un vacío de
    frontend. Ver detalle abajo. Commit `2.5-pasillo-estante-nivel`.
-4. ⬜ **2.3 — Recepción: reconocido/nuevo explícito + revisar wizard.**
+4. ✅ **2.3 — Recepción: reconocido/nuevo explícito + revisar wizard.** El
+   wizard de línea de tiempo ya existía (`PurchaseChain`); el vacío real era
+   el mensaje reconocido/nuevo al escanear. Ver detalle abajo. Commit
+   `2.3-producto-reconocido-nuevo`.
 5. ✅ **2.4 — Auditoría del descuento atómico de inventario al confirmar
    venta.** El backend YA es atómico (probado); el hallazgo real fue de
    caché en el frontend. Ver detalle abajo. Commit `2.4-stock-al-dia`.
@@ -232,3 +235,45 @@ dato en la base esté mal.
 Técnica: `tsc -b` OK · `eslint` OK · `vitest` 174/174 (sin tests nuevos —
 cambio de configuración, cubierto por la suite existente) · `vite build` OK ·
 e2e `sales.e2e-spec.ts` (rollback atómico) re-corrido y en verde.
+
+## Detalle — 2.3 Recepción de facturas: reconocido vs. nuevo
+
+**Lo que ya existía (verificado, no se tocó):** `PurchaseChain.tsx` ya
+muestra "1. Registrar la factura → 2. Confirmar → 3. Recibir la mercadería →
+4. Pagar" como una sola línea de tiempo (no secciones sueltas), resaltando el
+paso actual según el estado real de la compra, y ya está presente en el
+listado, el formulario y el detalle. El wizard que pedía el dueño **ya
+estaba construido** en una sesión anterior.
+
+**El vacío real:** al registrar la factura (paso 1) ya se podía escanear un
+producto (`BarcodeScanButton` + `useScanToProduct`, igual que en Ventas), pero
+un código que no existía en el catálogo solo daba un mensaje de error
+("Ningún producto activo con el código «…»") sin ninguna salida — había que
+abandonar la compra, ir a Catálogo → Productos → Nuevo, cargarlo a mano, y
+volver a buscarlo. Nada distinguía "esto ya lo vendemos" de "esto es nuevo".
+
+**Cambios:**
+- `use-scan-to-product.ts`: nuevo tono `"new"` (antes solo `"ok" | "error"`),
+  con `allowNew` opcional — una venta solo puede referenciar catálogo
+  existente (ahí sigue siendo error), pero registrar una factura sí puede
+  toparse con una pieza nunca comprada antes. Mensaje "Reconocido: CÓDIGO ·
+  Nombre" (antes "Agregado:") cuando existe; "Producto nuevo: «código» no
+  está en el catálogo todavía." cuando no.
+- `PurchasePages.tsx`: activa `allowNew`; cuando el tono es "new" agrega un
+  enlace **"Registrar producto nuevo →"** a
+  `/app/catalog/products/new?code=<el código escaneado>`.
+- `ProductsPages.tsx` (`ProductFormPage`): lee `?code=` y precarga el campo
+  Código en un producto nuevo, para no volver a escribirlo.
+
+**Archivos:** `src/hooks/use-scan-to-product.ts`, `src/purchasing/PurchasePages.tsx`,
+`src/catalog/ProductsPages.tsx`, CSS `.scan-row__feedback--new` en
+`global.css`. Tests nuevos: `PurchasingPages.test.tsx` (+1, escanea un código
+reconocido y uno nuevo, revisa el enlace) y `ProductFormPage.test.tsx`
+(nuevo, precarga del código).
+
+**Verificado en navegador:** escaneado manual de "FILT-999-NUEVO" en
+Registrar factura → aviso ámbar "Producto nuevo…" con el enlace → clic →
+"Nuevo producto" ya trae el código cargado.
+
+Técnica: `tsc -b` OK · `eslint` OK · `vitest` 176/176 (+2 nuevos) ·
+`vite build` OK.

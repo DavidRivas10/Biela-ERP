@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { catalogApi, type ProductInput } from "../api/catalog-api";
 import { compatibilityApi } from "../api/compatibility-api";
 import { inventoryApi } from "../api/inventory-api";
@@ -387,8 +387,14 @@ export function ProductFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const client = useQueryClient();
+  const [searchParams] = useSearchParams();
   const editing = Boolean(id);
-  const [form, setForm] = useState<ProductFormState>(emptyProduct);
+  // Arriving from an unrecognized barcode scanned elsewhere (e.g. registering
+  // a purchase invoice) carries the code so it isn't typed twice.
+  const prefillCode = !editing ? (searchParams.get("code") ?? "") : "";
+  const [form, setForm] = useState<ProductFormState>(() =>
+    prefillCode ? { ...emptyProduct, code: prefillCode } : emptyProduct,
+  );
   const categories = useQuery({
     queryKey: queryKeys.productCategories,
     queryFn: catalogApi.categories,

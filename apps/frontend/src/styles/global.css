@@ -1845,6 +1845,9 @@ b {
 .scan-row__feedback--ok {
   color: var(--success);
 }
+.scan-row__feedback--new {
+  color: var(--amber);
+}
 .scan-row__feedback--error {
   color: var(--danger);
 }
