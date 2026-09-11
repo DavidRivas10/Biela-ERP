@@ -1299,11 +1299,11 @@ b {
 }
 /* Sale line: price/discount/tax stay out of the way until touched, so a
    vendor scanning products for a walk-in sale sees just product + quantity. */
-.line-price,
+.line-field,
 .line-more {
   font-size: 0.85rem;
 }
-.line-price summary,
+.line-field summary,
 .line-more summary {
   display: flex;
   align-items: baseline;
@@ -1313,20 +1313,20 @@ b {
   font-weight: 600;
   list-style: none;
 }
-.line-price summary::-webkit-details-marker,
+.line-field summary::-webkit-details-marker,
 .line-more summary::-webkit-details-marker {
   display: none;
 }
-.line-price summary strong {
+.line-field summary strong {
   color: var(--ink-strong);
   font-family: var(--font-mono);
   font-size: 0.95rem;
 }
-.line-price[open] summary strong,
+.line-field[open] summary strong,
 .line-more[open] summary {
   color: var(--primary);
 }
-.line-price .field,
+.line-field .field,
 .line-more .field {
   margin-top: 0.4rem;
 }

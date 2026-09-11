@@ -20,6 +20,7 @@ import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { ProductSelector } from "../components/EntitySelectors";
 import { SupplierSelector } from "../components/PurchasingSelectors";
+import { useFocusFieldById } from "../hooks/use-focus-field";
 import { useKeyboardWedge } from "../hooks/use-keyboard-wedge";
 import { useScanToProduct } from "../hooks/use-scan-to-product";
 import { useUrlFilters } from "../hooks/use-url-filters";
@@ -232,6 +233,8 @@ export function PurchasesPage() {
   );
 }
 
+const today = () => new Date().toISOString().slice(0, 10);
+
 type PurchaseLineForm = {
   key: number;
   productId: string;
@@ -240,6 +243,11 @@ type PurchaseLineForm = {
   discountAmount: string;
   taxAmount: string;
 };
+function hasMoneyAdjustment(line: PurchaseLineForm): boolean {
+  const isZero = (value: string) => !value || Number(value) === 0;
+  return !isZero(line.discountAmount) || !isZero(line.taxAmount);
+}
+
 const newLine = (key: number): PurchaseLineForm => ({
   key,
   productId: "",
@@ -292,7 +300,7 @@ function PurchaseFormEditor({
     initial?.supplierDocumentNumber ?? "",
   );
   const [documentDate, setDocumentDate] = useState(
-    initial?.documentDate.slice(0, 10) ?? "",
+    initial?.documentDate.slice(0, 10) ?? today(),
   );
   const [paymentDueDate, setPaymentDueDate] = useState(
     initial?.paymentDueDate?.slice(0, 10) ?? "",
@@ -333,18 +341,37 @@ function PurchaseFormEditor({
       ),
     );
   }
+
+  // After a product lands on a line (scanned or picked), the cursor jumps
+  // straight to Cantidad — ready to type, or to keep scanning the next one.
+  const [focusTarget, setFocusTarget] = useState<string | null>(null);
+  useFocusFieldById(focusTarget);
+
   const addScannedProduct = useCallback((product: Product) => {
+    let targetKey = 0;
     setLines((current) => {
       if (current.some((line) => line.productId === product.id)) return current;
+      // Purchase cost is real money paid this time, not authoritative — but
+      // the reference cost is a fair starting point so the field can stay
+      // collapsed instead of demanding a value with nothing to go on.
+      const cost = product.referenceCost ?? "";
       const emptyIndex = current.findIndex((line) => !line.productId);
       if (emptyIndex >= 0) {
+        targetKey = current[emptyIndex].key;
         return current.map((line, index) =>
-          index === emptyIndex ? { ...line, productId: product.id } : line,
+          index === emptyIndex
+            ? { ...line, productId: product.id, unitCost: line.unitCost || cost }
+            : line,
         );
       }
       const nextKey = Math.max(...current.map((line) => line.key)) + 1;
-      return [...current, { ...newLine(nextKey), productId: product.id }];
+      targetKey = nextKey;
+      return [
+        ...current,
+        { ...newLine(nextKey), productId: product.id, unitCost: cost },
+      ];
     });
+    setFocusTarget(`purchase-quantity-${targetKey}`);
   }, []);
   const { handleScan, feedback: scanFeedback } = useScanToProduct(
     addScannedProduct,
@@ -475,7 +502,13 @@ function PurchaseFormEditor({
                 label={`Producto ${index + 1}`}
                 required
                 value={line.productId}
-                onChange={(productId) => updateLine(line.key, { productId })}
+                onChange={(productId, item?: Product) => {
+                  updateLine(line.key, {
+                    productId,
+                    unitCost: item?.referenceCost ?? line.unitCost,
+                  });
+                  setFocusTarget(`purchase-quantity-${line.key}`);
+                }}
               />
               <Field
                 label="Cantidad"
@@ -494,47 +527,60 @@ function PurchaseFormEditor({
                   }
                 />
               </Field>
-              <Field
-                label="Costo unitario"
-                htmlFor={`purchase-cost-${line.key}`}
-                required
-              >
-                <input
-                  id={`purchase-cost-${line.key}`}
+              <details className="line-field" open={!line.unitCost}>
+                <summary>
+                  Costo unitario
+                  <strong>
+                    {line.unitCost ? formatMoney(line.unitCost) : "Elegí uno"}
+                  </strong>
+                </summary>
+                <Field
+                  label="Costo unitario"
+                  htmlFor={`purchase-cost-${line.key}`}
                   required
-                  inputMode="decimal"
-                  pattern="\d+(\.\d{1,4})?"
-                  value={line.unitCost}
-                  onChange={(e) =>
-                    updateLine(line.key, { unitCost: e.target.value })
-                  }
-                />
-              </Field>
-              <Field
-                label="Descuento"
-                htmlFor={`purchase-discount-${line.key}`}
-              >
-                <input
-                  id={`purchase-discount-${line.key}`}
-                  inputMode="decimal"
-                  pattern="\d+(\.\d{1,2})?"
-                  value={line.discountAmount}
-                  onChange={(e) =>
-                    updateLine(line.key, { discountAmount: e.target.value })
-                  }
-                />
-              </Field>
-              <Field label="Impuesto" htmlFor={`purchase-tax-${line.key}`}>
-                <input
-                  id={`purchase-tax-${line.key}`}
-                  inputMode="decimal"
-                  pattern="\d+(\.\d{1,2})?"
-                  value={line.taxAmount}
-                  onChange={(e) =>
-                    updateLine(line.key, { taxAmount: e.target.value })
-                  }
-                />
-              </Field>
+                >
+                  <input
+                    id={`purchase-cost-${line.key}`}
+                    required
+                    inputMode="decimal"
+                    pattern="\d+(\.\d{1,4})?"
+                    value={line.unitCost}
+                    onChange={(e) =>
+                      updateLine(line.key, { unitCost: e.target.value })
+                    }
+                  />
+                </Field>
+              </details>
+              <details className="line-more" open={hasMoneyAdjustment(line)}>
+                <summary>Descuento / impuesto</summary>
+                <div className="line-more__fields">
+                  <Field
+                    label="Descuento"
+                    htmlFor={`purchase-discount-${line.key}`}
+                  >
+                    <input
+                      id={`purchase-discount-${line.key}`}
+                      inputMode="decimal"
+                      pattern="\d+(\.\d{1,2})?"
+                      value={line.discountAmount}
+                      onChange={(e) =>
+                        updateLine(line.key, { discountAmount: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Impuesto" htmlFor={`purchase-tax-${line.key}`}>
+                    <input
+                      id={`purchase-tax-${line.key}`}
+                      inputMode="decimal"
+                      pattern="\d+(\.\d{1,2})?"
+                      value={line.taxAmount}
+                      onChange={(e) =>
+                        updateLine(line.key, { taxAmount: e.target.value })
+                      }
+                    />
+                  </Field>
+                </div>
+              </details>
               {lines.length > 1 ? (
                 <Button
                   type="button"

@@ -23,6 +23,7 @@ import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { CustomerSelector } from "../components/SalesSelectors";
 import { clearDraft, readDraft, useAutosaveDraft } from "../hooks/use-draft-autosave";
+import { useFocusFieldById } from "../hooks/use-focus-field";
 import { useKeyboardWedge } from "../hooks/use-keyboard-wedge";
 import { useScanToProduct } from "../hooks/use-scan-to-product";
 import { useUrlFilters } from "../hooks/use-url-filters";
@@ -359,15 +360,22 @@ type Line = {
   key: number;
   productId: string;
   sourceLocationId: string;
+  /** Display label ("BOD-01 · Bodega principal") for the collapsed summary. */
+  sourceLocationLabel: string;
   quantity: string;
   unitPrice: string;
   discountAmount: string;
   taxAmount: string;
 };
-const newLine = (key: number, sourceLocationId = ""): Line => ({
+const newLine = (
+  key: number,
+  sourceLocationId = "",
+  sourceLocationLabel = "",
+): Line => ({
   key,
   productId: "",
   sourceLocationId,
+  sourceLocationLabel,
   quantity: "1",
   unitPrice: "",
   discountAmount: "0.00",
@@ -379,11 +387,18 @@ const newLine = (key: number, sourceLocationId = ""): Line => ({
  * whichever location the last one used, so "Ubicación origen" is rarely
  * something the vendor has to touch while scanning.
  */
-function lastUsedLocation(lines: Line[]): string {
+function lastUsedLocation(lines: Line[]): Pick<
+  Line,
+  "sourceLocationId" | "sourceLocationLabel"
+> {
   for (let i = lines.length - 1; i >= 0; i -= 1) {
-    if (lines[i].sourceLocationId) return lines[i].sourceLocationId;
+    if (lines[i].sourceLocationId)
+      return {
+        sourceLocationId: lines[i].sourceLocationId,
+        sourceLocationLabel: lines[i].sourceLocationLabel,
+      };
   }
-  return "";
+  return { sourceLocationId: "", sourceLocationLabel: "" };
 }
 
 function hasMoneyAdjustment(line: Line): boolean {
@@ -467,6 +482,9 @@ function SaleEditor({
           key: index + 1,
           productId: item.productId,
           sourceLocationId: item.sourceLocationId,
+          sourceLocationLabel: item.sourceLocation
+            ? `${item.sourceLocation.code} · ${item.sourceLocation.name}`
+            : "",
           quantity: String(item.quantity),
           unitPrice: item.unitPrice,
           discountAmount: item.discountAmount,
@@ -527,15 +545,23 @@ function SaleEditor({
       );
     },
   });
+  // After a product lands on a line (scanned or picked), the cursor jumps
+  // straight to that line's Cantidad — ready to type a quantity, or just to
+  // keep scanning if the physical reader's next code lands globally anyway.
+  const [focusTarget, setFocusTarget] = useState<string | null>(null);
+  useFocusFieldById(focusTarget);
+
   const updateLine = (key: number, changes: Partial<Line>) =>
     setLines((current) =>
       current.map((line) => (line.key === key ? { ...line, ...changes } : line)),
     );
   const addScannedProduct = useCallback((product: Product) => {
+    let targetKey = 0;
     setLines((current) => {
       const price = product.defaultSalePrice ?? "";
       const emptyIndex = current.findIndex((line) => !line.productId);
       if (emptyIndex >= 0) {
+        targetKey = current[emptyIndex].key;
         return current.map((line, index) =>
           index === emptyIndex
             ? { ...line, productId: product.id, unitPrice: line.unitPrice || price }
@@ -543,15 +569,22 @@ function SaleEditor({
         );
       }
       const nextKey = Math.max(...current.map((line) => line.key)) + 1;
+      targetKey = nextKey;
+      const location = lastUsedLocation(current);
       return [
         ...current,
         {
-          ...newLine(nextKey, lastUsedLocation(current)),
+          ...newLine(
+            nextKey,
+            location.sourceLocationId,
+            location.sourceLocationLabel,
+          ),
           productId: product.id,
           unitPrice: price,
         },
       ];
     });
+    setFocusTarget(`sale-qty-${targetKey}`);
   }, []);
   const { handleScan, feedback: scanFeedback } =
     useScanToProduct(addScannedProduct);
@@ -787,21 +820,13 @@ function SaleEditor({
                 label={`Producto ${index + 1}`}
                 required
                 value={line.productId}
-                onChange={(productId, item?: Product) =>
+                onChange={(productId, item?: Product) => {
                   updateLine(line.key, {
                     productId,
                     unitPrice: item?.defaultSalePrice ?? line.unitPrice,
-                  })
-                }
-              />
-              <LocationSelector
-                id={`sale-location-${line.key}`}
-                label="Ubicación origen"
-                required
-                value={line.sourceLocationId}
-                onChange={(sourceLocationId) =>
-                  updateLine(line.key, { sourceLocationId })
-                }
+                  });
+                  setFocusTarget(`sale-qty-${line.key}`);
+                }}
               />
               <Field
                 label="Cantidad"
@@ -820,7 +845,33 @@ function SaleEditor({
                   }
                 />
               </Field>
-              <details className="line-price" open={!line.unitPrice}>
+              <details
+                className="line-field"
+                open={!line.sourceLocationId}
+              >
+                <summary>
+                  Ubicación
+                  <strong>
+                    {line.sourceLocationLabel ||
+                      (line.sourceLocationId ? "Elegida" : "Elegí una")}
+                  </strong>
+                </summary>
+                <LocationSelector
+                  id={`sale-location-${line.key}`}
+                  label="Ubicación origen"
+                  required
+                  value={line.sourceLocationId}
+                  onChange={(sourceLocationId, item) =>
+                    updateLine(line.key, {
+                      sourceLocationId,
+                      sourceLocationLabel: item
+                        ? `${item.code} · ${item.name}`
+                        : "",
+                    })
+                  }
+                />
+              </details>
+              <details className="line-field" open={!line.unitPrice}>
                 <summary>
                   Precio unitario
                   <strong>
@@ -886,13 +937,17 @@ function SaleEditor({
             type="button"
             variant="secondary"
             onClick={() =>
-              setLines((current) => [
-                ...current,
-                newLine(
-                  Math.max(...current.map((line) => line.key)) + 1,
-                  lastUsedLocation(current),
-                ),
-              ])
+              setLines((current) => {
+                const location = lastUsedLocation(current);
+                return [
+                  ...current,
+                  newLine(
+                    Math.max(...current.map((line) => line.key)) + 1,
+                    location.sourceLocationId,
+                    location.sourceLocationLabel,
+                  ),
+                ];
+              })
             }
           >
             Agregar producto

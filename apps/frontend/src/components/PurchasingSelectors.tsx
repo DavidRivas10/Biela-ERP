@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { purchasingFinanceApi } from "../api/purchasing-finance-api";
 import { suppliersApi } from "../api/suppliers-api";
+import { useAutoSelectSoleOption } from "../hooks/use-auto-select-sole-option";
 import { useDebouncedValue } from "../hooks/use-debounced-value";
 import { queryKeys } from "../query/query-keys";
 import type { CashSession, PaymentMethod, Supplier } from "../types/purchasing";
@@ -57,6 +58,18 @@ export function SupplierSelector({
     enabled: enabled && Boolean(value) && !inPage,
   });
   const rows = includeSelected(list.data?.data ?? [], selected.data);
+
+  // Only one active supplier at all — don't make anyone choose from a list
+  // of one.
+  useAutoSelectSoleOption({
+    value,
+    searchTerm: debounced,
+    loading: list.isFetching,
+    total: list.data?.meta.total,
+    rows: list.data?.data ?? [],
+    onSelect: (row) => onChange(row.id, row),
+  });
+
   return (
     <div className="entity-selector">
       <Field

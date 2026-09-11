@@ -15,6 +15,7 @@ import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
+import { useFocusFieldById } from "../hooks/use-focus-field";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { InventorySummary } from "./InventorySummary";
 import { InventoryTabs } from "./InventoryTabs";
@@ -219,6 +220,9 @@ export function InventoryMovementsPage() {
   const [selectedLocation, setSelectedLocation] = useState<Location>();
   const [confirm, setConfirm] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  // After a product is picked, jump straight to Cantidad.
+  const [focusTarget, setFocusTarget] = useState<string | null>(null);
+  useFocusFieldById(focusTarget);
   const params = {
     page: filters.page,
     limit: filters.limit,
@@ -371,6 +375,7 @@ export function InventoryMovementsPage() {
               onChange={(productId, product) => {
                 setForm({ ...form, productId });
                 setSelectedProduct(product);
+                setFocusTarget("movement-quantity");
               }}
             />
             <LocationSelector

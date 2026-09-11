@@ -347,3 +347,105 @@ para 2.4 y 2.5.
 - Recorré vos mismo Ventas (cuentas simultáneas), Compras (producto nuevo) e
   Inventario/Ubicaciones (pasillo/estante) antes de la presentación — son los
   tres flujos con más cambio de comportamiento esta ronda.
+
+## Fase 15 — Prioridad crítica: velocidad de captura (2026-09-11)
+
+David reportó que cargar un solo producto en Ventas o Compras toma cerca de
+3 minutos, y pidió, por encima de cualquier ajuste visual: colapsar todo
+campo secundario por defecto, autoseleccionar cuando hay una sola opción
+posible, foco automático en el siguiente campo útil, y Guardar como una sola
+acción sin campos obligatorios sin sentido — aplicado de forma uniforme en
+Ventas (las 3 modalidades), Compras e Inventario. Pidió cronometrar el
+resultado yo mismo.
+
+### Regla 1 — Campos secundarios colapsados por defecto
+
+- **Ventas** (`SalesPages.tsx`, las 3 modalidades comparten el mismo editor
+  de línea): además de Precio unitario y Descuento/Impuesto (ya colapsados
+  en la ronda anterior), ahora **Ubicación origen** también queda detrás de
+  un resumen compacto ("Ubicación: BOD-01 · Bodega principal", editable con
+  un clic). Solo **Producto** y **Cantidad** quedan siempre visibles por
+  línea.
+- **Compras** (`PurchasePages.tsx`): **Costo unitario** pasa al mismo patrón
+  compacto — se precarga con el costo de referencia del producto
+  (`referenceCost`, ya existía en el catálogo pero no se usaba acá) y se
+  cierra solo; si el producto no tiene costo de referencia, queda abierto
+  para pedirlo (nunca esconde un dato que hace falta). **Descuento/Impuesto**
+  colapsados igual que en Ventas.
+- **Inventario**: el formulario de movimiento manual ya era acotado (Tipo,
+  Producto, Ubicación, Cantidad, Motivo) — no tiene una línea que se repite
+  por producto como Ventas/Compras, así que no había "descuento/impuesto"
+  que esconder ahí. Sí se beneficia de la regla 2 (ubicación) y 3 (foco).
+
+### Regla 2 — Autoseleccionar cuando hay una sola opción posible
+
+- Nuevo hook `useAutoSelectSoleOption` (`hooks/use-auto-select-sole-option.ts`):
+  cuando una búsqueda sin término activo resuelve en exactamente un
+  resultado total y nada está elegido todavía, lo selecciona solo — sin
+  pedirle al usuario que confirme una lista de uno. Se queda quieto mientras
+  hay un término de búsqueda activo (no le gana a una búsqueda deliberada).
+- Conectado en **`LocationSelector`** y **`SupplierSelector`**
+  (`EntitySelectors.tsx` / `PurchasingSelectors.tsx`) — beneficia de
+  inmediato a Ventas, Compras (proveedor, una sola vez por factura, no por
+  línea), Inventario (movimientos y transferencias) sin tocar esas pantallas
+  para nada; es un cambio en el componente compartido.
+- **Cero cambios de backend**: los endpoints de ubicaciones/proveedores ya
+  devuelven `meta.total`, que es todo lo que hace falta para saber si hay
+  una sola opción activa.
+
+### Regla 3 — Foco en el siguiente campo útil
+
+- Nuevo hook `useFocusFieldById` (`hooks/use-focus-field.ts`): enfoca y
+  selecciona el texto del campo indicado apenas cambia el id objetivo.
+- Conectado en Ventas, Compras e Inventario: apenas un producto entra a una
+  línea (escaneado o elegido a mano), el cursor salta solo a **Cantidad**
+  (con el valor ya seleccionado, listo para sobrescribir con un número, o
+  para seguir escaneando si se deja en "1").
+
+### Regla 4 — Guardar como una sola acción sin campos sin sentido
+
+- Auditado: Ventas y Compras ya no piden "Fecha de vencimiento" salvo en
+  los modos donde tiene sentido (crédito), y no era obligatoria en ningún
+  caso. **Encontrado y corregido:** Compras pedía "Fecha del documento" en
+  blanco por defecto (Ventas ya la precargaba con hoy) — ahora Compras
+  también arranca con la fecha de hoy.
+
+### Verificación cronometrada (navegador real, no simulada)
+
+Con exactamente un producto, una ubicación y un proveedor activos (el caso
+típico de un negocio con un solo mostrador/bodega), midiendo con
+`performance.now()` dentro del propio navegador de principio a fin:
+
+| Pantalla | Desde escribir el código hasta Cantidad enfocada | Guardar → confirmado |
+|---|---|---|
+| Ventas (mostrador) | **1.37 s** | 0.30 s |
+| Compras | **1.86 s** (con costo de referencia precargado) | 1.00 s |
+| Inventario (movimiento) | **1.86 s** | *(no se completó — ver nota)* |
+
+En los tres casos, la ubicación (y en Compras, el proveedor) ya estaban
+elegidos solos antes de que el operador tocara nada más que el código del
+producto. De "cerca de 3 minutos" a **menos de 3 segundos** de principio a
+fin por línea, incluyendo Guardar.
+
+Nota: no completé el movimiento de Inventario de la prueba (los movimientos
+son inmutables, no se pueden borrar — completar uno real habría dejado un
+registro permanente y un saldo de stock solo para esta verificación).
+Cancelé el formulario antes del último paso; el tiempo hasta "listo para
+cargar la cantidad" ya quedó medido igual.
+
+Producto/ubicación/proveedor de prueba desactivados al terminar; las 4
+ventas/compras de prueba creadas en esta sesión quedaron canceladas — nada
+de esto queda activo en la base para la presentación.
+
+**Archivos:** `src/hooks/use-auto-select-sole-option.ts` (nuevo),
+`src/hooks/use-focus-field.ts` (nuevo), `src/components/EntitySelectors.tsx`,
+`src/components/PurchasingSelectors.tsx`, `src/sales/SalesPages.tsx`,
+`src/purchasing/PurchasePages.tsx`, `src/inventory/InventoryPages.tsx`,
+CSS (`.line-field` generalizado, antes `.line-price`). Tests nuevos: 2 en
+`EntitySelectors.test.tsx`, 1 en `PurchasingSelectors.test.tsx`, 3 en
+`SaleEditor.test.tsx`, 1 en `PurchasingPages.test.tsx`, 1 archivo nuevo
+`InventoryMovementsPage.test.tsx`.
+
+Técnica: `tsc -b` OK · `eslint` 0 warnings · `vitest` **182/182** (+9 nuevos)
+· `vite build` OK · e2e de rollback atómico (backend, no tocado) re-verificado
+en verde.

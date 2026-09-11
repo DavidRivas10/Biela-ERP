@@ -257,9 +257,11 @@ describe("Venta rápida — campos secundarios de línea colapsados por defecto"
     const user = userEvent.setup();
     renderNewSale();
 
-    const priceDetails = document.querySelector(
-      "details.line-price",
-    ) as HTMLDetailsElement;
+    const findPriceDetails = () =>
+      [...document.querySelectorAll("details.line-field")].find((d) =>
+        d.querySelector("summary")?.textContent?.includes("Precio"),
+      ) as HTMLDetailsElement;
+    const priceDetails = findPriceDetails();
     const moreDetails = document.querySelector(
       "details.line-more",
     ) as HTMLDetailsElement;
@@ -296,6 +298,17 @@ describe("Venta rápida — campos secundarios de línea colapsados por defecto"
     ) as HTMLSelectElement;
     expect(secondLocation).not.toBeNull();
     expect(secondLocation.value).toBe("location-1");
+  });
+
+  it("moves the cursor to Cantidad right after a product is picked", async () => {
+    stubFetch({ sales: [], products: [product1], locations: [location1] });
+    const user = userEvent.setup();
+    renderNewSale();
+
+    await screen.findByRole("option", { name: /FILT-001/ });
+    await user.selectOptions(screen.getByLabelText(/^Producto 1/), "product-1");
+
+    expect(document.getElementById("sale-qty-1")).toHaveFocus();
   });
 
   it("keeps an existing discount/tax visible instead of hiding it behind the toggle", async () => {

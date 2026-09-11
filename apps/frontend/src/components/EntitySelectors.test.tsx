@@ -137,6 +137,82 @@ describe("high-cardinality entity selectors", () => {
     expect(screen.getByText("location-101")).toBeVisible();
   });
 
+  it("auto-selects the only active Location instead of making someone choose", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          jsonResponse({
+            data: [{ id: "location-1", code: "BOD-01", name: "Bodega" }],
+            meta: pageMeta(1, 1, 1),
+          }),
+        ),
+      ),
+    );
+
+    function Harness() {
+      const [value, setValue] = useState("");
+      return (
+        <>
+          <LocationSelector
+            id="location"
+            label="Ubicación"
+            value={value}
+            onChange={setValue}
+          />
+          <output>{value}</output>
+        </>
+      );
+    }
+
+    renderWithQueryClient(<Harness />);
+    expect(await screen.findByText("location-1")).toBeVisible();
+  });
+
+  it("does not auto-select a lone search match by name — only an exact code, or no search at all", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL | Request) => {
+        const url = new URL(
+          input instanceof Request ? input.url : input.toString(),
+        );
+        const searching = url.searchParams.get("search") === "bodega";
+        return Promise.resolve(
+          jsonResponse({
+            data: searching
+              ? [{ id: "location-1", code: "BOD-01", name: "La Bodega" }]
+              : [],
+            meta: pageMeta(1, searching ? 1 : 0, searching ? 1 : 0),
+          }),
+        );
+      }),
+    );
+
+    function Harness() {
+      const [value, setValue] = useState("");
+      return (
+        <>
+          <LocationSelector
+            id="location"
+            label="Ubicación"
+            value={value}
+            onChange={setValue}
+          />
+          <output data-testid="chosen-value">{value}</output>
+        </>
+      );
+    }
+
+    const user = userEvent.setup();
+    renderWithQueryClient(<Harness />);
+    await user.type(screen.getByRole("searchbox"), "bodega");
+    await screen.findByRole("option", { name: /BOD-01/ });
+    // A single name match while searching does not auto-select — only an
+    // exact code match does (existing behavior) or having no search at all
+    // with exactly one location overall (the new behavior above).
+    expect(screen.getByTestId("chosen-value")).toHaveTextContent("");
+  });
+
   it("retrieves and selects a Vehicle from a later server page", async () => {
     const fetchMock = vi.fn((input: string | URL | Request) => {
       const url = new URL(

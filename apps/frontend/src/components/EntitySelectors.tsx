@@ -5,6 +5,7 @@ import { inventoryApi } from "../api/inventory-api";
 import { vehiclesApi } from "../api/vehicles-api";
 import { useDebouncedValue } from "../hooks/use-debounced-value";
 import { queryKeys } from "../query/query-keys";
+import { useAutoSelectSoleOption } from "../hooks/use-auto-select-sole-option";
 import type { Location, PaginationMeta, Product, Vehicle } from "../types/erp";
 import { locationPhysicalHint } from "../utils/formatters";
 import { Field } from "./Field";
@@ -227,6 +228,17 @@ export function LocationSelector({
     if (exact && exact.id !== value) onChange(exact.id, exact);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, list.isFetching, value]);
+
+  // Only one location exists at all (a one-counter shop) — don't make
+  // anyone choose from a list of one.
+  useAutoSelectSoleOption({
+    value,
+    searchTerm: debouncedSearch,
+    loading: list.isFetching,
+    total: list.data?.meta.total,
+    rows: results,
+    onSelect: (row) => onChange(row.id, row),
+  });
 
   const chosen = rows.find((row) => row.id === value);
 

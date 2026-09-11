@@ -29,11 +29,12 @@ const supplier = {
   createdAt: "2026-08-20T12:00:00.000Z",
   updatedAt: "2026-08-20T12:00:00.000Z",
 };
-const product = (id: string, code: string) => ({
+const product = (id: string, code: string, referenceCost?: string) => ({
   id,
   code,
   name: `Producto ${code}`,
   active: true,
+  ...(referenceCost ? { referenceCost } : {}),
 });
 const purchase = {
   id: "purchase-1",
@@ -217,6 +218,50 @@ describe("Frontend Phase 10.C purchasing screens", () => {
         }),
       ).toBe(true),
     );
+  });
+
+  it("collapses cost and discount/tax by default, prefilling cost from the product's reference cost", async () => {
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = new URL(
+        input instanceof Request ? input.url : input.toString(),
+      );
+      if (url.pathname === "/api/suppliers")
+        return Promise.resolve(
+          jsonResponse({ data: [supplier], meta: emptyMeta }),
+        );
+      if (url.pathname === "/api/products")
+        return Promise.resolve(
+          jsonResponse({
+            data: [product("product-1", "PROD-001", "82.0000")],
+            meta: emptyMeta,
+          }),
+        );
+      return Promise.resolve(jsonResponse({}));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage(
+      "/app/purchasing/purchases/new",
+      "/app/purchasing/purchases/new",
+      <PurchaseFormPage />,
+    );
+
+    const findCostDetails = () =>
+      [...document.querySelectorAll("details.line-field")].find((d) =>
+        d.querySelector("summary")?.textContent?.includes("Costo"),
+      ) as HTMLDetailsElement;
+    const moreDetails = document.querySelector(
+      "details.line-more",
+    ) as HTMLDetailsElement;
+    expect(findCostDetails().open).toBe(true);
+    expect(moreDetails.open).toBe(false);
+
+    await screen.findByRole("option", { name: /PROD-001/ });
+    await user.selectOptions(screen.getByLabelText(/^Producto 1/), "product-1");
+
+    expect(await screen.findByText("L 82.00")).toBeVisible();
+    expect(findCostDetails().open).toBe(false);
+    expect(document.getElementById("purchase-quantity-1")).toHaveFocus();
   });
 
   it("tells a new part apart from a recognized one when scanning to build a Purchase", async () => {

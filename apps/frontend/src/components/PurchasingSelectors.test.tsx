@@ -80,6 +80,38 @@ describe("Frontend Phase 10.C bounded server selectors", () => {
     ).toBe(true);
   });
 
+  it("auto-selects the only active Supplier instead of making someone choose", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          jsonResponse({
+            data: [
+              { id: "supplier-1", code: "SUP-001", businessName: "Único" },
+            ],
+            meta: meta(1, 1, 1),
+          }),
+        ),
+      ),
+    );
+    function Harness() {
+      const [value, setValue] = useState("");
+      return (
+        <>
+          <SupplierSelector
+            id="supplier"
+            label="Proveedor"
+            value={value}
+            onChange={setValue}
+          />
+          <output>{value}</output>
+        </>
+      );
+    }
+    renderSelector(<Harness />);
+    expect(await screen.findByText("supplier-1")).toBeVisible();
+  });
+
   it("retrieves a Payment Method from a later server page", async () => {
     vi.stubGlobal(
       "fetch",
