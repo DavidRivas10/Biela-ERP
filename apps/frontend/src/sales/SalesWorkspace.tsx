@@ -11,6 +11,7 @@ import { Field } from "../components/Field";
 import { OpenAccountsBar } from "../components/OpenAccountsBar";
 import { PageHeader } from "../components/PageHeader";
 import { CustomerSelector } from "../components/SalesSelectors";
+import { TabBar, TabPanel } from "../components/WorkspaceTabs";
 import { clearDraft, readDraft, useAutosaveDraft } from "../hooks/use-draft-autosave";
 import { queryKeys } from "../query/query-keys";
 import {
@@ -117,56 +118,32 @@ export function SaleFormPage() {
   return (
     <div className="page-stack">
       <PageHeader eyebrow="Vender" title="Ventas" />
-      <div className="workspace-tabs" role="tablist" aria-label="Modalidad de venta">
-        {WORKSPACE_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            role="tab"
-            id={`workspace-tab-${tab.key}`}
-            aria-selected={activePanel === tab.key}
-            aria-controls={`sales-panel-${tab.key}`}
-            className="workspace-tab"
-            onClick={() => setActivePanel(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-      <div className="sales-workspace">
-        <section
-          id="sales-panel-mostrador"
-          role="tabpanel"
-          aria-labelledby="workspace-tab-mostrador"
-          hidden={activePanel !== "mostrador"}
-        >
+      <TabBar
+        idPrefix="sales"
+        ariaLabel="Modalidad de venta"
+        tabs={WORKSPACE_TABS}
+        activeKey={activePanel}
+        onChange={setActivePanel}
+      />
+      <div className="workspace-tab-content">
+        <TabPanel idPrefix="sales" tabKey="mostrador" activeKey={activePanel}>
           <QuickSalePanel active={activePanel === "mostrador"} />
-        </section>
-        <section
-          id="sales-panel-cliente"
-          role="tabpanel"
-          aria-labelledby="workspace-tab-cliente"
-          hidden={activePanel !== "cliente"}
-        >
+        </TabPanel>
+        <TabPanel idPrefix="sales" tabKey="cliente" activeKey={activePanel}>
           <CustomerSalePanel
             key={customerSaleId ?? "new"}
             resumeId={customerSaleId}
             presetCustomerId={presetCustomerId}
             active={activePanel === "cliente"}
           />
-        </section>
-        <section
-          id="sales-panel-cuenta"
-          role="tabpanel"
-          aria-labelledby="workspace-tab-cuenta"
-          hidden={activePanel !== "cuenta"}
-        >
+        </TabPanel>
+        <TabPanel idPrefix="sales" tabKey="cuenta" activeKey={activePanel}>
           <OpenAccountColumn
             focusedId={accountId}
             onFocusedIdChange={setAccountId}
             active={activePanel === "cuenta"}
           />
-        </section>
+        </TabPanel>
       </div>
     </div>
   );
