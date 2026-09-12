@@ -658,6 +658,235 @@ Técnica: `tsc -b` OK · `eslint` 0 warnings (frontend y `ms-autorepuesto`) ·
 `ms-autorepuesto` **126/126** · e2e `api-gateway` **21/21** (sin cambios,
 re-verificado por tocar un contrato compartido).
 
+## Fase 17 — Rediseño de Ventas en tres columnas + principios de UX
+## transversales (2026-09-12)
+
+Prompt de David: encontró, probando en vivo y comparando contra Treinta, que
+la pantalla de Ventas tiene un bug de estado cruzado entre modalidades y una
+estructura de formulario único que no se explica sola. Pidió, en orden: (1)
+el bug; (2) un cobro de un solo paso para Venta rápida (mostrador); (3)
+reorganizar Ventas en tres columnas independientes; (4) aplicar en todo el
+sistema paginación real de a 10, menos controles visibles por defecto, y cero
+dependencia de texto de ayuda; más una revisión de Cajas/Sesiones de caja con
+ese mismo criterio.
+
+### 1 — Bug: estado cruzado entre modalidades de venta
+
+**Causa real:** `SaleEditor` era un único componente para las tres
+modalidades, con un solo estado `lines` compartido y un `<input type="radio">`
+que solo cambiaba una variable `mode` — nunca vaciaba la tabla de productos
+al cambiar de radio button. Cargar algo bajo "Cuenta abierta" y después tocar
+"Venta rápida" dejaba la tabla intacta porque, para el código, seguía siendo
+la misma sesión de edición.
+
+**Corrección de raíz, no un parche:** en vez de vaciar el estado al detectar
+un cambio de modo (lo que David pidió como mínimo, con una confirmación
+antes), se eliminó el selector de modo por completo. Ahora **cada modalidad
+es su propio componente con su propio estado** (`QuickSalePanel`,
+`CustomerSalePanel`, `OpenAccountColumn` en el nuevo
+`src/sales/SalesWorkspace.tsx`), montados los tres a la vez, lado a lado. No
+existe ningún estado compartido que pueda "cruzarse" — la pregunta "¿hace
+falta confirmar antes de perder lo cargado?" ya no aplica porque cambiar de
+columna nunca toca las otras dos.
+
+**Verificado en navegador:** cargué `FILT-001` en Mostrador → Cliente
+registrado y Cuentas abiertas siguieron mostrando "Todavía no agregaste
+ningún producto." Test de regresión nuevo (`SalesWorkspace.test.tsx`) cubre
+exactamente este escenario.
+
+### 2 — Venta rápida (mostrador): cobrar en un solo paso
+
+Nuevo botón **"Cobrar y confirmar"** en la columna Mostrador que hace, en una
+sola mutación encadenada, lo que antes eran tres pantallas: `POST /sales`
+(crea) → `POST /sales/:id/post` (confirma, descuenta inventario) →
+`POST /sales/:id/payments` (cobra). Método de pago y monto se eligen en la
+misma columna:
+
+- El **monto a cobrar se precarga con el total de la tabla** y se mantiene
+  sincronizado mientras el vendedor no lo edite a mano (patrón de "estado
+  derivado ajustado en el render", no en un efecto, siguiendo la guía oficial
+  de React para evitar un render de más).
+- Si el método es efectivo, aparecen **Sesión de caja ABIERTA** y **Monto
+  recibido** (para el cambio) — ambos con auto-selección cuando hay una sola
+  opción activa (ver más abajo).
+- **Cuenta abierta y Cliente registrado a crédito no se tocaron** — siguen
+  con el flujo de varios pasos (guardar borrador → confirmar → cobrar
+  después) porque genuinamente quedan abiertas en el tiempo.
+- Manejo de fallo parcial: si la venta se crea pero falla al confirmar o al
+  cobrar, no se pierde el rastro — el mensaje de error dice que la venta #N
+  quedó creada/confirmada y hay que completarla desde Ventas, en vez de un
+  error genérico.
+- Permisos: si al usuario le falta `sales.post` o `payments.create`, la
+  columna cae a un simple "Guardar venta" (crear borrador, como antes) en vez
+  de desaparecer la función.
+
+**Auto-selección agregada a `PaymentMethodSelector` y `OpenCashSessionSelector`**
+(`src/components/PurchasingSelectors.tsx`) reusando el hook
+`useAutoSelectSoleOption` ya construido en la Fase 15 — un negocio con una
+sola caja y un solo turno abierto no vuelve a elegir nada, coherente con el
+mismo criterio ya aplicado a Ubicación y Proveedor.
+
+**Verificado en navegador:** agregué `FILT-001`, el método "Cash · Efectivo"
+disparó la sesión de caja auto-elegida, el monto ya traía `L 85.00`, y
+"Cobrar y confirmar" mostró "Venta #144 lista — cobrada L 85.00. Podés seguir
+con el próximo cliente." con la tabla vacía otra vez, lista para el
+siguiente cliente. Venta de prueba conciliada al terminar (devolución del
+producto + reingreso del pago, ver nota de datos más abajo).
+
+### 3 — Ventas en tres columnas
+
+`src/sales/SalesWorkspace.tsx` (nuevo) reemplaza el `SaleEditor` compartido.
+La lógica de la tabla de productos (antes toda dentro de `SalesPages.tsx`) se
+extrajo a `src/sales/SaleLineItems.tsx` como un hook (`useSaleLineItems`) y
+un componente (`ProductLinesEditor`) reutilizados por las tres columnas —
+para no repetir la tabla tres veces, no para volver a compartir estado.
+
+- **Columna izquierda — Venta rápida (mostrador):** el flujo de un paso del
+  punto 2.
+- **Columna central — Cliente registrado:** buscador de cliente (obligatorio
+  para esta columna) + tabla + "A crédito / notas" colapsado (fecha de
+  vencimiento y notas, antes siempre visibles). Guarda como borrador y va al
+  detalle, igual que antes.
+- **Columna derecha — Cuentas abiertas:** reutiliza `OpenAccountsBar` (Fase
+  14.2) — no se reconstruyó. Se le agregaron props `onSelect`/`onNew` para
+  que, dentro del workspace, cambiar de pestaña actualice un parámetro de
+  búsqueda (`?account=<id>`) **sin cambiar de ruta**, así las otras dos
+  columnas nunca pierden lo que tenían cargado. Fuera del workspace (si
+  alguien más la usara) sigue navegando como antes.
+- **Compatibilidad de enlaces:** `/app/sales/:id/edit` (usado antes desde
+  varios lugares) sigue existiendo como una redirección (`SaleEditRedirect`)
+  hacia `/app/sales/new?account=<id>` o `?customerSale=<id>` según el tipo de
+  venta, para no romper enlaces existentes. Los enlaces internos
+  (`OpenAccountsBar`, `SaleDetailPage`, `PosPage`) se actualizaron para ir
+  directo al esquema nuevo.
+- **Detalle no trivial:** el lector físico USB/Bluetooth (`useKeyboardWedge`)
+  escucha `keydown` en `window`, no en el elemento enfocado — con las tres
+  columnas montadas a la vez, un mismo escaneo habría llegado a las tres
+  simultáneamente. Se agregó una noción de "columna activa" (la última que
+  recibió foco o clic) y cada columna solo arma su lector físico cuando es la
+  activa. Mostrador es la activa por defecto al entrar. Cubierto con un test
+  que dispara un escaneo simulado y confirma que solo llega a la columna
+  correcta antes y después de cambiar el foco.
+
+**Archivos:** `src/sales/SalesWorkspace.tsx` (nuevo), `src/sales/SaleLineItems.tsx`
+(nuevo), `src/sales/SalesPages.tsx` (se le quita `SaleEditor`/`SaleFormPage`,
+queda con la lista y el detalle), `src/components/OpenAccountsBar.tsx`
+(props nuevas), `src/pos/PosPage.tsx` y `src/app/AppRoutes.tsx` (enlaces),
+CSS `.sales-workspace` en `global.css`. Test nuevo
+`src/sales/SalesWorkspace.test.tsx` (4 casos) reemplaza al viejo
+`SaleEditor.test.tsx` (arquitectura de interacción distinta: un solo buscador
+de "Agregar producto" por columna en vez de un selector por línea).
+
+**Verificado en navegador:** las tres columnas conviven en una sola pantalla
+sin ayuda contextual encima; guardé una cuenta abierta, la pestaña apareció,
+"+ Nueva cuenta" volvió al formulario en blanco sin tocar Mostrador (que
+seguía mostrando el mensaje de venta cobrada) ni Cliente registrado.
+
+### 4a — Paginación real de a 10, en todo el sistema
+
+`useUrlFilters` (usado por casi todas las pantallas de lista vía
+`page`/`limit`, ya 100% servidor desde las Fases 10/11 — no había paginación
+falsa en el cliente para corregir) tenía un límite por defecto de 20. Bajado
+a **10**, y alineados a 10 todos los `limit: 20`/`PAGE_SIZE`/
+`SELECTOR_PAGE_SIZE` sueltos que quedaban en selectores y sub-listas
+(Proveedor, Método de pago, Sesión de caja, Producto/Ubicación de los
+selectores compartidos, movimientos de caja, pagos, devoluciones, bandeja de
+compras, etc.). Dos tests de paginación de detalle (`DetailPagination.test.tsx`)
+tenían el tamaño de página escrito a mano y se actualizaron.
+
+### 4b/4c — Menos controles visibles, cero texto de ayuda
+
+Aplicado de lleno en el rediseño de Ventas (punto 3): la pantalla nueva no
+lleva ningún párrafo explicando "cómo es esta venta" — el propósito de cada
+columna lo dice el título de la columna. `documentDate` se dejó de mostrar en
+las tres columnas (se sigue guardando, con hoy como valor implícito, o el
+valor original si se está editando una cuenta/venta existente — nunca se
+pisa a mano) porque nadie carga una venta que está pasando ahora con una
+fecha distinta a hoy en el 90% de los casos. Mostrador además dejó de pedir
+notas (no aporta en un cobro de mostrador de segundos). Cliente registrado y
+Cuentas abiertas colapsaron vencimiento/cliente asociado/notas detrás de un
+solo `<details>` "opcional".
+
+**Alcance real de este punto:** no se hizo una auditoría exhaustiva de cada
+pantalla del sistema esta noche — el tiempo se concentró en Ventas (el pedido
+explícito) y en Cajas (pedido explícito, ver 5). El resto de los módulos
+(Inventario, Productos, Compras, Clientes, Proveedores, Vehículos,
+Administración) no se tocaron con este criterio. Si David quiere que se
+aplique ahí también, es un buen alcance para una próxima ronda dedicada.
+
+### 5 — Revisión de Cajas / Sesiones de caja
+
+Encontré un problema real, no solo estético: **dos formularios distintos
+para cerrar el turno, con distinto nivel de seguridad**. `PosPage` ("Cerrar
+la caja", acceso rápido desde Punto de venta) cerraba la caja **al instante**
+al enviar el formulario, sin ninguna confirmación — una acción que bloquea
+toda venta/movimiento hasta abrir un turno nuevo. `CashSessionDetailPage`
+("Cerrar sesión", en Cajas → Sesiones de caja → detalle) sí pedía confirmar
+con un diálogo antes de cerrar. Dos caminos para la misma acción irreversible,
+uno más peligroso que el otro, es exactamente el tipo de inconsistencia que
+hace dudar a alguien nuevo ("¿esto cierra de una, o me van a preguntar?").
+
+**Corrección:** `PosPage` ahora también pide confirmación
+(`ConfirmDialog`, mismo patrón que el resto del sistema) antes de cerrar la
+caja, con el mismo texto explicando la consecuencia ("ya no se pueden
+registrar más movimientos ni ventas... hasta que se abra uno nuevo").
+
+**Otras observaciones, sin cambios de código:** el color "tenue" de los
+hints (`--muted`) es un teal desaturado del tema petróleo/latón — a primera
+vista en una captura puede leerse como azul de enlace, pero no es un enlace
+ni comparte el color real de `.table-link`; lo revisé de cerca y no es un
+bug, es el tono del sistema de diseño. No encontré un "descuadre" numérico
+real en la sección de cierre — los cálculos de efectivo esperado/diferencia
+son siempre del servidor.
+
+**Archivo:** `src/pos/PosPage.tsx`.
+
+### Nota de datos importante: correr las suites e2e ensucia la base de
+### desarrollo compartida
+
+Verificando esta ronda encontré ventas de prueba (`#142`, `#143`) con saldo
+pendiente en "Ventas por cobrar" de Punto de venta que **no las generé yo
+manualmente** — vienen de correr las suites e2e de `ms-autorepuesto`
+(`sales.e2e-spec.ts`, las de concurrencia, etc.) para verificar los cambios
+de esta noche. `ConfigModule` del backend carga el `.env` de la raíz tanto en
+producción como en los tests e2e — **no hay una base de datos separada para
+tests**, así que cada corrida de `npm run test:e2e` escribe Ventas, Pagos,
+Clientes, etc. reales en la misma Postgres que usa el navegador. Las reglas
+del proyecto prohíben el borrado físico de historial, así que estos
+registros de prueba se acumulan sesión tras sesión sin que ninguna suite los
+limpie después.
+
+No intenté rastrear ni limpiar corridas anteriores (impráctico y no era lo
+pedido). Si te importa que la base quede prolija para una demo, lo más
+simple es restaurar desde un backup limpio (`scripts/restore-local.sh`,
+ver `backups/`) antes de mostrarla, o pedirme una limpieza dirigida de
+`Sale`/`Payment`/`CashMovement` con prefijo de fecha de hoy.
+
+**Venta #144 (mi propia prueba del cobro en un solo paso):** la dejé
+conciliada — devolví el producto (stock de vuelta) y volví a registrar el
+pago para que no quedara como pendiente de cobro — pero el rastro de auditoría
+no es perfectamente limpio (pago → reversión → devolución → nuevo pago, todo
+anotado en las notas). Preferí eso a dejarla visible como "Debe L85" en la
+pantalla que ves todos los días.
+
+Técnica: `tsc -b` OK · `eslint` 0 warnings · `vitest` **178/178** (reescribí
+6 tests obsoletos de `SaleEditor.test.tsx` en `SalesWorkspace.test.tsx` con
+4 casos nuevos, más 2 tests de paginación de detalle actualizados) ·
+`vite build` OK.
+
+## Estado al cierre de la Fase 17
+
+- Todo commiteado en `redesign/producto-ux`, en commits pequeños por bloque.
+  **Sin push** — a la espera de tu confirmación.
+- **Pendiente de tu decisión:** limpieza de datos de prueba acumulados por
+  las suites e2e en la base local (ver nota de arriba); si querés que
+  "menos controles / cero ayuda" se aplique también al resto del sistema en
+  una próxima ronda; el guardado en tiempo real de cuentas abiertas (Fase 16,
+  punto 4) sigue pendiente si lo querés priorizar.
+- Recorré vos mismo la pantalla de Ventas completa (las tres columnas, el
+  cobro de un solo paso, las pestañas de cuentas abiertas) y el cierre de
+  caja desde Punto de venta, antes de la presentación.
+
 ## Estado al cierre de la Fase 16
 
 - **Todo commiteado en `redesign/producto-ux`**, en commits pequeños por
