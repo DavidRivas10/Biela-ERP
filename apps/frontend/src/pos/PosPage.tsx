@@ -7,6 +7,7 @@ import { salesFinanceApi } from "../api/sales-finance-api";
 import { useAuth } from "../auth/AuthContext";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
@@ -55,6 +56,7 @@ export function PosPage() {
   const [openError, setOpenError] = useState<string | null>(null);
   const [counted, setCounted] = useState("");
   const [closeNotes, setCloseNotes] = useState("");
+  const [closeConfirm, setCloseConfirm] = useState(false);
 
   const registers = useQuery({
     queryKey: queryKeys.cashRegisters({ active: true, page: 1, limit: 50 }),
@@ -119,6 +121,7 @@ export function PosPage() {
     onSuccess: async () => {
       setCounted("");
       setCloseNotes("");
+      setCloseConfirm(false);
       await Promise.all([
         client.invalidateQueries({
           queryKey: queryKeys.currentCashSession(effectiveRegisterId),
@@ -227,7 +230,7 @@ export function PosPage() {
                     className="pos-shift__close"
                     onSubmit={(event) => {
                       event.preventDefault();
-                      close.mutate();
+                      setCloseConfirm(true);
                     }}
                   >
                     <h3>Cerrar la caja</h3>
@@ -273,12 +276,21 @@ export function PosPage() {
                       <Button
                         type="submit"
                         variant="danger"
-                        loading={close.isPending}
                         disabled={!isMoneyAtLeast(counted, "0")}
                       >
                         Cerrar caja
                       </Button>
                     </div>
+                    <ConfirmDialog
+                      open={closeConfirm}
+                      title="Cerrar caja"
+                      description="Cierra tu turno y ya no se pueden registrar más movimientos ni ventas en esta caja hasta que se abra uno nuevo. El efectivo esperado y la diferencia final los calcula el sistema."
+                      confirmLabel="Cerrar caja"
+                      dangerous
+                      loading={close.isPending}
+                      onCancel={() => setCloseConfirm(false)}
+                      onConfirm={() => close.mutate()}
+                    />
                   </form>
                 ) : null}
               </div>
@@ -427,7 +439,7 @@ export function PosPage() {
                   </div>
                   <Link
                     className="button button--secondary"
-                    to={`/app/sales/${sale.id}/edit`}
+                    to={`/app/sales/new?account=${sale.id}`}
                   >
                     Seguir cargando
                   </Link>
