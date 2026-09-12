@@ -901,3 +901,116 @@ Técnica: `tsc -b` OK · `eslint` 0 warnings · `vitest` **178/178** (reescribí
   de cuentas abiertas para que el administrador vea el avance (punto 4).
 - Recorré vos mismo Ventas (las 3 modalidades) y Compras con la tabla nueva,
   y el ciclo completo cerrar cuenta → cobrar, antes de la presentación.
+
+## Fase 18 — Cinco hallazgos de revisar Ventas y Punto de venta en vivo
+## (2026-09-12)
+
+David separó lo que encontró en dos partes: dos preguntas suyas que eran de
+entendimiento (cómo se cobra en Mostrador, para qué es cada pantalla — ambas
+ya funcionaban como se pidió, solo faltaba que la pantalla lo dijera) y cinco
+cosas que sí eran bugs reales. Las cinco:
+
+### 1 — Dos caminos para cobrar, uno solo corregido
+
+**El bug:** el botón "Cobrar" de "Ventas por cobrar" en Punto de venta llevaba
+a `/app/sales/:id/payments` (la pantalla vieja de pagos), cuyo campo Monto
+arrancaba vacío — el mismo bug que ya se había corregido en "Cobrar y
+confirmar" de Mostrador, pero en una implementación de código completamente
+aparte que nunca recibió el arreglo.
+
+**Corrección: un solo componente, no una copia arreglada.** Nuevo
+`src/sales/SalePaymentFields.tsx`: un hook (`useSalePaymentFields`) que sabe
+precargar el monto (del total de Mostrador o del saldo pendiente de la
+pantalla vieja) y mantenerlo sincronizado salvo que el usuario lo edite a
+mano, más un componente (`SalePaymentFieldset`) con método de pago + monto +
+sesión de caja + monto recibido. Lo usan ahora **los dos lugares**:
+`QuickSalePanel` (Mostrador) y `FinancialOperations` (la pantalla de
+`/app/sales/:id/payments` y `/app/sales/returns/:id/refunds`, que comparten
+el mismo componente desde antes). De regalo, el campo Monto del formulario de
+reembolsos también quedó precargado con el reembolsable — mismo bug,
+mismo arreglo, sin trabajo extra.
+
+**Verificado en navegador:** entré a "Cobrar" de una venta pendiente real
+(Venta #142, debía L 85.00) — el campo Monto ya traía "85" en vez de vacío.
+
+### 2 — El cartel de "borrador sin guardar" decía "Operación completada"
+
+**El bug:** en Cliente registrado y Cuentas abiertas, cuando hay un borrador
+autoguardado de una sesión anterior, el aviso usaba `<FormFeedback
+success="Hay cambios sin guardar de antes.">` — que renderiza el título fijo
+"Operación completada" en estilo de éxito. Communicaba exactamente lo
+contrario de lo que es: una alerta de recuperación, no una confirmación de
+que algo salió bien. Era una regresión mía de esta misma noche, al mover este
+aviso del `SaleEditor` viejo al nuevo `SalesWorkspace.tsx` lo simplifiqué mal.
+
+**Corrección:** vuelve a usar `<Alert tone="warning" title="Hay cambios sin
+guardar de antes">` con el párrafo explicativo, igual que el resto del
+sistema para este mismo tipo de aviso.
+
+**Verificado en navegador:** el cartel ahora aparece en ámbar/advertencia,
+con el título correcto y el párrafo "Parece que se cerró la pestaña o hubo
+un corte antes de guardar...".
+
+### 3 — Pista corta en Mostrador
+
+Se agregó una línea (`.sales-panel__hint`, chica, sin ser un párrafo de
+ayuda) debajo del título de la columna: "Cargá todos los productos del
+cliente y cobrá una sola vez al final con «Cobrar y confirmar»." Responde
+justamente la pregunta que David tuvo que hacer.
+
+### 4 — Ancho desperdiciado en pantallas operativas
+
+**Diagnóstico correcto, causa distinta a la esperada.** Medí el layout real
+en el navegador (no solo leí el CSS): `.page-stack` sin `grid-template-columns`
+explícito ya estiraba sus paneles al 100% del contenedor — esa no era la
+causa. La causa real: `.content` (el contenedor de toda página, en
+`AppShell.tsx`) tenía `width: min(100rem, 100%)` — un tope de 1600px. En
+cualquier monitor más ancho que eso (uno de 1920px, o el de David, de
+2880px lógicos), el contenido queda centrado con una franja vacía real a los
+costados — exactamente lo reportado, y no solo en Ventas: en **cualquier**
+pantalla del sistema, porque `.content` envuelve todas.
+
+**Corrección:** subido a `min(160rem, 100%)` (2560px) — sigue evitando que el
+contenido se estire de forma absurda en un monitor ultra-wide, pero usa
+mucho más del ancho real en cualquier pantalla normal o grande. Un cambio de
+una línea en `global.css` que arregla el ancho **en todo el sistema a la
+vez**, no pantalla por pantalla.
+
+De paso, `.page-stack` quedó con `grid-template-columns: minmax(0, 1fr)`
+explícito — no era la causa de este bug, pero es la práctica correcta para
+que un hijo con contenido intrínsecamente ancho (una tabla larga, por
+ejemplo) nunca fuerce un desborde en vez de usar su propio scroll interno.
+
+**Verificado:** medido con `getBoundingClientRect()` en el navegador real
+(no solo capturas de pantalla, que en este entorno de automatización no
+reflejan el ancho real de la ventana): `.content` pasó de 1600px a 2560px de
+ancho en una ventana de 2880px.
+
+### 5 — Verificación: ¿una cuenta abierta suma a algún total antes de tiempo?
+
+**No — verificado leyendo el código del backend, no solo probado a ojo.**
+`CommercialService.summary()` (`services/ms-autorepuesto/src/commercial/commercial.service.ts`)
+calcula "Vendido hoy" con
+`WHERE "status" = 'POSTED' AND "documentDate" = businessDate` — una cuenta
+abierta es una venta en estado `DRAFT`, así que queda afuera hasta que se
+cierra. La misma función que arma Cuentas por cobrar (`receivableQuery`)
+parte de `s."status" = 'POSTED'` también. El propio texto del panel del
+Panel de inicio ya lo dice: "N ventas **confirmadas** hoy" — nunca cuenta
+borradores. No hizo falta ningún cambio de código; quedó documentado acá
+para que quede registrado que se verificó y no es un bug.
+
+Técnica: `tsc -b` OK · `eslint` 0 warnings · `vitest` 178/178 (un test
+actualizado por el cambio de label "Monto a cobrar" → "Monto" al unificar el
+componente) · `vite build` OK.
+
+## Estado al cierre de la Fase 18
+
+- Todo commiteado en `redesign/producto-ux`, en commits pequeños por bloque.
+  **Sin push** — a la espera de tu confirmación.
+- Creé un cliente de prueba (`CLI-PRUEBA-001 · Cliente de Prueba`) para
+  verificar la columna Cliente registrado de punta a punta (agregar
+  producto, Guardar venta, queda como borrador #150) — cancelado al
+  terminar, no queda en la base.
+- Nada pendiente nuevo de esta ronda; los pendientes de las Fases 16/17
+  (limpieza de datos de prueba de las suites e2e, guardado en tiempo real de
+  cuentas abiertas) siguen igual.
