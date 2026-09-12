@@ -303,56 +303,89 @@ export function PurchaseReturnCreatePage() {
             onChange={(e) => setReason(e.target.value)}
           />
         </Field>
-        <div className="return-lines">
-          {eligible.map((item) => {
-            const current = lines[item.id] ?? { quantity: "", locationId: "" };
-            const available = item.receivedQuantity - item.returnedQuantity;
-            return (
-              <section className="form-section" key={item.id}>
-                <h2>
-                  {item.product.code} · {item.product.name}
-                </h2>
-                <p>
-                  Recibido {item.receivedQuantity} · devuelto{" "}
-                  {item.returnedQuantity} · elegible {available}
-                </p>
-                <div className="form-grid">
-                  <LocationSelector
-                    id={`return-location-${item.id}`}
-                    label="Ubicación origen"
-                    required={Number(current.quantity) > 0}
-                    value={current.locationId}
-                    onChange={(locationId) =>
-                      setLines((all) => ({
-                        ...all,
-                        [item.id]: { ...current, locationId },
-                      }))
-                    }
-                  />
-                  <Field
-                    label="Cantidad a devolver"
-                    htmlFor={`return-quantity-${item.id}`}
-                  >
-                    <input
-                      id={`return-quantity-${item.id}`}
-                      type="number"
-                      min={0}
-                      max={available}
-                      step={1}
-                      value={current.quantity}
-                      onChange={(e) =>
-                        setLines((all) => ({
-                          ...all,
-                          [item.id]: { ...current, quantity: e.target.value },
-                        }))
-                      }
-                    />
-                  </Field>
-                </div>
-              </section>
-            );
-          })}
-        </div>
+        {eligible.length ? (
+          <div className="table-wrap line-items-table-wrap">
+            <table className="line-items-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Recibido</th>
+                  <th>Devuelto</th>
+                  <th>Elegible</th>
+                  <th>Cantidad a devolver</th>
+                </tr>
+              </thead>
+              <tbody>
+                {eligible.map((item) => {
+                  const current = lines[item.id] ?? {
+                    quantity: "",
+                    locationId: "",
+                  };
+                  const available =
+                    item.receivedQuantity - item.returnedQuantity;
+                  return (
+                    <tr key={item.id}>
+                      <td className="line-product">
+                        <strong>{item.product.code}</strong>
+                        <small>{item.product.name}</small>
+                        <details
+                          className="line-location"
+                          open={!current.locationId}
+                        >
+                          <summary>
+                            {current.locationId
+                              ? "Ubicación elegida"
+                              : "Elegí la ubicación de origen"}
+                          </summary>
+                          <LocationSelector
+                            id={`return-location-${item.id}`}
+                            label="Ubicación origen"
+                            required={Number(current.quantity) > 0}
+                            value={current.locationId}
+                            onChange={(locationId) =>
+                              setLines((all) => ({
+                                ...all,
+                                [item.id]: { ...current, locationId },
+                              }))
+                            }
+                          />
+                        </details>
+                      </td>
+                      <td>{item.receivedQuantity}</td>
+                      <td>{item.returnedQuantity}</td>
+                      <td>{available}</td>
+                      <td>
+                        <Field
+                          label="Cantidad a devolver"
+                          htmlFor={`return-quantity-${item.id}`}
+                        >
+                          <input
+                            id={`return-quantity-${item.id}`}
+                            className="line-qty-input"
+                            type="number"
+                            min={0}
+                            max={available}
+                            step={1}
+                            value={current.quantity}
+                            onChange={(e) =>
+                              setLines((all) => ({
+                                ...all,
+                                [item.id]: {
+                                  ...current,
+                                  quantity: e.target.value,
+                                },
+                              }))
+                            }
+                          />
+                        </Field>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
         <div className="form-actions">
           <Button
             type="button"
