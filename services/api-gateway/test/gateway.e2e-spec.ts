@@ -583,5 +583,18 @@ describe("API Gateway HTTP", () => {
       authorization: "Bearer commercial-token",
       query: expect.objectContaining({ limit: "10" }),
     });
+
+    await request(app.getHttpServer())
+      .get("/api/commercial/money-summary?dateFrom=2026-08-01&dateTo=2026-08-31")
+      .set("Authorization", "Bearer commercial-token")
+      .expect(200);
+    expect(upstream.request).toHaveBeenLastCalledWith("autorepuesto", {
+      path: "commercial/money-summary",
+      authorization: "Bearer commercial-token",
+      query: expect.objectContaining({
+        dateFrom: "2026-08-01",
+        dateTo: "2026-08-31",
+      }),
+    });
   });
 });

@@ -80,6 +80,22 @@ export class CommercialController {
     return this.get("commercial/summary", {}, authorization);
   }
 
+  @Get("commercial/money-summary")
+  @ApiOperation({
+    summary:
+      "Read money collected/paid by method for a date range, plus live expected Cash per open session",
+    description:
+      "Read-only aggregate over existing Payment and CashSession rows. Not accounting, profit, COGS, forecasting, or a financial statement.",
+  })
+  @ApiQuery({ name: "dateFrom", required: false, format: "date" })
+  @ApiQuery({ name: "dateTo", required: false, format: "date" })
+  moneySummary(
+    @Query() query: ProxyQuery,
+    @Headers("authorization") authorization?: string,
+  ) {
+    return this.get("commercial/money-summary", query, authorization);
+  }
+
   private get(path: string, query: ProxyQuery, authorization?: string) {
     return this.upstream.request("autorepuesto", {
       path,
