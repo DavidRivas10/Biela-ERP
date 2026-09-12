@@ -67,3 +67,29 @@ export interface CommercialSummary {
     };
   };
 }
+
+export interface MoneySummaryMethodAmount {
+  paymentMethodId: string;
+  code: string;
+  name: string;
+  kind: "CASH" | "CARD" | "BANK_TRANSFER" | "OTHER";
+  amount: string;
+}
+
+export interface MoneySummaryOpenCashSession {
+  id: string;
+  cashRegisterCode: string;
+  cashRegisterName: string;
+  openedAt: string;
+  openingAmount: string;
+  expectedCash: string;
+}
+
+export interface MoneySummary {
+  dateFrom: string;
+  dateTo: string;
+  salesCollected: { total: string; byMethod: MoneySummaryMethodAmount[] };
+  receivablesCollected: { total: string; byMethod: MoneySummaryMethodAmount[] };
+  purchasesPaid: { total: string; byMethod: MoneySummaryMethodAmount[] };
+  openCashSessions: MoneySummaryOpenCashSession[];
+}

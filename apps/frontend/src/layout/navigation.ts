@@ -78,6 +78,12 @@ export const NAVIGATION: NavigationGroup[] = [
     label: "Dinero",
     items: [
       {
+        label: "Resumen",
+        path: "/app/commercial/money-summary",
+        short: "RS",
+        permission: "commercial-summary.read",
+      },
+      {
         label: "Cuentas por cobrar",
         path: "/app/commercial/receivables",
         short: "CC",

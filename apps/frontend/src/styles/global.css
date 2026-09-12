@@ -840,6 +840,46 @@ b {
   color: var(--muted);
   font-size: 0.75rem;
 }
+/* Dinero → Resumen: three read-only cards, one per money bucket, each with
+   a big total and a breakdown by payment method underneath. */
+.money-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.9rem;
+}
+.money-summary-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.money-summary-card__head h2 {
+  margin: 0;
+}
+.money-summary-card__total {
+  font-family: var(--font-mono);
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+}
+.money-summary-card__methods {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.money-summary-card__methods li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.4rem;
+}
+.money-summary-card__methods li:first-child {
+  border-top: none;
+  padding-top: 0;
+}
 .empty-state {
   display: grid;
   min-height: 18rem;

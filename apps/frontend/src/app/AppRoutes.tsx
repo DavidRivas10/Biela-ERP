@@ -32,6 +32,7 @@ import {
   CustomersPage,
 } from "../sales/CustomerPages";
 import { ReceivablesPage } from "../sales/ReceivablesPage";
+import { MoneySummaryPage } from "../commercial/MoneySummaryPage";
 import {
   SaleReturnCreatePage,
   SaleReturnDetailPage,
@@ -422,6 +423,7 @@ export function AppRoutes() {
           <Route path="sales/customers/:id" element={<RequirePermission permission="customers.read"><CustomerDetailPage /></RequirePermission>} />
           <Route path="sales/customers/:id/edit" element={<RequirePermission permission="customers.update"><CustomerFormPage /></RequirePermission>} />
           <Route path="commercial/receivables" element={<RequirePermission permission="commercial-receivables.read"><ReceivablesPage /></RequirePermission>} />
+          <Route path="commercial/money-summary" element={<RequirePermission permission="commercial-summary.read"><MoneySummaryPage /></RequirePermission>} />
           <Route path="customers/*" element={<Navigate to="/app/sales/customers" replace />} />
           <Route path="receivables/*" element={<Navigate to="/app/commercial/receivables" replace />} />
           <Route path="cash/registers" element={<RequirePermission permission="cash-registers.read"><CashRegistersPage /></RequirePermission>} />

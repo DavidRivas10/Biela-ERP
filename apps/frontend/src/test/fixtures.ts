@@ -1,6 +1,7 @@
 import type {
   CommercialSummary,
   CurrentUser,
+  MoneySummary,
   SystemHealth,
 } from "../types/api";
 
@@ -55,6 +56,57 @@ export const commercialSummary: CommercialSummary = {
   payables: { ...totals, outstandingAmount: "475.50" },
   cash: { openSessionCount: 1, expectedCash: "250.25" },
   sales: { today: { count: 3, total: "1360.00" } },
+};
+
+export const moneySummary: MoneySummary = {
+  dateFrom: "2026-08-19",
+  dateTo: "2026-08-19",
+  salesCollected: {
+    total: "85.00",
+    byMethod: [
+      {
+        paymentMethodId: "method-cash",
+        code: "CASH",
+        name: "Efectivo",
+        kind: "CASH",
+        amount: "85.00",
+      },
+    ],
+  },
+  receivablesCollected: {
+    total: "40.00",
+    byMethod: [
+      {
+        paymentMethodId: "method-transfer",
+        code: "TRANSFERENCIA",
+        name: "Transferencia",
+        kind: "BANK_TRANSFER",
+        amount: "40.00",
+      },
+    ],
+  },
+  purchasesPaid: {
+    total: "200.00",
+    byMethod: [
+      {
+        paymentMethodId: "method-cash",
+        code: "CASH",
+        name: "Efectivo",
+        kind: "CASH",
+        amount: "200.00",
+      },
+    ],
+  },
+  openCashSessions: [
+    {
+      id: "session-1",
+      cashRegisterCode: "CAJA-01",
+      cashRegisterName: "Caja principal",
+      openedAt: "2026-08-19T13:00:00.000Z",
+      openingAmount: "500.00",
+      expectedCash: "585.00",
+    },
+  ],
 };
 
 export function jsonResponse(payload: unknown, status = 200): Response {

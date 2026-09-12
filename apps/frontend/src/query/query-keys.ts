@@ -106,6 +106,7 @@ export const queryKeys = {
   receivables: (filters: object) => ["commercial", "receivables", filters] as const,
   customerAccountsRoot: ["commercial", "customer-account"] as const,
   commercialSummary: ["commercial-summary"] as const,
+  moneySummary: (filters: object) => ["commercial", "money-summary", filters] as const,
   usersRoot: ["administration", "users"] as const,
   users: (filters: object) => ["administration", "users", filters] as const,
   user: (id: string) => ["administration", "user", id] as const,
