@@ -1283,3 +1283,107 @@ la página.
   **Sin push** — a la espera de tu confirmación.
 - Nada pendiente nuevo de esta ronda. Con esto, Dinero queda cerrado tanto
   en lógica (Fase 20) como en presentación (Fase 21).
+
+## Fase 22 — Pasada de consistencia visual: Compras, Catálogo, Almacén (2026-09-12)
+
+Pedido explícito: **no reestructurar**, solo layout y claridad visual —
+ancho completo (ya corregido en Fase 18) y el mismo criterio de "se
+entiende sin texto de ayuda" ya aplicado en Ventas/Dinero. Recorrí en el
+navegador, yo mismo, cada pantalla de los tres módulos: Recepción de
+facturas, Compras (lista, detalle, alta, pagos, devolución), Proveedores
+(lista, detalle, alta); Productos (lista, detalle, alta, edición),
+Vehículos (lista, alta), Compatibilidad (lista, alta); Inventario
+(Existencias, Movimientos + alta de movimiento manual, Transferencias,
+Buscar repuesto).
+
+### Encontré un bug real de layout (no solo estético) — lo arreglé
+
+En **Transferencias de inventario** y en **Devolver mercadería al
+proveedor**, el campo "Cantidad" / "Cantidad a devolver" aparecía con un
+hueco enorme entre la etiqueta y el campo, como si faltara algo. Medí el
+DOM en el navegador: la causa es que ese `.field` cae en la misma fila de
+grilla que un buscador-de-ubicación (`.entity-selector`) que es más alto
+(tiene una línea extra "Elegida: ..."), y `.field` no fijaba
+`align-content`, así que por defecto CSS Grid estira su contenido (label +
+input) para llenar toda la altura de la fila en vez de quedarse arriba.
+**Corrección de una línea**: `align-content: start` en la regla base
+`.field` de `global.css` — el campo ahora se queda arriba, del tamaño que
+le corresponde, sin importar cuán alto sea su vecino de fila. Es un
+arreglo global (una sola regla), no por pantalla, y no toca ningún campo
+ni lógica.
+
+### Ayuda en párrafo recortada a una línea
+
+- **Compras → Registrar una factura de proveedor**: el párrafo de dos
+  oraciones bajo el título se recortó a la única parte que no es obvia
+  ("Todavía no entra al inventario — eso pasa cuando marcás la mercadería
+  como recibida."); el resto ya lo decían los campos. Lo mismo en la
+  sección "Productos que trae la factura": de un párrafo de dos oraciones
+  a una línea muted corta.
+- **Compras → Devolver mercadería al proveedor**: mismo criterio — se
+  sacó la primera oración (redundante con los campos del formulario) y se
+  dejaron las dos partes que sí son información real: que queda como
+  borrador y que el ajuste del dinero es aparte.
+- **Almacén → Movimiento manual**: el texto de ayuda que cambia según el
+  tipo de movimiento (Inicial/Entrada/Salida/Ajuste) se dejó tal cual — a
+  diferencia de los anteriores, esto sí es información necesaria y no
+  obvia (a qué ubicación va, de cuál sale), no relleno — pero se le bajó
+  el peso visual a `.muted`, igual que el resto de los textos de ayuda del
+  sistema, en vez de texto de cuerpo normal.
+
+### Campos secundarios colapsados
+
+En **Compras → Registrar una factura**, "Fecha de vencimiento" y "Notas"
+(ambos opcionales, no se usan en cada compra) pasaron a vivir dentro de un
+`<details>` "Vencimiento y notas (opcional)" — el mismo patrón exacto que
+ya usa Ventas (`<details className="filter-details">`) para sus propios
+campos opcionales. No se tocó ningún otro formulario del pase porque el
+resto (Proveedor, Producto, Vehículo, Compatibilidad) ya tiene pocos
+campos y los muestra en una grilla de dos columnas sin sensación de
+exceso — colapsar ahí no habría sumado claridad, así que los dejé como
+estaban.
+
+### Dos hallazgos que reporto, sin tocar (tal como pediste)
+
+1. **Almacén → Inventario ya es un caso real de "varios flujos distintos
+   en una sola pantalla"**: la pantalla ya tiene sub-navegación propia
+   (`InventoryTabs.tsx`) entre Existencias, Movimientos, Transferencias y
+   Buscar repuesto — pero implementada con **rutas reales** (`NavLink` a
+   `/app/inventory`, `/app/inventory/movements`, etc.), no con el patrón
+   de paneles-en-memoria de Ventas/Dinero (`WorkspaceTabs`). El mismo
+   patrón de sub-pestañas por rutas (`.subtabs`) lo usa también Cajas ↔
+   Sesiones de caja en Dinero. No decidí nada por mi cuenta: te lo dejo
+   para que definas si conviene pasarlo al patrón `WorkspaceTabs` (ganaría
+   el ancho completo por pestaña y evitaría perder filtros al navegar,
+   pero cambiaría de navegación por URL a estado en memoria) o dejarlo
+   como está — no es obviamente mejor de una forma, y no lo tocaría sin
+   que lo decidas vos.
+2. **IDs de actor sin resolver a nombre**: en Movimientos de inventario
+   (columna "Actor") y en Cajas/Sesiones de caja (Dinero), lo que se
+   muestra es el UUID interno del usuario, no su nombre — un vendedor no
+   puede saber quién hizo un movimiento con solo mirar la pantalla. No es
+   nuevo de esta ronda ni de estos tres módulos (es el mismo patrón en
+   Cajas), y no es un problema de layout: hace falta relacionar el actor
+   con su usuario en alguna parte del backend, o guardar el nombre además
+   del id. Lo marco como hallazgo real de funcionamiento, no lo toqué.
+
+### Verificación
+
+- `tsc -b`, `eslint --max-warnings=0`, `vitest` (184/184), `vite build`:
+  los cuatro sin errores en el frontend — ningún test dependía del texto
+  exacto de los párrafos recortados ni de que "Fecha de vencimiento"/
+  "Notas" estuvieran siempre visibles.
+- **Recorrido y verificado en el navegador por mí mismo**, pantalla por
+  pantalla, antes y después de cada cambio — incluida la medición directa
+  del DOM (`getBoundingClientRect`) que confirmó la causa exacta del bug
+  de "Cantidad" antes de tocar el CSS, y una captura después del arreglo
+  confirmando que el campo quedó del tamaño correcto en Transferencias y
+  en Devolver mercadería.
+
+## Estado al cierre de la Fase 22
+
+- Todo commiteado en `redesign/producto-ux`, en un commit por bloque.
+  **Sin push** — a la espera de tu confirmación.
+- Dos hallazgos reportados arriba, ninguno corregido — a la espera de tu
+  decisión sobre si aplicar pestañas a Inventario/Cajas y sobre si vale la
+  pena resolver los IDs de actor sin nombre.
