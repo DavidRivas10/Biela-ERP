@@ -143,6 +143,22 @@ function renderWorkspace(path = "/app/sales/new") {
   );
 }
 
+/** The three panels stay mounted at all times — only the active one lacks
+ * the `hidden` attribute. Grabbing them by id (rather than by role/heading,
+ * which testing-library excludes when hidden) works regardless of which tab
+ * is currently selected. */
+function panels() {
+  return {
+    mostrador: document.getElementById("sales-panel-mostrador") as HTMLElement,
+    cliente: document.getElementById("sales-panel-cliente") as HTMLElement,
+    cuenta: document.getElementById("sales-panel-cuenta") as HTMLElement,
+  };
+}
+
+function workspaceTab(name: string) {
+  return screen.getByRole("tab", { name });
+}
+
 beforeEach(() => {
   auth = {
     status: "authenticated",
@@ -165,16 +181,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("Ventas — tres columnas independientes", () => {
+describe("Ventas — tres pestañas, tres drafts independientes", () => {
   it("agregar un producto en Mostrador no aparece en Cliente ni en Cuentas abiertas (bug de estado cruzado)", async () => {
     stubFetch({ products: [product1], locations: [location1] });
     renderWorkspace();
 
-    const mostrador = screen.getByRole("heading", { name: "Venta rápida (mostrador)" }).closest("form")!;
-    const cliente = screen.getByRole("heading", { name: "Cliente registrado" }).closest("form")!;
-    const cuenta = screen
-      .getByRole("heading", { name: "Cuentas abiertas" })
-      .closest(".sales-panel") as HTMLElement;
+    const { mostrador, cliente, cuenta } = panels();
+    expect(mostrador).not.toHaveAttribute("hidden");
 
     await within(mostrador).findByRole("option", { name: /FILT-001/ });
     await userEvent.selectOptions(
@@ -187,36 +200,78 @@ describe("Ventas — tres columnas independientes", () => {
     expect(within(cuenta).queryByText("FILT-001")).toBeNull();
     expect(
       within(cliente).getByText("Todavía no agregaste ningún producto."),
-    ).toBeVisible();
+    ).toBeInTheDocument();
     expect(
       within(cuenta).getByText("Todavía no agregaste ningún producto."),
-    ).toBeVisible();
+    ).toBeInTheDocument();
   });
 
-  it("un scan físico solo llega al panel donde el vendedor está trabajando", async () => {
+  it("un scan físico solo llega a la pestaña activa", async () => {
     stubFetch({ products: [product1, product2], locations: [location1] });
     renderWorkspace();
 
-    const mostrador = screen.getByRole("heading", { name: "Venta rápida (mostrador)" }).closest("form")!;
-    const cliente = screen.getByRole("heading", { name: "Cliente registrado" }).closest("form")!;
+    const { mostrador, cliente } = panels();
 
-    // Default focus is Mostrador (the leftmost, most-used column) — a burst
-    // of fast keystrokes there should land in Mostrador's table.
+    // Mostrador is the default active tab — a burst of fast keystrokes there
+    // should land in its table.
     fireScan("FILT-001");
     await waitFor(() =>
       expect(within(mostrador).getByText("FILT-001")).toBeVisible(),
     );
     expect(within(cliente).queryByText("FILT-001")).toBeNull();
 
-    // Clicking into Cliente switches which panel a physical scan targets.
-    await userEvent.click(
-      within(cliente).getByLabelText(/^Buscar cliente/),
-    );
+    // Switching tabs is the only way to change which panel a physical scan
+    // targets — nothing else re-arms the scanner.
+    await userEvent.click(workspaceTab("Cliente registrado"));
     fireScan("PAST-002");
     await waitFor(() =>
       expect(within(cliente).getByText("PAST-002")).toBeVisible(),
     );
     expect(within(mostrador).queryByText("PAST-002")).toBeNull();
+    // Mostrador's own line from before the tab switch is untouched, just
+    // not on screen anymore.
+    expect(within(mostrador).getByText("FILT-001")).toBeInTheDocument();
+  });
+
+  it("cambiar de pestaña no resetea lo cargado en las otras dos", async () => {
+    stubFetch({ products: [product1, product2], locations: [location1] });
+    const user = userEvent.setup();
+    renderWorkspace();
+
+    const { mostrador, cliente, cuenta } = panels();
+
+    // Load something into Mostrador.
+    await within(mostrador).findByRole("option", { name: /FILT-001/ });
+    await user.selectOptions(
+      within(mostrador).getByLabelText(/^Agregar producto/),
+      "product-1",
+    );
+    expect(within(mostrador).getByText("FILT-001")).toBeVisible();
+
+    // Jump to Cliente registrado and load something different there.
+    await user.click(workspaceTab("Cliente registrado"));
+    expect(mostrador).toHaveAttribute("hidden");
+    expect(cliente).not.toHaveAttribute("hidden");
+    await within(cliente).findByRole("option", { name: /PAST-002/ });
+    await user.selectOptions(
+      within(cliente).getByLabelText(/^Agregar producto/),
+      "product-2",
+    );
+    expect(within(cliente).getByText("PAST-002")).toBeVisible();
+
+    // Jump to Cuentas abiertas — still empty, doesn't affect the other two.
+    await user.click(workspaceTab("Cuentas abiertas"));
+    expect(cliente).toHaveAttribute("hidden");
+    expect(cuenta).not.toHaveAttribute("hidden");
+
+    // Back to Mostrador: its product is still exactly where it was.
+    await user.click(workspaceTab("Venta rápida"));
+    expect(cuenta).toHaveAttribute("hidden");
+    expect(mostrador).not.toHaveAttribute("hidden");
+    expect(within(mostrador).getByText("FILT-001")).toBeVisible();
+
+    // And Cliente, still hidden, kept its own line too.
+    expect(within(cliente).getByText("PAST-002")).toBeInTheDocument();
   });
 });
 
@@ -251,7 +306,7 @@ describe("Venta rápida (mostrador) — cobrar en un solo paso", () => {
     const user = userEvent.setup();
     renderWorkspace();
 
-    const mostrador = screen.getByRole("heading", { name: "Venta rápida (mostrador)" }).closest("form")!;
+    const { mostrador } = panels();
     await within(mostrador).findByRole("option", { name: /FILT-001/ });
     await user.selectOptions(
       within(mostrador).getByLabelText(/^Agregar producto/),
@@ -291,8 +346,8 @@ describe("Venta rápida (mostrador) — cobrar en un solo paso", () => {
   });
 });
 
-describe("Cuentas abiertas — pestañas dentro del mismo workspace", () => {
-  it("cambiar de pestaña no navega a otra ruta ni afecta a Mostrador o Cliente", async () => {
+describe("Cuentas abiertas — sub-navegación dentro de la pestaña", () => {
+  it("cambiar de cuenta no navega a otra ruta ni afecta a Mostrador o Cliente", async () => {
     stubFetch({
       products: [product1],
       locations: [location1],
@@ -308,7 +363,7 @@ describe("Cuentas abiertas — pestañas dentro del mismo workspace", () => {
     const user = userEvent.setup();
     renderWorkspace();
 
-    const mostrador = screen.getByRole("heading", { name: "Venta rápida (mostrador)" }).closest("form")!;
+    const { mostrador } = panels();
     await within(mostrador).findByRole("option", { name: /FILT-001/ });
     await user.selectOptions(
       within(mostrador).getByLabelText(/^Agregar producto/),
@@ -316,14 +371,17 @@ describe("Cuentas abiertas — pestañas dentro del mismo workspace", () => {
     );
     expect(within(mostrador).getByText("FILT-001")).toBeVisible();
 
-    const tab = await screen.findByRole("tab", {
+    // The individual-account selector only becomes reachable once the
+    // Cuentas abiertas tab itself is active.
+    await user.click(workspaceTab("Cuentas abiertas"));
+    const accountTab = await screen.findByRole("tab", {
       name: /Corolla azul – Juan/,
     });
-    await user.click(tab);
+    await user.click(accountTab);
 
     expect(await screen.findByDisplayValue("Corolla azul – Juan")).toBeVisible();
-    // Mostrador's in-progress line survived the tab switch untouched.
-    expect(within(mostrador).getByText("FILT-001")).toBeVisible();
+    // Mostrador's in-progress line survived both tab switches, untouched.
+    expect(within(mostrador).getByText("FILT-001")).toBeInTheDocument();
   });
 });
 
