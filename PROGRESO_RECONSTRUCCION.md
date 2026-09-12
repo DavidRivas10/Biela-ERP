@@ -1014,3 +1014,85 @@ componente) · `vite build` OK.
 - Nada pendiente nuevo de esta ronda; los pendientes de las Fases 16/17
   (limpieza de datos de prueba de las suites e2e, guardado en tiempo real de
   cuentas abiertas) siguen igual.
+
+## Fase 19 — Ventas: de tres columnas a tres pestañas (2026-09-12)
+
+Cambio de layout pedido por David, no un bug: las computadoras del mostrador
+tienen monitores angostos, y las tres columnas simultáneas de la Fase 17
+(pensadas para una pantalla ancha) desperdiciaban espacio ahí — cada columna
+terminaba comprimida. La instrucción fue explícita en que **no** es un
+cambio de arquitectura de estado: las tres columnas ya eran tres drafts
+totalmente independientes (Fase 17); esto es solo un cambio de qué tanto de
+la pantalla ocupa cada una y cómo se navega entre ellas.
+
+### El cambio
+
+`SaleFormPage` (`apps/frontend/src/sales/SalesWorkspace.tsx`) ahora renderiza
+una barra de pestañas (`role="tablist"`, `Venta rápida | Cliente registrado
+| Cuentas abiertas`) seguida de un único área de contenido a ancho completo.
+Los tres paneles (`QuickSalePanel`, `CustomerSalePanel`, `OpenAccountColumn`)
+siguen **montados los tres, todo el tiempo** — la pestaña activa solo
+controla cuál de las tres `<section>` no tiene el atributo `hidden`. Cambiar
+de pestaña es puramente un cambio de vista: no se desmonta ni se reinicia
+ningún componente, así que no hay forma de que perder productos cargados,
+cliente elegido o cuenta activa sea siquiera posible — el estado de React
+que lo sostiene nunca deja de existir.
+
+Esto es una simplificación, no una construcción nueva: el estado
+`activePanel` que decide qué panel arma la barra de pestañas es el mismo que
+ya existía desde la Fase 17 para la lógica de "qué panel escucha al lector
+de código de barras" (`scannerEnabled`/`active`). Antes ese estado decidía
+además el estilo de foco visual entre tres columnas visibles a la vez; ahora
+decide, con el mismo mecanismo, cuál sección lleva `hidden`. No hizo falta
+tocar `SaleLineItems.tsx` ni la lógica de scanner-gating en absoluto.
+
+Dentro de Cuentas abiertas, el selector de cuentas individuales
+(`OpenAccountsBar`, las pestañas TOYOTA/CRV/+ Nueva cuenta) se dejó
+exactamente como estaba — sigue siendo una sub-navegación de segundo nivel,
+ahora simplemente dentro de una pestaña de primer nivel en lugar de dentro
+de una columna.
+
+### Totales y monto a cobrar, grandes y al final
+
+Se agregó `.sale-totals-bar` (nueva franja al pie de cada uno de los tres
+formularios, separada del resto por un borde superior) con el total en
+`2.75rem`/peso 800 — antes el total solo aparecía chico, en el `<tfoot>` de
+la tabla de productos, mezclado visualmente con las demás columnas. En
+Venta rápida, el bloque de método de pago/monto a cobrar quedó dentro de
+esta misma franja, justo antes del botón «Cobrar y confirmar» (también
+agrandado, `.button--large`) — en vez de ser "un campo de formulario más"
+entre otros. Cliente registrado y Cuentas abiertas no cobran en el momento,
+pero también ganaron esta franja de total destacado antes de su botón
+«Guardar», por consistencia visual entre las tres pestañas.
+
+### Verificación
+
+- `tsc -b`, `eslint --max-warnings=0`, `vite build`: los tres sin errores.
+- `vitest`: reescribí los 4 tests de `SalesWorkspace.test.tsx` que asumían
+  las tres columnas visibles a la vez (`within` sobre cada columna
+  simultáneamente) al modelo de pestañas — ahora ubican cada panel por su
+  `id` fijo (`sales-panel-mostrador/cliente/cuenta`, que no cambia estén o
+  no ocultos) y usan `toBeInTheDocument()` en vez de `toBeVisible()` para
+  aserciones sobre el contenido de una pestaña inactiva (correctamente no
+  visible, pero debe seguir en el DOM). Sumé un test nuevo,
+  específicamente para el requisito de "no reset al cambiar de pestaña":
+  carga un producto en Mostrador, salta a Cliente y carga uno distinto,
+  salta a Cuentas abiertas, vuelve a Mostrador y confirma que su línea
+  sigue ahí, y que la de Cliente (todavía oculta) también. 179/179 en la
+  suite completa.
+- **Verificado en el navegador por mí mismo**, con el stack de desarrollo
+  real (no la suite de tests): cargué `FILT-001` en Venta rápida (el total
+  pasó a mostrarse grande, "L 85.00", con el monto a cobrar precargado),
+  salté a Cliente registrado y cargué el mismo producto ahí también (línea
+  y total propios, independientes), salté a Cuentas abiertas (con TOYOTA y
+  CRV como sub-pestañas intactas), y volví a Venta rápida y a Cliente
+  registrado en ese orden — ambos conservaban exactamente lo que tenían
+  antes de saltar, sin ningún reseteo.
+
+## Estado al cierre de la Fase 19
+
+- Todo commiteado en `redesign/producto-ux`, en commits pequeños por bloque.
+  **Sin push** — a la espera de tu confirmación.
+- Nada pendiente nuevo de esta ronda.
+- Siguiente paso, según lo conversado: revisar el módulo Dinero, que todavía
+  no se validó en esta serie de rondas.
