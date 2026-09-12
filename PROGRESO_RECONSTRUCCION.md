@@ -1096,3 +1096,120 @@ pero también ganaron esta franja de total destacado antes de su botón
 - Nada pendiente nuevo de esta ronda.
 - Siguiente paso, según lo conversado: revisar el módulo Dinero, que todavía
   no se validó en esta serie de rondas.
+
+## Fase 20 — Dinero: método Transferencia y Resumen de solo lectura (2026-09-12)
+
+Dos pedidos acotados sobre Dinero, el módulo que todavía no se había
+revisado en esta serie.
+
+### 1 — Método de pago "Transferencia" en Cuentas por pagar
+
+**El código ya estaba bien** — no fue necesario tocar backend ni frontend.
+`PaymentsService.resolveCash()` (`services/ms-autorepuesto/src/finance/payments.service.ts`)
+ya exige `cashSessionId`/valida efectivo de la sesión únicamente cuando
+`method.kind === 'CASH'`; para cualquier otro `kind` (incluido
+`BANK_TRANSFER`) directamente rechaza que se mande `cashSessionId` o
+`tenderedAmount`. Lo mismo del lado del frontend: tanto
+`SalePaymentFieldset` (Ventas) como `PurchaseFinancePages.tsx` (Cuentas por
+pagar) ya condicionan el campo de sesión de caja y el texto del diálogo de
+confirmación ("Aumentará el efectivo esperado" / "No afectará efectivo
+físico") exclusivamente a `method.kind === 'CASH'`.
+
+**Lo que faltaba era el dato, no el código**: revisé la base de datos real
+y el método "Transferencia" no existía — solo había dos métodos de prueba
+dejados por una corrida de e2e (`CARD-1789178356225` / `CASH-1789178356225`,
+el problema de contaminación de la base de dev por los tests, ya documentado
+en rondas anteriores). Agregué el registro real: `PaymentMethod` con código
+`TRANSFERENCIA`, nombre "Transferencia", `kind = BANK_TRANSFER`, activo.
+Como `PaymentMethodSelector` no filtra por `kind`, ya aparece como tercera
+opción en los selectores de método de pago de Ventas y Compras sin ningún
+cambio de código.
+
+### 2 — Resumen de Dinero (solo lectura)
+
+Nueva pantalla en Dinero → **Resumen** (`/app/commercial/money-summary`),
+con selector de rango de fechas (por defecto, hoy). Backend: un método
+nuevo `CommercialService.moneySummary()` +
+`GET /commercial/money-summary` (mismo permiso que el resumen del panel de
+inicio, `commercial-summary.read`), agregado también al proxy del
+api-gateway. Es una lectura agregada sobre `Payment` y `CashSession` que ya
+existen — sin ninguna tabla, campo ni concepto contable nuevo.
+
+**Un aviso que pediste explícitamente si aparecía, y apareció**: "Total
+vendido hoy, desglosado por método de pago" tal como lo pediste **no se
+puede calcular limpio** con lo que existe hoy. La razón: "Vendido hoy" en
+este sistema (el mismo número que ya se muestra en el Panel de inicio) es
+el total de una Venta confirmada (`Sale.total` con `status = POSTED` y
+`documentDate = hoy`) — pero una Venta no tiene un único método de pago:
+puede pagarse dividida entre efectivo y tarjeta, puede quedar total o
+parcialmente a crédito (sin ningún pago todavía), y hasta puede cobrarse un
+día distinto al de la venta. No hay forma honesta de repartir ese total
+único entre métodos de pago sin inventar una regla arbitraria.
+
+**Lo que sí se puede calcular limpio, y es lo que construí en su lugar**:
+separé los pagos de venta (`Payment` con `type = SALE_PAYMENT`) en dos
+grupos, usando la única distinción que el dato ya sostiene sin ambigüedad —
+si la fecha del pago coincide con la fecha de la venta que salda, o es
+posterior:
+- **"Vendido y cobrado el mismo día"**: pagos cuya fecha coincide con la
+  `documentDate` de la venta — el caso de mostrador, cobra en el momento.
+- **"Cobrado de cuentas por cobrar"**: pagos de una fecha posterior a la
+  venta que saldan — un abono contra un saldo que ya existía.
+
+Ambos, desglosados por método de pago (esto sí es limpio: cada `Payment`
+tiene exactamente un método). Igual para **"Pagado a proveedores"**
+(`PURCHASE_PAYMENT`, por método, sin esta distinción porque no la pediste
+para ese lado). Y **"Efectivo esperado por sesión de caja abierta"**: una
+fila por cada `CashSession` con `status = OPEN`, con el mismo cálculo
+(`movementDelta` sobre sus `CashMovement`) que ya usa
+`CashSessionsService`/`CashLedgerService` para el cierre de caja — no es un
+número nuevo, es el mismo, mostrado por sesión en vez de agregado. Esta
+tabla no depende del rango de fechas elegido (es estado actual).
+
+**Lo que esto significa para el control real del negocio**: hoy el sistema
+sabe con certeza cuánto entró y de qué método, y cuánto efectivo debería
+haber en cada caja — pero **no sabe "cuánto se vendió" como una cifra única
+y repartible por método de pago**, porque una venta y su cobro son eventos
+separados en el modelo de datos (correctamente, ya que así es como
+funciona una cuenta por cobrar). Si en algún momento se quiere ese número
+exacto iría a costa de una simplificación real del negocio (por ejemplo,
+prohibir pagos divididos, o asumir que todo se cobra el mismo día) — no es
+algo que se pueda resolver solo con una consulta distinta.
+
+**Verificado en el navegador por mí mismo**: cargué el filtro con datos
+reales de la sesión de trabajo de hoy — "Vendido y cobrado el mismo día"
+mostró L 510.00 (Efectivo), "Cobrado de cuentas por cobrar" L 100.00
+(Efectivo) — probé el rango de fechas ampliándolo hacia atrás (el total de
+CxC subió a L 450.00 al incluir más abonos históricos) y luego a un rango
+sin actividad (1–2 de enero de 2000), donde las tres tarjetas cayeron
+correctamente a L 0.00 sin afectar la tabla de sesiones abiertas (que
+mostró 2 sesiones con su efectivo esperado, ajeno al filtro). También
+probé un rango inválido (desde > hasta) y el backend lo rechazó con el
+mensaje correcto, propagado a la pantalla.
+
+Técnica: `tsc -b`/`eslint`/build limpios en `ms-autorepuesto`,
+`api-gateway` y frontend. `ms-autorepuesto`: 23 unit + 128 e2e (sumé un
+caso a `commercial-finance.e2e-spec.ts` que crea una venta con
+`documentDate` de hoy pagada hoy, y un abono hoy sobre una venta con
+`documentDate` de hace más de un mes, y confirma por diferencia (antes/
+después) que cada uno cae en el bucket correcto). `api-gateway`: sumé un
+caso a `gateway.e2e-spec.ts` confirmando que reenvía `dateFrom`/`dateTo` tal
+cual al upstream. Frontend: `MoneySummaryPage.test.tsx` nuevo (4 casos:
+datos completos, sin sesiones abiertas, cambio de rango dispara la query
+con los parámetros correctos, error con reintento) — 183/183 en la suite
+completa.
+
+## Estado al cierre de la Fase 20
+
+- Todo commiteado en `redesign/producto-ux`, en commits pequeños por bloque.
+  **Sin push** — a la espera de tu confirmación.
+- Dato agregado a la base de datos de desarrollo (el `PaymentMethod`
+  "Transferencia"): no es un cambio de código, así que no está en ningún
+  commit — si se recrea la base de datos desde cero, hay que volver a
+  crearlo (a mano, o vía un futuro script de datos iniciales, que todavía
+  no existe para este módulo).
+- Pendiente para vos, no para mí: decidir si "vendido hoy desglosado por
+  método de pago" tal como se pidió originalmente amerita simplificar
+  alguna regla de negocio (por ejemplo, no permitir pagos divididos en
+  Venta rápida), o si la vista con la distinción "mismo día / cuentas por
+  cobrar" que construí ya resuelve lo que necesitás ver día a día.
