@@ -273,8 +273,7 @@ describe("Venta rápida (mostrador) — cobrar en un solo paso", () => {
       ).toBe("session-1"),
     );
     expect(
-      within(mostrador).getByLabelText<HTMLInputElement>(/^Monto a cobrar/)
-        .value,
+      (document.getElementById("mostrador-amount") as HTMLInputElement).value,
     ).toBe("85.00");
 
     await user.click(

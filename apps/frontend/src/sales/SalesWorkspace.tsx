@@ -4,15 +4,12 @@ import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-
 import { salesApi, type SaleInput } from "../api/sales-api";
 import { salesFinanceApi } from "../api/sales-finance-api";
 import { useAuth } from "../auth/AuthContext";
+import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { FormFeedback } from "../components/FormFeedback";
 import { Field } from "../components/Field";
 import { OpenAccountsBar } from "../components/OpenAccountsBar";
 import { PageHeader } from "../components/PageHeader";
-import {
-  OpenCashSessionSelector,
-  PaymentMethodSelector,
-} from "../components/PurchasingSelectors";
 import { CustomerSelector } from "../components/SalesSelectors";
 import { clearDraft, readDraft, useAutosaveDraft } from "../hooks/use-draft-autosave";
 import { queryKeys } from "../query/query-keys";
@@ -21,9 +18,9 @@ import {
   invalidateInventoryIntegration,
 } from "../query/invalidation";
 import type { Sale } from "../types/sales";
-import type { PaymentMethod } from "../types/purchasing";
 import { apiErrorMessage } from "../utils/api-error";
 import { formatMoney, isMoneyAtLeast } from "../utils/formatters";
+import { useSalePaymentFields, SalePaymentFieldset } from "./SalePaymentFields";
 import {
   linesTotal,
   useSaleLineItems,
@@ -186,35 +183,16 @@ function QuickSalePanel({ active }: { active: boolean }) {
   const { lines, updateLine, removeLine, addScannedProduct, handleScan, scanFeedback, duplicate, setLines } =
     useSaleLineItems("mostrador", undefined, active);
   const total = linesTotal(lines);
-
-  const [methodId, setMethodId] = useState("");
-  const [method, setMethod] = useState<PaymentMethod>();
   const suggestedAmount = total > 0 ? total.toFixed(2) : "";
-  const [amount, setAmount] = useState(suggestedAmount);
-  const [autoAmount, setAutoAmount] = useState(suggestedAmount);
-  const [cashSessionId, setCashSessionId] = useState("");
-  const [tenderedAmount, setTenderedAmount] = useState("");
+  const payment = useSalePaymentFields(suggestedAmount);
+  const { methodId, method, amount, cashSessionId, tenderedAmount } = payment;
+
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<Sale | null>(null);
 
-  // The amount to collect defaults to the table's total and stays in sync
-  // with it — unless the vendor typed a different number, in which case we
-  // stop overwriting their edit. Adjusted during render (React's documented
-  // pattern for "state derived from a changing value, but overridable") so
-  // it never lags a render behind, unlike doing this in an effect.
-  if (suggestedAmount !== autoAmount) {
-    setAutoAmount(suggestedAmount);
-    if (amount === autoAmount) setAmount(suggestedAmount);
-  }
-
   function resetAll() {
     setLines([]);
-    setMethodId("");
-    setMethod(undefined);
-    setAmount("");
-    setAutoAmount("");
-    setCashSessionId("");
-    setTenderedAmount("");
+    payment.reset();
   }
 
   const checkout = useMutation({
@@ -319,6 +297,10 @@ function QuickSalePanel({ active }: { active: boolean }) {
   return (
     <form className="panel erp-form sales-panel" onSubmit={submit}>
       <h2>Venta rápida (mostrador)</h2>
+      <p className="sales-panel__hint">
+        Cargá todos los productos del cliente y cobrá una sola vez al final
+        con «Cobrar y confirmar».
+      </p>
       {confirmed ? (
         <FormFeedback
           success={`Venta #${confirmed.number} lista${
@@ -356,55 +338,7 @@ function QuickSalePanel({ active }: { active: boolean }) {
       />
       {canCheckoutInOneStep ? (
         <div className="form-grid quick-sale-payment">
-          <PaymentMethodSelector
-            id="mostrador-payment-method"
-            label="Método de pago"
-            required
-            value={methodId}
-            onChange={(value, selected) => {
-              setMethodId(value);
-              setMethod(selected);
-              setCashSessionId("");
-              setTenderedAmount("");
-            }}
-          />
-          <Field
-            label="Monto a cobrar"
-            htmlFor="mostrador-amount"
-            hint="Se precarga con el total; cambialo si cobrás distinto."
-          >
-            <input
-              id="mostrador-amount"
-              inputMode="decimal"
-              pattern="\d+(\.\d{1,2})?"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </Field>
-          {method?.kind === "CASH" ? (
-            <>
-              <OpenCashSessionSelector
-                id="mostrador-cash-session"
-                label="Sesión de caja ABIERTA"
-                required
-                value={cashSessionId}
-                onChange={setCashSessionId}
-              />
-              <Field
-                label="Monto recibido"
-                htmlFor="mostrador-tendered"
-                hint="El sistema calcula y devuelve el cambio."
-              >
-                <input
-                  id="mostrador-tendered"
-                  inputMode="decimal"
-                  pattern="\d+(\.\d{1,2})?"
-                  value={tenderedAmount}
-                  onChange={(e) => setTenderedAmount(e.target.value)}
-                />
-              </Field>
-            </>
-          ) : null}
+          <SalePaymentFieldset idPrefix="mostrador" fields={payment} />
         </div>
       ) : null}
       <div className="form-actions">
@@ -557,17 +491,20 @@ function CustomerSaleForm({
     <form className="panel erp-form sales-panel" onSubmit={submit}>
       <h2>Cliente registrado</h2>
       {!draftResolved && restorableDraft ? (
-        <FormFeedback success="Hay cambios sin guardar de antes." />
-      ) : null}
-      {!draftResolved && restorableDraft ? (
-        <div className="dialog-actions">
-          <Button type="button" variant="secondary" onClick={discardDraft}>
-            Descartar
-          </Button>
-          <Button type="button" onClick={restoreDraft}>
-            Restaurar
-          </Button>
-        </div>
+        <Alert tone="warning" title="Hay cambios sin guardar de antes">
+          <p>
+            Parece que se cerró la pestaña o hubo un corte antes de guardar.
+            Podés seguir con lo que tenías o descartarlo.
+          </p>
+          <div className="dialog-actions">
+            <Button type="button" variant="secondary" onClick={discardDraft}>
+              Descartar
+            </Button>
+            <Button type="button" onClick={restoreDraft}>
+              Restaurar
+            </Button>
+          </div>
+        </Alert>
       ) : null}
       <FormFeedback
         error={formError ?? (mutation.error ? apiErrorMessage(mutation.error) : null)}
@@ -769,8 +706,11 @@ function OpenAccountForm({
   return (
     <form className="erp-form" onSubmit={submit}>
       {!draftResolved && restorableDraft ? (
-        <>
-          <FormFeedback success="Hay cambios sin guardar de antes." />
+        <Alert tone="warning" title="Hay cambios sin guardar de antes">
+          <p>
+            Parece que se cerró la pestaña o hubo un corte antes de guardar.
+            Podés seguir con lo que tenías o descartarlo.
+          </p>
           <div className="dialog-actions">
             <Button type="button" variant="secondary" onClick={discardDraft}>
               Descartar
@@ -779,7 +719,7 @@ function OpenAccountForm({
               Restaurar
             </Button>
           </div>
-        </>
+        </Alert>
       ) : null}
       <FormFeedback
         error={formError ?? (mutation.error ? apiErrorMessage(mutation.error) : null)}
