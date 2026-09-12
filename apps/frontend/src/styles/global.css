@@ -684,7 +684,12 @@ b {
   background: var(--surface-soft);
 }
 .content {
-  width: min(100rem, 100%);
+  /* Was capped at 100rem (1600px) — narrow enough to leave a wide empty
+     strip on a normal desktop monitor, let alone a wide one. This is a
+     data-dense ERP tool (tables, multi-column forms), not flowing prose, so
+     there's no readability reason to cap it that tight. 160rem (2560px)
+     still keeps it from stretching absurdly on an ultra-wide display. */
+  width: min(160rem, 100%);
   min-width: 0;
   margin: 0 auto;
   padding: clamp(1.1rem, 3vw, 2.2rem);
@@ -955,6 +960,7 @@ b {
 /* Frontend Phase 10.B operational ERP patterns */
 .page-stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   gap: 1.15rem;
 }
@@ -1438,6 +1444,11 @@ b {
 }
 .sales-panel h2 {
   margin: 0 0 0.2rem;
+}
+.sales-panel__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 .quick-sale-payment {
   border-top: 1px solid var(--line);
