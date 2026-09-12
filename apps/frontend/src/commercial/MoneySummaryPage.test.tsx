@@ -21,48 +21,35 @@ function renderPage() {
   );
 }
 
+/** Every tab panel stays mounted at all times — only the active one lacks
+ * `hidden`. Grabbing them by id works regardless of which tab is selected. */
+function panel(key: string) {
+  return document.getElementById(`money-summary-panel-${key}`) as HTMLElement;
+}
+
+function moneyTab(name: string) {
+  return screen.getByRole("tab", { name });
+}
+
 describe("MoneySummaryPage", () => {
-  it("shows the three money buckets by method and the open Cash sessions", async () => {
+  it("defaults to the first tab, full width, with the other three mounted but hidden", async () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(jsonResponse(moneySummary))));
     renderPage();
-    await screen.findByRole("heading", { name: "Vendido y cobrado el mismo día" });
-    const cardFor = (heading: string) =>
-      within(screen.getByRole("heading", { name: heading }).closest("section")!);
 
-    const totalIn = (heading: string, amount: string) =>
-      cardFor(heading).getByText(amount, {
-        selector: ".money-summary-card__total",
-      });
-
-    expect(totalIn("Vendido y cobrado el mismo día", "L 85.00")).toBeInTheDocument();
-    expect(cardFor("Vendido y cobrado el mismo día").getByText("Efectivo")).toBeInTheDocument();
-    expect(totalIn("Cobrado de cuentas por cobrar", "L 40.00")).toBeInTheDocument();
-    expect(cardFor("Cobrado de cuentas por cobrar").getByText("Transferencia")).toBeInTheDocument();
-    expect(totalIn("Pagado a proveedores", "L 200.00")).toBeInTheDocument();
-    expect(screen.getByText("CAJA-01")).toBeInTheDocument();
-    expect(screen.getByText("L 585.00")).toBeInTheDocument(); // efectivo esperado
-    expect(
-      screen.getByText(/Rango mostrado: 19 ago 2026/),
-    ).toBeInTheDocument();
-  });
-
-  it("has no open Cash sessions", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve(
-          jsonResponse({ ...moneySummary, openCashSessions: [] }),
-        ),
-      ),
-    );
-    renderPage();
+    expect(panel("same-day")).not.toHaveAttribute("hidden");
+    expect(panel("receivables")).toHaveAttribute("hidden");
+    expect(panel("purchases")).toHaveAttribute("hidden");
+    expect(panel("cash-sessions")).toHaveAttribute("hidden");
 
     expect(
-      await screen.findByText("No hay sesiones de caja abiertas ahora"),
+      await within(panel("same-day")).findByText("L 85.00", {
+        selector: ".sale-totals-bar__amount",
+      }),
     ).toBeInTheDocument();
+    expect(within(panel("same-day")).getByText("Efectivo")).toBeInTheDocument();
   });
 
-  it("re-queries with the chosen date range", async () => {
+  it("switching tabs never resets another tab's own date filter", async () => {
     const fetchMock = vi.fn((url: string) => {
       void url;
       return Promise.resolve(jsonResponse(moneySummary));
@@ -70,11 +57,12 @@ describe("MoneySummaryPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     renderPage();
-    await screen.findByRole("heading", { name: "Vendido y cobrado el mismo día" });
+    await within(panel("same-day")).findByRole("heading", {
+      name: "Vendido y cobrado el mismo día",
+    });
 
-    await user.type(screen.getByLabelText("Desde"), "2026-08-01");
-    await user.type(screen.getByLabelText("Hasta"), "2026-08-31");
-
+    // Set a custom range on the first tab.
+    await user.type(within(panel("same-day")).getByLabelText("Desde"), "2026-08-01");
     await waitFor(() =>
       expect(
         fetchMock.mock.calls.some(([url]) =>
@@ -82,17 +70,63 @@ describe("MoneySummaryPage", () => {
         ),
       ).toBe(true),
     );
-    expect(
-      fetchMock.mock.calls.some(([url]) =>
-        String(url).includes("dateTo=2026-08-31"),
-      ),
-    ).toBe(true);
 
-    await user.click(screen.getByRole("button", { name: "Volver a hoy" }));
-    expect(screen.queryByDisplayValue("2026-08-01")).not.toBeInTheDocument();
+    // Jump to Cobrado de cuentas por cobrar and back — its own filter is
+    // untouched, and it defaulted independently (no dateFrom of its own).
+    await user.click(moneyTab("Cobrado de cuentas por cobrar"));
+    expect(panel("same-day")).toHaveAttribute("hidden");
+    expect(panel("receivables")).not.toHaveAttribute("hidden");
+    expect(
+      within(panel("receivables")).getByLabelText<HTMLInputElement>("Desde")
+        .value,
+    ).toBe("");
+
+    await user.click(moneyTab("Vendido y cobrado el mismo día"));
+    expect(
+      within(panel("same-day")).getByLabelText<HTMLInputElement>("Desde")
+        .value,
+    ).toBe("2026-08-01");
   });
 
-  it("surfaces a query failure with a retry", async () => {
+  it("shows the fourth tab's open Cash sessions, unaffected by any date filter", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(jsonResponse(moneySummary))));
+    const user = userEvent.setup();
+    renderPage();
+    await within(panel("same-day")).findByRole("heading", {
+      name: "Vendido y cobrado el mismo día",
+    });
+
+    await user.click(moneyTab("Efectivo esperado por caja abierta"));
+    expect(panel("cash-sessions")).not.toHaveAttribute("hidden");
+    expect(within(panel("cash-sessions")).queryByLabelText("Desde")).toBeNull();
+    expect(
+      await within(panel("cash-sessions")).findByText("CAJA-01"),
+    ).toBeInTheDocument();
+    expect(within(panel("cash-sessions")).getByText("L 585.00")).toBeInTheDocument();
+  });
+
+  it("has no open Cash sessions", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(jsonResponse({ ...moneySummary, openCashSessions: [] })),
+      ),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await within(panel("same-day")).findByRole("heading", {
+      name: "Vendido y cobrado el mismo día",
+    });
+    await user.click(moneyTab("Efectivo esperado por caja abierta"));
+
+    expect(
+      await within(panel("cash-sessions")).findByText(
+        "No hay sesiones de caja abiertas ahora",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("surfaces a query failure with a retry on each tab independently", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(jsonResponse({ message: "Unavailable" }, 503)),
@@ -100,10 +134,10 @@ describe("MoneySummaryPage", () => {
     renderPage();
 
     expect(
-      await screen.findByText("No se pudo cargar el resumen de dinero"),
+      await within(panel("same-day")).findByText("No se pudo cargar este total"),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Reintentar" }),
+      within(panel("same-day")).getByRole("button", { name: "Reintentar" }),
     ).toBeInTheDocument();
   });
 });
