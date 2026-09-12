@@ -1337,6 +1337,91 @@ b {
 .line-more__fields .field {
   flex: 1;
 }
+/* Line items table: one row per scanned/added product, growing downward,
+   with the running total in the footer. Replaces the old repeated
+   product-selector-per-line form. */
+.line-items-table-wrap {
+  margin-bottom: 1rem;
+}
+.line-items-table {
+  width: 100%;
+  min-width: 40rem;
+  border-collapse: collapse;
+}
+.line-items-table th,
+.line-items-table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.line-items-table th {
+  background: var(--surface-soft);
+  border-bottom: 2px solid var(--line-strong);
+  color: var(--muted);
+  font-size: 0.73rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.line-items-table tbody tr:last-child td {
+  border-bottom: 1px solid var(--line);
+}
+.line-product strong {
+  display: block;
+  font-family: var(--font-mono);
+}
+.line-product small {
+  display: block;
+  color: var(--muted);
+}
+.line-product .line-location {
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+}
+.line-location summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 600;
+  list-style: none;
+}
+.line-location summary::-webkit-details-marker {
+  display: none;
+}
+.line-location[open] summary {
+  color: var(--primary);
+}
+.line-location .field {
+  margin-top: 0.4rem;
+  min-width: 14rem;
+}
+.line-items-table .line-qty-input {
+  width: 4.5rem;
+}
+.line-items-table .line-price-input {
+  width: 6.5rem;
+}
+.line-items-table td.line-total {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.line-items-table tfoot td {
+  border-bottom: 0;
+  border-top: 2px solid var(--line-strong);
+  font-weight: 800;
+}
+.line-items-table .line-remove {
+  min-height: 2rem;
+  padding: 0.3rem 0.6rem;
+}
+.line-add {
+  max-width: 28rem;
+}
+.line-empty {
+  color: var(--muted);
+  font-style: italic;
+}
 .return-line {
   display: grid;
   grid-template-columns: minmax(13rem, 1fr) minmax(15rem, 2fr) minmax(8rem, 1fr);

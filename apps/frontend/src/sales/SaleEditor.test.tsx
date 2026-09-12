@@ -26,6 +26,13 @@ const product1 = {
   active: true,
   defaultSalePrice: "85.0000",
 };
+const product2 = {
+  id: "product-2",
+  code: "PAST-002",
+  name: "Pastillas de freno",
+  active: true,
+  defaultSalePrice: "220.0000",
+};
 const location1 = {
   id: "location-1",
   code: "BOD-01",
@@ -251,47 +258,75 @@ describe("Open accounts (cuenta abierta) — tabs and local recovery", () => {
   });
 });
 
-describe("Venta rápida — campos secundarios de línea colapsados por defecto", () => {
-  it("abre el precio hasta elegir uno y lo tuca una vez que llega el sugerido; el descuento/impuesto queda cerrado", async () => {
+describe("Venta rápida — tabla de líneas que crece con cada producto agregado", () => {
+  it("agrega una fila por producto con el precio sugerido ya puesto y el descuento/impuesto cerrado", async () => {
     stubFetch({ sales: [], products: [product1], locations: [location1] });
     const user = userEvent.setup();
     renderNewSale();
 
-    const findPriceDetails = () =>
-      [...document.querySelectorAll("details.line-field")].find((d) =>
-        d.querySelector("summary")?.textContent?.includes("Precio"),
-      ) as HTMLDetailsElement;
-    const priceDetails = findPriceDetails();
+    expect(
+      screen.getByText("Todavía no agregaste ningún producto."),
+    ).toBeVisible();
+
+    await screen.findByRole("option", { name: /FILT-001/ });
+    await user.selectOptions(
+      screen.getByLabelText(/^Agregar producto/),
+      "product-1",
+    );
+
+    expect(document.getElementById("sale-price-1")).toHaveValue("85.0000");
     const moreDetails = document.querySelector(
       "details.line-more",
     ) as HTMLDetailsElement;
-    expect(priceDetails.open).toBe(true);
     expect(moreDetails.open).toBe(false);
-    expect(screen.getByText("Elegí uno")).toBeVisible();
+    expect(
+      screen.queryByText("Todavía no agregaste ningún producto."),
+    ).toBeNull();
+  });
+
+  it("escanear el mismo producto de nuevo suma la cantidad en vez de crear otra fila", async () => {
+    stubFetch({ sales: [], products: [product1], locations: [location1] });
+    const user = userEvent.setup();
+    renderNewSale();
 
     await screen.findByRole("option", { name: /FILT-001/ });
-    await user.selectOptions(screen.getByLabelText(/^Producto 1/), "product-1");
+    await user.selectOptions(
+      screen.getByLabelText(/^Agregar producto/),
+      "product-1",
+    );
+    await user.selectOptions(
+      screen.getByLabelText(/^Agregar producto/),
+      "product-1",
+    );
 
-    expect(await screen.findByText("L 85.00")).toBeVisible();
-    expect(priceDetails.open).toBe(false);
-    expect(moreDetails.open).toBe(false);
+    expect(screen.getByLabelText(/^Cantidad/)).toHaveValue(2);
+    expect(document.querySelectorAll("tbody tr")).toHaveLength(1);
   });
 
   it("defaults a new line's location to the previous line's", async () => {
     stubFetch({
       sales: [],
-      products: [product1],
+      products: [product1, product2],
       locations: [location1, location2],
     });
     const user = userEvent.setup();
     renderNewSale();
 
+    await screen.findByRole("option", { name: /FILT-001/ });
+    await user.selectOptions(
+      screen.getByLabelText(/^Agregar producto/),
+      "product-1",
+    );
     await screen.findByRole("option", { name: /BOD-01/ });
     await user.selectOptions(
       screen.getByLabelText(/^Ubicación origen/),
       "location-1",
     );
-    await user.click(screen.getByRole("button", { name: "Agregar producto" }));
+
+    await user.selectOptions(
+      screen.getByLabelText(/^Agregar producto/),
+      "product-2",
+    );
 
     const secondLocation = document.querySelector(
       "#sale-location-2",
@@ -306,7 +341,10 @@ describe("Venta rápida — campos secundarios de línea colapsados por defecto"
     renderNewSale();
 
     await screen.findByRole("option", { name: /FILT-001/ });
-    await user.selectOptions(screen.getByLabelText(/^Producto 1/), "product-1");
+    await user.selectOptions(
+      screen.getByLabelText(/^Agregar producto/),
+      "product-1",
+    );
 
     expect(document.getElementById("sale-qty-1")).toHaveFocus();
   });
@@ -322,7 +360,9 @@ describe("Venta rápida — campos secundarios de línea colapsados por defecto"
       items: [
         {
           productId: "product-1",
+          product: product1,
           sourceLocationId: "location-1",
+          sourceLocation: location1,
           quantity: 1,
           unitPrice: "85.0000",
           discountAmount: "10.00",

@@ -141,7 +141,7 @@ describe("Frontend Phase 10.C purchasing screens", () => {
     expect(screen.getByLabelText(/^Razón social/)).toHaveValue("Proveedor Uno");
   });
 
-  it("builds a multi-line Purchase, blocks duplicates and preserves money strings", async () => {
+  it("builds a multi-line Purchase table, bumps quantity on a repeat scan and preserves money strings", async () => {
     const fetchMock = vi.fn(
       (input: string | URL | Request, _init?: RequestInit) => {
         void _init;
@@ -182,26 +182,21 @@ describe("Frontend Phase 10.C purchasing screens", () => {
       target: { value: "2026-08-20" },
     });
     await screen.findByRole("option", { name: /PROD-001/ });
-    await user.selectOptions(screen.getByLabelText(/^Producto 1/), "product-1");
+    await user.selectOptions(screen.getByLabelText(/^Agregar producto/), "product-1");
+    await user.clear(screen.getByLabelText(/^Costo unitario/));
     await user.type(screen.getByLabelText(/^Costo unitario/), "12.3456");
-    await user.click(screen.getByRole("button", { name: "Agregar producto" }));
-    await user.selectOptions(
-      await screen.findByLabelText(/^Producto 2/),
-      "product-1",
-    );
-    await user.type(screen.getAllByLabelText(/^Costo unitario/)[1], "2.5000");
-    await user.click(screen.getByRole("button", { name: "Guardar compra" }));
-    expect(
-      await screen.findByText(/solo puede aparecer una vez/i),
-    ).toBeVisible();
-    expect(
-      fetchMock.mock.calls.filter(
-        ([input]) =>
-          new URL(input instanceof Request ? input.url : input.toString())
-            .pathname === "/api/purchases",
-      ),
-    ).toHaveLength(0);
-    await user.selectOptions(screen.getByLabelText(/^Producto 2/), "product-2");
+
+    // Adding the same product a second time bumps its quantity instead of
+    // creating a duplicate row — the table stays one row per product.
+    await user.selectOptions(screen.getByLabelText(/^Agregar producto/), "product-1");
+    expect(screen.getByLabelText(/^Cantidad/)).toHaveValue(2);
+
+    // A different product gets its own row.
+    await user.selectOptions(screen.getByLabelText(/^Agregar producto/), "product-2");
+    const costInputs = screen.getAllByLabelText(/^Costo unitario/);
+    await user.clear(costInputs[1]);
+    await user.type(costInputs[1], "2.5000");
+
     await user.click(screen.getByRole("button", { name: "Guardar compra" }));
     await waitFor(() =>
       expect(
@@ -209,10 +204,11 @@ describe("Frontend Phase 10.C purchasing screens", () => {
           if (init?.method !== "POST" || typeof init.body !== "string")
             return false;
           const body = JSON.parse(init.body) as {
-            items: Array<{ unitCost: string }>;
+            items: Array<{ unitCost: string; orderedQuantity: number }>;
           };
           return (
             body.items[0]?.unitCost === "12.3456" &&
+            body.items[0]?.orderedQuantity === 2 &&
             body.items[1]?.unitCost === "2.5000"
           );
         }),
@@ -220,7 +216,7 @@ describe("Frontend Phase 10.C purchasing screens", () => {
     );
   });
 
-  it("collapses cost and discount/tax by default, prefilling cost from the product's reference cost", async () => {
+  it("adds a table row prefilling cost from the product's reference cost, with discount/tax collapsed", async () => {
     const fetchMock = vi.fn((input: string | URL | Request) => {
       const url = new URL(
         input instanceof Request ? input.url : input.toString(),
@@ -246,21 +242,18 @@ describe("Frontend Phase 10.C purchasing screens", () => {
       <PurchaseFormPage />,
     );
 
-    const findCostDetails = () =>
-      [...document.querySelectorAll("details.line-field")].find((d) =>
-        d.querySelector("summary")?.textContent?.includes("Costo"),
-      ) as HTMLDetailsElement;
+    expect(
+      screen.getByText("Todavía no agregaste ningún producto."),
+    ).toBeVisible();
+
+    await screen.findByRole("option", { name: /PROD-001/ });
+    await user.selectOptions(screen.getByLabelText(/^Agregar producto/), "product-1");
+
+    expect(document.getElementById("purchase-cost-1")).toHaveValue("82.0000");
     const moreDetails = document.querySelector(
       "details.line-more",
     ) as HTMLDetailsElement;
-    expect(findCostDetails().open).toBe(true);
     expect(moreDetails.open).toBe(false);
-
-    await screen.findByRole("option", { name: /PROD-001/ });
-    await user.selectOptions(screen.getByLabelText(/^Producto 1/), "product-1");
-
-    expect(await screen.findByText("L 82.00")).toBeVisible();
-    expect(findCostDetails().open).toBe(false);
     expect(document.getElementById("purchase-quantity-1")).toHaveFocus();
   });
 

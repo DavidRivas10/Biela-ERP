@@ -238,6 +238,10 @@ const today = () => new Date().toISOString().slice(0, 10);
 type PurchaseLineForm = {
   key: number;
   productId: string;
+  /** Snapshot of the product's code/name, shown directly in the table row
+   * instead of a per-line search widget once the product is already chosen. */
+  productCode: string;
+  productName: string;
   orderedQuantity: string;
   unitCost: string;
   discountAmount: string;
@@ -248,9 +252,22 @@ function hasMoneyAdjustment(line: PurchaseLineForm): boolean {
   return !isZero(line.discountAmount) || !isZero(line.taxAmount);
 }
 
+/** Line total: quantity × unit cost, minus the discount, plus the tax. */
+function purchaseLineTotal(
+  line: Pick<PurchaseLineForm, "orderedQuantity" | "unitCost" | "discountAmount" | "taxAmount">,
+): number {
+  const qty = Number(line.orderedQuantity) || 0;
+  const cost = Number(line.unitCost) || 0;
+  const discount = Number(line.discountAmount) || 0;
+  const tax = Number(line.taxAmount) || 0;
+  return qty * cost - discount + tax;
+}
+
 const newLine = (key: number): PurchaseLineForm => ({
   key,
   productId: "",
+  productCode: "",
+  productName: "",
   orderedQuantity: "1",
   unitCost: "",
   discountAmount: "0.00",
@@ -311,12 +328,14 @@ function PurchaseFormEditor({
       ? (initial.items ?? []).map((item, index) => ({
           key: index + 1,
           productId: item.productId,
+          productCode: item.product.code,
+          productName: item.product.name,
           orderedQuantity: String(item.orderedQuantity),
           unitCost: item.unitCost,
           discountAmount: item.discountAmount,
           taxAmount: item.taxAmount,
         }))
-      : [newLine(1)],
+      : [],
   );
   const [formError, setFormError] = useState<string | null>(null);
   const mutation = useMutation({
@@ -350,25 +369,41 @@ function PurchaseFormEditor({
   const addScannedProduct = useCallback((product: Product) => {
     let targetKey = 0;
     setLines((current) => {
-      if (current.some((line) => line.productId === product.id)) return current;
+      // Scanning the same product again just bumps its quantity by one
+      // instead of a second row — the table stays one row per product.
+      const existingIndex = current.findIndex(
+        (line) => line.productId === product.id,
+      );
+      if (existingIndex >= 0) {
+        targetKey = current[existingIndex].key;
+        return current.map((line, index) =>
+          index === existingIndex
+            ? {
+                ...line,
+                orderedQuantity: String(
+                  (Number(line.orderedQuantity) || 0) + 1,
+                ),
+              }
+            : line,
+        );
+      }
       // Purchase cost is real money paid this time, not authoritative — but
       // the reference cost is a fair starting point so the field can stay
       // collapsed instead of demanding a value with nothing to go on.
       const cost = product.referenceCost ?? "";
-      const emptyIndex = current.findIndex((line) => !line.productId);
-      if (emptyIndex >= 0) {
-        targetKey = current[emptyIndex].key;
-        return current.map((line, index) =>
-          index === emptyIndex
-            ? { ...line, productId: product.id, unitCost: line.unitCost || cost }
-            : line,
-        );
-      }
-      const nextKey = Math.max(...current.map((line) => line.key)) + 1;
+      const nextKey = current.length
+        ? Math.max(...current.map((line) => line.key)) + 1
+        : 1;
       targetKey = nextKey;
       return [
         ...current,
-        { ...newLine(nextKey), productId: product.id, unitCost: cost },
+        {
+          ...newLine(nextKey),
+          productId: product.id,
+          productCode: product.code,
+          productName: product.name,
+          unitCost: cost,
+        },
       ];
     });
     setFocusTarget(`purchase-quantity-${targetKey}`);
@@ -380,6 +415,14 @@ function PurchaseFormEditor({
   useKeyboardWedge(handleScan);
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (lines.length === 0) {
+      setFormError("Agregá al menos un producto antes de guardar.");
+      return;
+    }
+    if (lines.some((line) => !line.unitCost)) {
+      setFormError("Elegí el costo unitario de cada producto.");
+      return;
+    }
     if (duplicateProducts) {
       setFormError("Un producto solo puede aparecer una vez en la compra.");
       return;
@@ -465,8 +508,10 @@ function PurchaseFormEditor({
         <fieldset className="form-section purchase-lines">
           <legend>Productos que trae la factura</legend>
           <p>
-            Cargá cada producto con la cantidad y el costo que figura en la
-            factura. El total lo calcula el sistema al guardar.
+            Escaneá el código o buscalo abajo para sumarlo a la tabla, con la
+            cantidad y el costo que figura en la factura. Un producto ya
+            conocido trae su costo de referencia solo; el total lo calcula el
+            sistema al guardar.
           </p>
           <div className="scan-row">
             <BarcodeScanButton
@@ -495,119 +540,154 @@ function PurchaseFormEditor({
               </span>
             ) : null}
           </div>
-          {lines.map((line, index) => (
-            <div className="purchase-line" key={line.key}>
-              <ProductSelector
-                id={`purchase-product-${line.key}`}
-                label={`Producto ${index + 1}`}
-                required
-                value={line.productId}
-                onChange={(productId, item?: Product) => {
-                  updateLine(line.key, {
-                    productId,
-                    unitCost: item?.referenceCost ?? line.unitCost,
-                  });
-                  setFocusTarget(`purchase-quantity-${line.key}`);
-                }}
-              />
-              <Field
-                label="Cantidad"
-                htmlFor={`purchase-quantity-${line.key}`}
-                required
-              >
-                <input
-                  id={`purchase-quantity-${line.key}`}
-                  required
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={line.orderedQuantity}
-                  onChange={(e) =>
-                    updateLine(line.key, { orderedQuantity: e.target.value })
-                  }
-                />
-              </Field>
-              <details className="line-field" open={!line.unitCost}>
-                <summary>
-                  Costo unitario
-                  <strong>
-                    {line.unitCost ? formatMoney(line.unitCost) : "Elegí uno"}
-                  </strong>
-                </summary>
-                <Field
-                  label="Costo unitario"
-                  htmlFor={`purchase-cost-${line.key}`}
-                  required
-                >
-                  <input
-                    id={`purchase-cost-${line.key}`}
-                    required
-                    inputMode="decimal"
-                    pattern="\d+(\.\d{1,4})?"
-                    value={line.unitCost}
-                    onChange={(e) =>
-                      updateLine(line.key, { unitCost: e.target.value })
-                    }
-                  />
-                </Field>
-              </details>
-              <details className="line-more" open={hasMoneyAdjustment(line)}>
-                <summary>Descuento / impuesto</summary>
-                <div className="line-more__fields">
-                  <Field
-                    label="Descuento"
-                    htmlFor={`purchase-discount-${line.key}`}
-                  >
-                    <input
-                      id={`purchase-discount-${line.key}`}
-                      inputMode="decimal"
-                      pattern="\d+(\.\d{1,2})?"
-                      value={line.discountAmount}
-                      onChange={(e) =>
-                        updateLine(line.key, { discountAmount: e.target.value })
-                      }
-                    />
-                  </Field>
-                  <Field label="Impuesto" htmlFor={`purchase-tax-${line.key}`}>
-                    <input
-                      id={`purchase-tax-${line.key}`}
-                      inputMode="decimal"
-                      pattern="\d+(\.\d{1,2})?"
-                      value={line.taxAmount}
-                      onChange={(e) =>
-                        updateLine(line.key, { taxAmount: e.target.value })
-                      }
-                    />
-                  </Field>
-                </div>
-              </details>
-              {lines.length > 1 ? (
-                <Button
-                  type="button"
-                  variant="danger"
-                  onClick={() =>
-                    setLines((current) =>
-                      current.filter((item) => item.key !== line.key),
-                    )
-                  }
-                >
-                  Quitar línea
-                </Button>
-              ) : null}
+          {lines.length ? (
+            <div className="table-wrap line-items-table-wrap">
+              <table className="line-items-table">
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Costo unitario</th>
+                    <th>Total</th>
+                    <th aria-label="Quitar" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((line) => (
+                    <tr key={line.key}>
+                      <td className="line-product">
+                        <strong>{line.productCode}</strong>
+                        <small>{line.productName}</small>
+                      </td>
+                      <td>
+                        <Field
+                          label="Cantidad"
+                          htmlFor={`purchase-quantity-${line.key}`}
+                          required
+                        >
+                          <input
+                            id={`purchase-quantity-${line.key}`}
+                            className="line-qty-input"
+                            required
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={line.orderedQuantity}
+                            onChange={(e) =>
+                              updateLine(line.key, {
+                                orderedQuantity: e.target.value,
+                              })
+                            }
+                          />
+                        </Field>
+                      </td>
+                      <td>
+                        <Field
+                          label="Costo unitario"
+                          htmlFor={`purchase-cost-${line.key}`}
+                          required
+                        >
+                          <input
+                            id={`purchase-cost-${line.key}`}
+                            className="line-price-input"
+                            required
+                            inputMode="decimal"
+                            pattern="\d+(\.\d{1,4})?"
+                            value={line.unitCost}
+                            onChange={(e) =>
+                              updateLine(line.key, { unitCost: e.target.value })
+                            }
+                          />
+                        </Field>
+                        <details
+                          className="line-more"
+                          open={hasMoneyAdjustment(line)}
+                        >
+                          <summary>Descuento / impuesto</summary>
+                          <div className="line-more__fields">
+                            <Field
+                              label="Descuento"
+                              htmlFor={`purchase-discount-${line.key}`}
+                            >
+                              <input
+                                id={`purchase-discount-${line.key}`}
+                                inputMode="decimal"
+                                pattern="\d+(\.\d{1,2})?"
+                                value={line.discountAmount}
+                                onChange={(e) =>
+                                  updateLine(line.key, {
+                                    discountAmount: e.target.value,
+                                  })
+                                }
+                              />
+                            </Field>
+                            <Field
+                              label="Impuesto"
+                              htmlFor={`purchase-tax-${line.key}`}
+                            >
+                              <input
+                                id={`purchase-tax-${line.key}`}
+                                inputMode="decimal"
+                                pattern="\d+(\.\d{1,2})?"
+                                value={line.taxAmount}
+                                onChange={(e) =>
+                                  updateLine(line.key, {
+                                    taxAmount: e.target.value,
+                                  })
+                                }
+                              />
+                            </Field>
+                          </div>
+                        </details>
+                      </td>
+                      <td className="line-total">
+                        {formatMoney(purchaseLineTotal(line).toFixed(4))}
+                      </td>
+                      <td>
+                        <Button
+                          type="button"
+                          variant="danger"
+                          className="line-remove"
+                          onClick={() =>
+                            setLines((current) =>
+                              current.filter((item) => item.key !== line.key),
+                            )
+                          }
+                        >
+                          Quitar
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={3}>Total</td>
+                    <td className="line-total">
+                      {formatMoney(
+                        lines
+                          .reduce((sum, line) => sum + purchaseLineTotal(line), 0)
+                          .toFixed(4),
+                      )}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-          ))}
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() =>
-              setLines((current) => [
-                ...current,
-                newLine(Math.max(...current.map((line) => line.key)) + 1),
-              ])
-            }
-          >
-            Agregar producto
-          </Button>
+          ) : (
+            <p className="line-empty">Todavía no agregaste ningún producto.</p>
+          )}
+          <div className="line-add">
+            <ProductSelector
+              id="purchase-add-product"
+              label="Agregar producto"
+              value=""
+              onChange={(_productId, item?: Product) => {
+                if (item) addScannedProduct(item);
+              }}
+            />
+          </div>
         </fieldset>
         <div className="form-actions">
           <Button

@@ -359,6 +359,10 @@ export function SalesPage() {
 type Line = {
   key: number;
   productId: string;
+  /** Snapshot of the product's code/name, so each table row can show it
+   * without a per-line search widget once the product is already chosen. */
+  productCode: string;
+  productName: string;
   sourceLocationId: string;
   /** Display label ("BOD-01 · Bodega principal") for the collapsed summary. */
   sourceLocationLabel: string;
@@ -374,6 +378,8 @@ const newLine = (
 ): Line => ({
   key,
   productId: "",
+  productCode: "",
+  productName: "",
   sourceLocationId,
   sourceLocationLabel,
   quantity: "1",
@@ -381,6 +387,15 @@ const newLine = (
   discountAmount: "0.00",
   taxAmount: "0.00",
 });
+
+/** Line total: quantity × unit price, minus the discount, plus the tax. */
+function lineTotal(line: Pick<Line, "quantity" | "unitPrice" | "discountAmount" | "taxAmount">): number {
+  const qty = Number(line.quantity) || 0;
+  const price = Number(line.unitPrice) || 0;
+  const discount = Number(line.discountAmount) || 0;
+  const tax = Number(line.taxAmount) || 0;
+  return qty * price - discount + tax;
+}
 
 /**
  * Most sales pull every line from the same shelf. Default a new line to
@@ -481,6 +496,8 @@ function SaleEditor({
       ? (initial.items ?? []).map((item, index) => ({
           key: index + 1,
           productId: item.productId,
+          productCode: item.product.code,
+          productName: item.product.name,
           sourceLocationId: item.sourceLocationId,
           sourceLocationLabel: item.sourceLocation
             ? `${item.sourceLocation.code} · ${item.sourceLocation.name}`
@@ -490,7 +507,7 @@ function SaleEditor({
           discountAmount: item.discountAmount,
           taxAmount: item.taxAmount,
         }))
-      : [newLine(1)],
+      : [],
   );
   const [formError, setFormError] = useState<string | null>(null);
   const duplicate = useMemo(() => {
@@ -559,16 +576,24 @@ function SaleEditor({
     let targetKey = 0;
     setLines((current) => {
       const price = product.defaultSalePrice ?? "";
-      const emptyIndex = current.findIndex((line) => !line.productId);
-      if (emptyIndex >= 0) {
-        targetKey = current[emptyIndex].key;
+      // Scanning (or picking) the same product again just bumps its
+      // quantity by one instead of adding a second row for it — the table
+      // stays one row per product, the way a vendor scanning several units
+      // of the same part expects.
+      const existingIndex = current.findIndex(
+        (line) => line.productId === product.id,
+      );
+      if (existingIndex >= 0) {
+        targetKey = current[existingIndex].key;
         return current.map((line, index) =>
-          index === emptyIndex
-            ? { ...line, productId: product.id, unitPrice: line.unitPrice || price }
+          index === existingIndex
+            ? { ...line, quantity: String((Number(line.quantity) || 0) + 1) }
             : line,
         );
       }
-      const nextKey = Math.max(...current.map((line) => line.key)) + 1;
+      const nextKey = current.length
+        ? Math.max(...current.map((line) => line.key)) + 1
+        : 1;
       targetKey = nextKey;
       const location = lastUsedLocation(current);
       return [
@@ -580,6 +605,8 @@ function SaleEditor({
             location.sourceLocationLabel,
           ),
           productId: product.id,
+          productCode: product.code,
+          productName: product.name,
           unitPrice: price,
         },
       ];
@@ -592,6 +619,18 @@ function SaleEditor({
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (lines.length === 0) {
+      setFormError("Agregá al menos un producto antes de guardar.");
+      return;
+    }
+    if (lines.some((line) => !line.sourceLocationId)) {
+      setFormError("Elegí la ubicación de origen de cada producto.");
+      return;
+    }
+    if (lines.some((line) => !line.unitPrice)) {
+      setFormError("Elegí el precio unitario de cada producto.");
+      return;
+    }
     if (duplicate) {
       setFormError(
         "Una combinación de producto y ubicación solo puede aparecer una vez.",
@@ -792,8 +831,9 @@ function SaleEditor({
         <fieldset className="form-section purchase-lines">
           <legend>Productos</legend>
           <p>
-            El precio arranca del precio sugerido del producto; podés cambiarlo
-            en cada línea. Escaneá o escribí el código para agregarlo.
+            Escaneá el código o buscalo abajo para sumarlo a la tabla — un
+            producto ya conocido no vuelve a pedir ubicación ni costo, solo
+            cantidad y, si hace falta, el precio.
           </p>
           <div className="scan-row">
             <BarcodeScanButton
@@ -813,145 +853,170 @@ function SaleEditor({
               </span>
             ) : null}
           </div>
-          {lines.map((line, index) => (
-            <div className="purchase-line" key={line.key}>
-              <ProductSelector
-                id={`sale-product-${line.key}`}
-                label={`Producto ${index + 1}`}
-                required
-                value={line.productId}
-                onChange={(productId, item?: Product) => {
-                  updateLine(line.key, {
-                    productId,
-                    unitPrice: item?.defaultSalePrice ?? line.unitPrice,
-                  });
-                  setFocusTarget(`sale-qty-${line.key}`);
-                }}
-              />
-              <Field
-                label="Cantidad"
-                htmlFor={`sale-qty-${line.key}`}
-                required
-              >
-                <input
-                  id={`sale-qty-${line.key}`}
-                  required
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={line.quantity}
-                  onChange={(e) =>
-                    updateLine(line.key, { quantity: e.target.value })
-                  }
-                />
-              </Field>
-              <details
-                className="line-field"
-                open={!line.sourceLocationId}
-              >
-                <summary>
-                  Ubicación
-                  <strong>
-                    {line.sourceLocationLabel ||
-                      (line.sourceLocationId ? "Elegida" : "Elegí una")}
-                  </strong>
-                </summary>
-                <LocationSelector
-                  id={`sale-location-${line.key}`}
-                  label="Ubicación origen"
-                  required
-                  value={line.sourceLocationId}
-                  onChange={(sourceLocationId, item) =>
-                    updateLine(line.key, {
-                      sourceLocationId,
-                      sourceLocationLabel: item
-                        ? `${item.code} · ${item.name}`
-                        : "",
-                    })
-                  }
-                />
-              </details>
-              <details className="line-field" open={!line.unitPrice}>
-                <summary>
-                  Precio unitario
-                  <strong>
-                    {line.unitPrice ? formatMoney(line.unitPrice) : "Elegí uno"}
-                  </strong>
-                </summary>
-                <Field label="Precio unitario" htmlFor={`sale-price-${line.key}`} required>
-                  <input
-                    id={`sale-price-${line.key}`}
-                    required
-                    inputMode="decimal"
-                    pattern="\d+(\.\d{1,4})?"
-                    value={line.unitPrice}
-                    onChange={(e) =>
-                      updateLine(line.key, { unitPrice: e.target.value })
-                    }
-                  />
-                </Field>
-              </details>
-              <details className="line-more" open={hasMoneyAdjustment(line)}>
-                <summary>Descuento / impuesto</summary>
-                <div className="line-more__fields">
-                  <Field label="Descuento" htmlFor={`sale-discount-${line.key}`}>
-                    <input
-                      id={`sale-discount-${line.key}`}
-                      inputMode="decimal"
-                      pattern="\d+(\.\d{1,2})?"
-                      value={line.discountAmount}
-                      onChange={(e) =>
-                        updateLine(line.key, { discountAmount: e.target.value })
-                      }
-                    />
-                  </Field>
-                  <Field label="Impuesto" htmlFor={`sale-tax-${line.key}`}>
-                    <input
-                      id={`sale-tax-${line.key}`}
-                      inputMode="decimal"
-                      pattern="\d+(\.\d{1,2})?"
-                      value={line.taxAmount}
-                      onChange={(e) =>
-                        updateLine(line.key, { taxAmount: e.target.value })
-                      }
-                    />
-                  </Field>
-                </div>
-              </details>
-              {lines.length > 1 && (
-                <Button
-                  type="button"
-                  variant="danger"
-                  onClick={() =>
-                    setLines((current) =>
-                      current.filter((item) => item.key !== line.key),
-                    )
-                  }
-                >
-                  Quitar
-                </Button>
-              )}
+          {lines.length ? (
+            <div className="table-wrap line-items-table-wrap">
+              <table className="line-items-table">
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Precio unitario</th>
+                    <th>Total</th>
+                    <th aria-label="Quitar" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((line) => (
+                    <tr key={line.key}>
+                      <td className="line-product">
+                        <strong>{line.productCode}</strong>
+                        <small>{line.productName}</small>
+                        <details
+                          className="line-location"
+                          open={!line.sourceLocationId}
+                        >
+                          <summary>
+                            {line.sourceLocationLabel ||
+                              (line.sourceLocationId
+                                ? "Ubicación elegida"
+                                : "Elegí la ubicación")}
+                          </summary>
+                          <LocationSelector
+                            id={`sale-location-${line.key}`}
+                            label="Ubicación origen"
+                            required
+                            value={line.sourceLocationId}
+                            onChange={(sourceLocationId, item) =>
+                              updateLine(line.key, {
+                                sourceLocationId,
+                                sourceLocationLabel: item
+                                  ? `${item.code} · ${item.name}`
+                                  : "",
+                              })
+                            }
+                          />
+                        </details>
+                      </td>
+                      <td>
+                        <Field
+                          label="Cantidad"
+                          htmlFor={`sale-qty-${line.key}`}
+                          required
+                        >
+                          <input
+                            id={`sale-qty-${line.key}`}
+                            className="line-qty-input"
+                            required
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={line.quantity}
+                            onChange={(e) =>
+                              updateLine(line.key, { quantity: e.target.value })
+                            }
+                          />
+                        </Field>
+                      </td>
+                      <td>
+                        <Field
+                          label="Precio unitario"
+                          htmlFor={`sale-price-${line.key}`}
+                          required
+                        >
+                          <input
+                            id={`sale-price-${line.key}`}
+                            className="line-price-input"
+                            required
+                            inputMode="decimal"
+                            pattern="\d+(\.\d{1,4})?"
+                            value={line.unitPrice}
+                            onChange={(e) =>
+                              updateLine(line.key, { unitPrice: e.target.value })
+                            }
+                          />
+                        </Field>
+                        <details
+                          className="line-more"
+                          open={hasMoneyAdjustment(line)}
+                        >
+                          <summary>Descuento / impuesto</summary>
+                          <div className="line-more__fields">
+                            <Field
+                              label="Descuento"
+                              htmlFor={`sale-discount-${line.key}`}
+                            >
+                              <input
+                                id={`sale-discount-${line.key}`}
+                                inputMode="decimal"
+                                pattern="\d+(\.\d{1,2})?"
+                                value={line.discountAmount}
+                                onChange={(e) =>
+                                  updateLine(line.key, {
+                                    discountAmount: e.target.value,
+                                  })
+                                }
+                              />
+                            </Field>
+                            <Field label="Impuesto" htmlFor={`sale-tax-${line.key}`}>
+                              <input
+                                id={`sale-tax-${line.key}`}
+                                inputMode="decimal"
+                                pattern="\d+(\.\d{1,2})?"
+                                value={line.taxAmount}
+                                onChange={(e) =>
+                                  updateLine(line.key, { taxAmount: e.target.value })
+                                }
+                              />
+                            </Field>
+                          </div>
+                        </details>
+                      </td>
+                      <td className="line-total">
+                        {formatMoney(lineTotal(line).toFixed(4))}
+                      </td>
+                      <td>
+                        <Button
+                          type="button"
+                          variant="danger"
+                          className="line-remove"
+                          onClick={() =>
+                            setLines((current) =>
+                              current.filter((item) => item.key !== line.key),
+                            )
+                          }
+                        >
+                          Quitar
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={3}>Total</td>
+                    <td className="line-total">
+                      {formatMoney(
+                        lines.reduce((sum, line) => sum + lineTotal(line), 0).toFixed(4),
+                      )}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-          ))}
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() =>
-              setLines((current) => {
-                const location = lastUsedLocation(current);
-                return [
-                  ...current,
-                  newLine(
-                    Math.max(...current.map((line) => line.key)) + 1,
-                    location.sourceLocationId,
-                    location.sourceLocationLabel,
-                  ),
-                ];
-              })
-            }
-          >
-            Agregar producto
-          </Button>
+          ) : (
+            <p className="line-empty">Todavía no agregaste ningún producto.</p>
+          )}
+          <div className="line-add">
+            <ProductSelector
+              id="sale-add-product"
+              label="Agregar producto"
+              value=""
+              onChange={(_productId, item?: Product) => {
+                if (item) addScannedProduct(item);
+              }}
+            />
+          </div>
         </fieldset>
         <div className="form-actions">
           <Button
@@ -1164,8 +1229,8 @@ export function SaleDetailPage() {
         description={
           action === "post"
             ? isAccount
-              ? "Se confirma la venta y se descuenta el inventario. Después registrás el pago o la dejás a crédito."
-              : "Se descuenta el inventario y no se puede deshacer desde la venta."
+              ? `Total final: ${formatMoney(sale.total)}. Se confirma la cuenta, se descuenta el inventario y no se pueden agregar más productos. Después registrás el pago o la dejás a crédito.`
+              : `Total final: ${formatMoney(sale.total)}. Se descuenta el inventario y no se puede deshacer desde la venta.`
             : "Solo se cancela el borrador. No afecta el inventario."
         }
         confirmLabel={action === "post" ? closeLabel : "Cancelar venta"}
