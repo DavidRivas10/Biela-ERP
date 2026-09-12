@@ -171,6 +171,74 @@ describe("Products HTTP with PostgreSQL", () => {
       .expect((response) => expect(response.body.active).toBe(true));
   });
 
+  it("keeps an existing product editable, including its own active toggle, after its category and brand are later deactivated", async () => {
+    await request(app.getHttpServer())
+      .patch(`/product-categories/${categoryId}`)
+      .send({ active: false })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/product-brands/${brandId}`)
+      .send({ active: false })
+      .expect(200);
+
+    // Saving the product without reassigning category/brand must still work,
+    // even though both are now inactive.
+    await request(app.getHttpServer())
+      .patch(`/products/${productId}`)
+      .send({ name: "Brake Pad After Category Deactivation" })
+      .expect(200);
+
+    // The dedicated toggle must keep working regardless of category/brand state.
+    await request(app.getHttpServer())
+      .patch(`/products/${productId}/deactivate`)
+      .expect(200)
+      .expect((response) => expect(response.body.active).toBe(false));
+    await request(app.getHttpServer())
+      .patch(`/products/${productId}/activate`)
+      .expect(200)
+      .expect((response) => expect(response.body.active).toBe(true));
+
+    // The same PATCH the frontend's edit form sends (categoryId/brandId and
+    // the existing attributes resent unchanged, just toggling `active`) must
+    // also keep working.
+    await request(app.getHttpServer())
+      .patch(`/products/${productId}`)
+      .send({
+        categoryId,
+        brandId,
+        active: false,
+        attributes: [{ definitionId, value: "ceramic" }],
+      })
+      .expect(200)
+      .expect((response) => expect(response.body.active).toBe(false));
+    await request(app.getHttpServer())
+      .patch(`/products/${productId}`)
+      .send({
+        categoryId,
+        brandId,
+        active: true,
+        attributes: [{ definitionId, value: "ceramic" }],
+      })
+      .expect(200)
+      .expect((response) => expect(response.body.active).toBe(true));
+
+    // Reassigning to a *different*, still-inactive category/brand must still
+    // be rejected — only the unchanged-reference case is exempt.
+    await request(app.getHttpServer())
+      .patch(`/products/${productId}`)
+      .send({ categoryId: randomUUID() })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .patch(`/product-categories/${categoryId}`)
+      .send({ active: true })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/product-brands/${brandId}`)
+      .send({ active: true })
+      .expect(200);
+  });
+
   it("stores and returns an optional reference cost and rejects a bad one", async () => {
     await request(app.getHttpServer())
       .patch(`/products/${productId}`)

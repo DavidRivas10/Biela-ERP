@@ -106,9 +106,16 @@ export class ProductsService {
   async update(id: string, dto: UpdateProductDto) {
     const existing = await this.findOne(id);
     const categoryId = dto.categoryId ?? existing.categoryId;
-    if (dto.categoryId)
+    // Only require the category/brand to be active when the product is being
+    // reassigned to a different one. The frontend resends the current
+    // categoryId/brandId on every save (e.g. just to flip `active`), and a
+    // product whose category or brand was deactivated afterwards must remain
+    // editable — including toggling its own active state — without forcing a
+    // reassignment.
+    if (dto.categoryId && dto.categoryId !== existing.categoryId)
       await this.catalogs.requireCategory(dto.categoryId, true);
-    if (dto.brandId) await this.catalogs.requireBrand(dto.brandId, true);
+    if (dto.brandId && dto.brandId !== existing.brandId)
+      await this.catalogs.requireBrand(dto.brandId, true);
 
     const replacingAttributes =
       dto.attributes !== undefined || dto.categoryId !== undefined;
