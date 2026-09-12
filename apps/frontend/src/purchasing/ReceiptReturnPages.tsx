@@ -281,7 +281,7 @@ export function PurchaseReturnCreatePage() {
       <PageHeader
         eyebrow="Comprar"
         title={`Devolver mercadería al proveedor · compra #${purchase.data?.number ?? "…"}`}
-        description="Marcá qué productos le devolvés al proveedor y desde qué ubicación salen. Se guarda como borrador; el inventario baja cuando confirmás la devolución. El ajuste del dinero es aparte."
+        description="Se guarda como borrador; el inventario baja cuando confirmás la devolución. El ajuste del dinero es aparte."
       />
       <form
         className="panel erp-form"

@@ -448,7 +448,7 @@ function PurchaseFormEditor({
       <PageHeader
         eyebrow="Comprar"
         title={id ? "Editar la factura" : "Registrar una factura de proveedor"}
-        description="Cargá acá la factura o remisión que te manda el proveedor: su número, la fecha y los productos que trae con su costo. Todavía no entra al inventario — eso pasa cuando marcás la mercadería como recibida."
+        description="Todavía no entra al inventario — eso pasa cuando marcás la mercadería como recibida."
       />
       <PurchaseChain current="register" purchaseId={id} />
       <form className="panel erp-form" onSubmit={submit}>
@@ -488,30 +488,33 @@ function PurchaseFormEditor({
               onChange={(e) => setDocumentDate(e.target.value)}
             />
           </Field>
-          <Field label="Fecha de vencimiento" htmlFor="purchase-due">
-            <input
-              id="purchase-due"
-              type="date"
-              value={paymentDueDate}
-              onChange={(e) => setPaymentDueDate(e.target.value)}
-            />
-          </Field>
-          <Field label="Notas" htmlFor="purchase-notes">
-            <textarea
-              id="purchase-notes"
-              maxLength={1000}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </Field>
         </div>
+        <details className="filter-details">
+          <summary>Vencimiento y notas (opcional)</summary>
+          <div className="form-grid">
+            <Field label="Fecha de vencimiento" htmlFor="purchase-due">
+              <input
+                id="purchase-due"
+                type="date"
+                value={paymentDueDate}
+                onChange={(e) => setPaymentDueDate(e.target.value)}
+              />
+            </Field>
+            <Field label="Notas" htmlFor="purchase-notes">
+              <textarea
+                id="purchase-notes"
+                maxLength={1000}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </Field>
+          </div>
+        </details>
         <fieldset className="form-section purchase-lines">
           <legend>Productos que trae la factura</legend>
-          <p>
-            Escaneá el código o buscalo abajo para sumarlo a la tabla, con la
-            cantidad y el costo que figura en la factura. Un producto ya
-            conocido trae su costo de referencia solo; el total lo calcula el
-            sistema al guardar.
+          <p className="muted">
+            Escaneá el código o buscalo abajo; el total lo calcula el sistema
+            al guardar.
           </p>
           <div className="scan-row">
             <BarcodeScanButton

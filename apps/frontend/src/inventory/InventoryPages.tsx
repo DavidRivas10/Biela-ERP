@@ -345,7 +345,7 @@ export function InventoryMovementsPage() {
       {showForm ? (
         <form className="panel erp-form" onSubmit={review}>
           <h2>Movimiento manual</h2>
-          <p>{movementHelp[form.type]}</p>
+          <p className="muted">{movementHelp[form.type]}</p>
           <FormFeedback
             error={mutation.error ? apiErrorMessage(mutation.error) : null}
           />
