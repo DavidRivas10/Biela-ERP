@@ -1213,3 +1213,73 @@ completa.
   alguna regla de negocio (por ejemplo, no permitir pagos divididos en
   Venta rápida), o si la vista con la distinción "mismo día / cuentas por
   cobrar" que construí ya resuelve lo que necesitás ver día a día.
+
+## Fase 21 — Dinero → Resumen: de tarjetas a pestañas (2026-09-12)
+
+Rediseño visual pedido por David, reutilizando explícitamente el patrón de
+pestañas de Ventas (Fase 19) en vez de construir uno nuevo — las tres
+tarjetas chicas y apretadas de la Fase 20 se sentían con poco espacio para
+un desglose que David quería ver con más claridad.
+
+### El componente de pestañas ahora es compartido
+
+Extraje el patrón de pestañas de `SalesWorkspace.tsx` a
+`apps/frontend/src/components/WorkspaceTabs.tsx` — dos piezas, `TabBar`
+(la fila de pestañas) y `TabPanel` (una sección que se muestra u oculta
+con el atributo `hidden`, nunca desmontada). `SalesWorkspace.tsx` se migró
+a este componente compartido sin ningún cambio de comportamiento — los 5
+tests de `SalesWorkspace.test.tsx` pasan sin tocarlos, prueba de que la
+extracción fue mecánica. La clase CSS que envuelve el contenido a ancho
+completo se renombró de `.sales-workspace` (específica de Ventas) a
+`.workspace-tab-content` (genérica), ya usada ahora por ambas pantallas.
+
+### Dinero → Resumen, con cuatro pestañas
+
+`MoneySummaryPage.tsx` pasó de "tres tarjetas + una tabla apretada al
+final" a cuatro pestañas de ancho completo, con `TabBar`/`TabPanel`:
+
+1. Vendido y cobrado el mismo día
+2. Cobrado de cuentas por cobrar
+3. Pagado a proveedores
+4. Efectivo esperado por caja abierta
+
+Las tres primeras mantienen su **propio** selector Desde/Hasta —
+independiente entre sí, no uno compartido arriba de todas. Cada una guarda
+su rango en la URL bajo un prefijo propio (`sameDayFrom`/`sameDayTo`,
+`receivablesFrom`/`receivablesTo`, `purchasesFrom`/`purchasesTo`), así que
+cambiar de pestaña nunca resetea el filtro de las otras dos — exactamente
+la misma razón por la que Ventas mantiene sus tres pestañas montadas todo
+el tiempo. El desglose por método de pago ahora se muestra con el mismo
+patrón de "total grande" que ya usa Venta rápida (`.sale-totals-bar`,
+reutilizado tal cual) seguido de una tabla Método/Monto a ancho completo,
+en vez de una lista chica dentro de una tarjeta.
+
+La cuarta pestaña (Efectivo esperado) no tiene selector de fechas — es
+estado actual, como ya aclaraba el texto debajo del título — y ahora tiene
+su propia pestaña a ancho completo en vez de aparecer apretada al pie de
+la página.
+
+### Verificación
+
+- `tsc -b`, `eslint --max-warnings=0`, `vite build`: sin errores.
+- Reescribí `MoneySummaryPage.test.tsx` para el modelo de 4 pestañas (5
+  casos: la primera pestaña activa por defecto con las otras tres montadas
+  pero ocultas, cambiar de pestaña no resetea el filtro de fecha de otra,
+  la cuarta pestaña no tiene selector de fechas y muestra las cajas
+  abiertas, sin cajas abiertas, y error con reintento por pestaña). 184/184
+  en la suite completa del frontend.
+- **Verificado en el navegador por mí mismo**: puse `Desde = 01/01/2020`
+  en "Vendido y cobrado el mismo día" (el total pasó a incluir todo el
+  historial), salté a "Cobrado de cuentas por cobrar" (su Desde seguía
+  vacío, sin ningún efecto del filtro de la otra pestaña), salté a
+  "Efectivo esperado por caja abierta" (sin selector de fechas, tabla a
+  ancho completo con las 2 sesiones abiertas), y volví a "Vendido y
+  cobrado el mismo día" — su `Desde = 01/01/2020` seguía exactamente donde
+  lo dejé.
+
+## Estado al cierre de la Fase 21
+
+- Todo commiteado en `redesign/producto-ux`, en un commit por bloque.
+  **Sin push** — a la espera de tu confirmación.
+- Nada pendiente nuevo de esta ronda. Con esto, Dinero queda cerrado tanto
+  en lógica (Fase 20) como en presentación (Fase 21).
