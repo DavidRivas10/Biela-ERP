@@ -104,39 +104,43 @@ export function InventoryPage() {
       />
       <InventoryTabs />
       <InventorySummary />
-      <section className="panel filter-bar">
-        <ProductSelector
-          id="inventory-product-filter"
-          label="Producto"
-          value={filters.values.productId ?? ""}
-          emptyLabel="Todos"
-          onChange={(productId) => filters.update({ productId })}
-        />
-        <LocationSelector
-          id="inventory-location-filter"
-          label="Ubicación"
-          value={filters.values.locationId ?? ""}
-          emptyLabel="Todas"
-          onChange={(locationId) => filters.update({ locationId })}
-        />
-        <Field label="Existencia" htmlFor="inventory-stock-filter">
-          <select
-            id="inventory-stock-filter"
-            value={filters.values.inStock ?? ""}
-            onChange={(e) => filters.update({ inStock: e.target.value })}
-          >
-            <option value="">Con y sin stock</option>
-            <option value="true">Solo con stock</option>
-            <option value="false">Solo en cero</option>
-          </select>
-        </Field>
-        {hasActiveFilters ? (
-          <div className="filter-actions">
-            <Button variant="ghost" onClick={filters.clear}>
-              Limpiar filtros
-            </Button>
-          </div>
-        ) : null}
+      <section className="panel">
+        <div className="form-grid">
+          <ProductSelector
+            id="inventory-product-filter"
+            label="Producto"
+            value={filters.values.productId ?? ""}
+            emptyLabel="Todos"
+            onChange={(productId) => filters.update({ productId })}
+          />
+          <LocationSelector
+            id="inventory-location-filter"
+            label="Ubicación"
+            value={filters.values.locationId ?? ""}
+            emptyLabel="Todas"
+            onChange={(locationId) => filters.update({ locationId })}
+          />
+        </div>
+        <div className="filter-bar">
+          <Field label="Existencia" htmlFor="inventory-stock-filter">
+            <select
+              id="inventory-stock-filter"
+              value={filters.values.inStock ?? ""}
+              onChange={(e) => filters.update({ inStock: e.target.value })}
+            >
+              <option value="">Con y sin stock</option>
+              <option value="true">Solo con stock</option>
+              <option value="false">Solo en cero</option>
+            </select>
+          </Field>
+          {hasActiveFilters ? (
+            <div className="filter-actions">
+              <Button variant="ghost" onClick={filters.clear}>
+                Limpiar filtros
+              </Button>
+            </div>
+          ) : null}
+        </div>
       </section>
       <section className="panel">
         <ErpTable
