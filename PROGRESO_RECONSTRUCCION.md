@@ -449,3 +449,226 @@ CSS (`.line-field` generalizado, antes `.line-price`). Tests nuevos: 2 en
 Técnica: `tsc -b` OK · `eslint` 0 warnings · `vitest` **182/182** (+9 nuevos)
 · `vite build` OK · e2e de rollback atómico (backend, no tocado) re-verificado
 en verde.
+
+## Fase 16 — Bug crítico de activar producto, cierre de cuenta, tabla de
+## productos y ajustes de Clientes (2026-09-11/12)
+
+Prompt de David para esta ronda, en orden de prioridad: (1) el toggle de
+activar/desactivar producto no funciona — queda inactivo aunque se intenta
+activar; (2) agregar el paso cerrar cuenta → cobrar a una cuenta abierta;
+(3) rediseñar "Productos" en Ventas y Compras como tabla; (4) confirmar si
+una cuenta abierta se guarda en el servidor al instante o solo en el
+navegador. Más tres ajustes puntuales en Clientes (prefijo `CLI`, RTN de 14
+dígitos, teléfono más largo).
+
+### 1 — Bug crítico: activar producto
+
+**El botón dedicado "Activar/Desactivar" de la ficha del producto (el
+`ConfirmDialog` que llama `PATCH /products/:id/activate|deactivate`) en
+realidad SÍ funciona** — probado en navegador real activando y desactivando
+`FILT-001` varias veces, con las llamadas de red devolviendo 200 y el estado
+cambiando en la UI cada vez. No era ahí el bug.
+
+**El bug real estaba en el formulario de edición** (`Editar` → tildar/destildar
+"Producto activo" → "Guardar producto"), que es el camino más natural para
+alguien que piensa en "activar/desactivar" como un campo del formulario, no
+como un botón aparte. `ProductsService.update()` llamaba
+`requireCategory(dto.categoryId, true)` / `requireBrand(dto.brandId, true)`
+**cada vez que el body traía `categoryId`/`brandId`** — y el frontend los
+manda siempre, en cada guardado, aunque no se estén cambiando. Si la
+categoría o la marca del producto había sido desactivada después (encontré
+exactamente este caso en los datos de prueba de la Fase 15: `Filtros de
+aceite` y `Bosch` quedaron inactivos pero `FILT-001` activo), **cualquier
+guardado del producto pasaba a fallar con 400 "Product category is invalid
+or inactive"** — incluyendo el intento de reactivarlo desde el formulario,
+que es exactamente "queda inactivo aunque se intenta activar".
+
+**Corrección:** en `ProductsService.update()`, solo exigir que la categoría o
+la marca estén activas cuando **de verdad se están reasignando** (`dto.categoryId
+!== existing.categoryId`), no cuando el formulario reenvía la misma que ya
+tenía. Coherente con la regla general del sistema de nunca invalidar una
+referencia histórica por la desactivación de otra cosa.
+
+**Archivos:** `services/ms-autorepuesto/src/products/products.service.ts`.
+Test nuevo en `test/products.e2e-spec.ts`: desactiva la categoría y la marca
+de un producto ya creado, confirma que igual se puede editar el nombre,
+tildar/destildar `active` (incluido el mismo body que manda el formulario:
+`categoryId`/`brandId` sin cambiar + `active`), y que el botón dedicado
+`/activate`/`/deactivate` sigue funcionando — pero que reasignar a una
+categoría *distinta* e inactiva sigue rechazándose.
+
+**Verificado en navegador:** reproduje el 400 exacto editando `FILT-001` con
+su categoría/marca inactivas, apliqué el fix, reinicié `ms-autorepuesto`, y
+repetí el mismo flujo (destildar → guardar → volver a tildar → guardar):
+ambos guardados funcionan y el estado queda correcto en la ficha. Reactivé
+`Filtros de aceite` y `Bosch` al terminar para no dejar la categoría/marca de
+un producto real inconsistente.
+
+Técnica: `test/products.e2e-spec.ts` 10/10 (+1 nuevo) · suite completa de
+`ms-autorepuesto` **126/126** (`--runInBand`, igual que el script oficial;
+corrida en paralelo sin esa bandera muestra fallos de contención de conflictos
+de transacción pre-existentes, no relacionados con este cambio).
+
+### 2 — Cierre de cuenta abierta → cobrar
+
+**Esto ya estaba construido de punta a punta** — lo verifiqué en el
+navegador antes de tocar nada, para no duplicar trabajo:
+- `SaleDetailPage` ya tiene, para una cuenta `DRAFT`: "Agregar productos"
+  (bloqueado apenas se cierra), "Cerrar cuenta" (llama al mismo endpoint de
+  confirmar venta — descuenta inventario, pasa a `POSTED`, ya no admite más
+  líneas) y, una vez cerrada, "Cobrar".
+- "Cobrar" abre `SalePaymentsPage`: método Efectivo (pide una sesión de caja
+  **ABIERTA** del turno actual, calcula el cambio si el monto recibido es
+  mayor) o Tarjeta; el saldo no cobrado queda como pendiente en la venta y,
+  si es un cliente registrado, aparece solo en Cuentas por cobrar (ya
+  existía, sin tocar).
+
+Probé el flujo real: abrí una cuenta de prueba, la cerré (tuve que cargar
+stock de prueba primero porque el producto de prueba no tenía existencia —
+el backend correctamente rechazó el cierre con "Insufficient stock" hasta
+que hubo stock), cobré en efectivo con monto recibido mayor al total, y
+confirmé en Sesiones de caja que el efectivo entró al turno abierto
+("Cobros de venta en efectivo" subió exactamente lo cobrado). Cuenta de
+prueba cerrada/cobrada, sin dejar datos reales afectados.
+
+**Lo único que agregué:** el diálogo de confirmar "Cerrar cuenta"/"Confirmar
+venta" no mostraba el total — lo pedía explícitamente el prompt ("muestra
+total final"). Ahora el texto del diálogo empieza con
+`Total final: L XXX.XX.` antes de la descripción de qué hace el botón.
+
+**Archivo:** `src/sales/SalesPages.tsx` (`SaleDetailPage`, texto del
+`ConfirmDialog` de post/cancelar).
+
+**Nota de datos:** durante esta verificación encontré una sesión de caja
+("Low Cash") y una venta de mostrador (`Venta #39`) que quedaron abiertas/sin
+cobrar de una sesión anterior — no las toqué, no me correspondía limpiar
+datos que no generé yo mismo esta noche; quedan para que decidas si cerrarlas
+antes de la demo. También hay dos métodos de pago con nombre mixto ("Card ·
+Tarjeta", "Cash · Efectivo") en vez de los 3 originales
+(Efectivo/Tarjeta/Transferencia) que la Fase 14 dejó anotado como wipeados —
+ver [[phone-access-https-tunnel]] y la nota de "Ambos local DBs wiped" en la
+memoria del proyecto. Te lo señalo por si querés que los renombre/reemplace
+antes de la presentación; no lo hice porque no formaba parte de lo pedido
+esta noche.
+
+### 4 — Respuesta: ¿la cuenta abierta se guarda en tiempo real?
+
+**No.** Confirmado leyendo el código: `SaleEditor` tiene una sola mutación
+(`salesApi.update`/`.create`), que solo se dispara al presionar "Guardar
+cuenta". Agregar productos mientras tanto solo cambia estado de React más un
+borrador en `localStorage` (autoguardado local de la Fase 14.2, para
+recuperarse de un cierre accidental de pestaña) — nada llega al servidor
+hasta el guardado explícito. Un administrador **no puede** ver el avance de
+una cuenta en otra pantalla/terminal mientras el vendedor sigue cargando
+piezas sin guardar. Para eso haría falta guardado incremental al servidor
+(cada línea) o un mecanismo de sondeo/tiempo real — un cambio de arquitectura
+más grande, fuera del pedido concreto de esta noche; quedó documentado para
+que decidas si lo priorizás en una próxima ronda.
+
+### 3 — Rediseño de "Productos": tabla en vez de formulario repetido
+
+**Antes:** cada línea de Ventas (mostrador/cliente/cuenta, un solo
+`SaleEditor` compartido) y de Compras era un `<ProductSelector>` completo
+(buscador + `<select>` + paginación) apilado uno debajo del otro por
+producto, con Ubicación/Precio (o Costo) colapsados detrás de un
+`<details>` por línea — funcional pero no la "tabla que crece con cada
+escaneo, una fila por producto, con el total recalculándose abajo" que pedía
+David.
+
+**Diseño nuevo:**
+- **Un solo buscador de "Agregar producto"**, fuera de la tabla, en vez de un
+  `<ProductSelector>` repetido por línea. Escanear (cámara o lector físico) o
+  elegir ahí agrega una fila a la tabla; el buscador queda listo para el
+  siguiente producto.
+- **Escanear/elegir el mismo producto de nuevo suma la cantidad en la fila
+  existente en vez de crear una fila duplicada** — antes esto directamente
+  fallaba al guardar ("solo puede aparecer una vez"), forzando a borrar la
+  línea y sumar la cantidad a mano. Es una mejora real, no solo visual: la
+  tabla se comporta como espera un vendedor escaneando varias unidades de la
+  misma pieza.
+- **Tabla real** (`<table>`, no una grilla de `<div>`): columnas Producto
+  (código + nombre; la ubicación de origen queda como un detalle colapsado
+  debajo, heredada de la línea anterior igual que antes — nunca se vuelve a
+  pedir para un producto conocido salvo que haga falta cambiarla), Cantidad,
+  Precio unitario (Compras: Costo unitario, precargado del costo de
+  referencia) — ambos editables directamente, sin toggle, porque el pedido
+  fue "solo se pide cantidad y, si hace falta, ajustar el precio" —,
+  Descuento/Impuesto (sigue colapsado, sin cambios de comportamiento), Total
+  por línea, y Quitar. Un `<tfoot>` con el Total general, recalculado en cada
+  tecla.
+- **Costo de referencia y margen siguen sin aparecer en la venta** — ya era
+  así (la línea de venta nunca tuvo esos campos); no hizo falta ningún
+  cambio ahí, solo confirmar que el rediseño no los introdujera.
+- Validaciones que antes venían gratis de los `required` de HTML por línea
+  (al menos un producto, ubicación elegida, precio/costo elegido) pasan a
+  chequearse explícitamente en `submit()`, con el mismo texto de error de
+  siempre.
+
+**Archivos:** `src/sales/SalesPages.tsx` (tipo `Line` con `productCode`/
+`productName`, `addScannedProduct` reescrito, tabla nueva), `src/purchasing/
+PurchasePages.tsx` (mismo patrón, tipo `PurchaseLineForm`), CSS nuevo en
+`global.css` (`.line-items-table` y afines). Tests reescritos para el nuevo
+patrón de interacción (un buscador de agregar en vez de un selector por
+línea) en `SaleEditor.test.tsx` y `PurchasingPages.test.tsx` — mismas
+garantías que antes (precio sugerido puesto solo, descuento/impuesto
+colapsado salvo que ya traiga un ajuste, ubicación heredada de la línea
+anterior, foco en Cantidad) más un test nuevo por archivo para el
+comportamiento de "escanear de nuevo suma cantidad".
+
+**Verificado en navegador:** en Ventas (mostrador) y en Compras, agregué
+`FILT-001` desde el buscador → aparece la fila con precio/costo precargado
+→ lo agregué una segunda vez → la cantidad subió a 2 en la misma fila (no
+se duplicó) → el total de la fila y el total general se recalcularon solos
+→ "Guardar venta" guardó las 2 unidades correctamente. Venta de prueba
+cancelada al terminar.
+
+Técnica: `tsc -b` OK · `eslint` 0 warnings · `vitest` **183/183** (+2 nuevos,
+netos tras reescribir 6 tests obsoletos) · `vite build` OK.
+
+### Clientes: prefijo CLI, RTN de 14 dígitos, teléfono más largo
+
+- **Código:** el formulario de cliente nuevo ahora precarga `CLI-` (antes
+  vacío, con un ejemplo genérico "TALLER-PROGRESO" en el hint). Sigue siendo
+  texto libre editable — no se fuerza por validación de backend, igual que
+  ningún otro módulo de este sistema fuerza un prefijo de código — para no
+  romper clientes ya cargados con otro esquema.
+- **RTN:** antes era texto libre de hasta 40 caracteres. Ahora el campo
+  limpia guiones/espacios mientras se escribe y limita a 14 dígitos
+  (`inputMode="numeric"`); el backend (`CreateCustomerDto.taxId`) exige
+  exactamente 14 dígitos numéricos cuando se manda un valor (sigue
+  opcional). Actualicé el único test e2e que creaba un cliente con un RTN
+  corto de prueba (`"0801"` → `"08011990123456"`).
+- **Teléfono:** el límite de 40 caracteres no alcanzaba para un negocio que
+  da dos números ("9999-9999 / 8888-8888") o uno con extensión. Subido a 60
+  en el formulario, el DTO **y la columna real de PostgreSQL** — migración
+  aditiva nueva `20260912022748_phase_14_customer_phone_length`
+  (`VARCHAR(40)` → `VARCHAR(60)`, sin pérdida de datos). Solo se tocó
+  Clientes, no Proveedores, que comparte el mismo límite pero no se pidió.
+
+**Archivos:** `services/ms-autorepuesto/src/customers/dto/customer.dto.ts`,
+`services/ms-autorepuesto/prisma/schema.prisma`, migración nueva,
+`src/sales/CustomerPages.tsx`, `test/sales.e2e-spec.ts` (fixture de RTN).
+
+**Verificado en navegador:** en "Nuevo cliente", el código ya trae `CLI-`;
+escribiendo `0801-1990-12345-6` en RTN queda `08011990123456` (guiones
+eliminados, 14 dígitos) solo.
+
+Técnica: `tsc -b` OK · `eslint` 0 warnings (frontend y `ms-autorepuesto`) ·
+`vitest` **183/183** · `vite build` OK · `nest build` OK · e2e
+`ms-autorepuesto` **126/126** · e2e `api-gateway` **21/21** (sin cambios,
+re-verificado por tocar un contrato compartido).
+
+## Estado al cierre de la Fase 16
+
+- **Todo commiteado en `redesign/producto-ux`**, en commits pequeños por
+  bloque (uno por punto de esta fase) más este archivo. **Sin push** — a la
+  espera de tu confirmación, mismo patrón que las rondas anteriores.
+- **Migración nueva aplicada a la base local** (`phase_14_customer_phone_length`,
+  aditiva, sin migraciones squash ni reset).
+- **Pendiente de tu decisión** (no las toqué, no me correspondía sin que lo
+  pidieras): la sesión de caja y la venta de mostrador sin cobrar que
+  quedaron abiertas de una sesión anterior; los métodos de pago con nombre
+  mixto en inglés/español; si querés que priorice el guardado en tiempo real
+  de cuentas abiertas para que el administrador vea el avance (punto 4).
+- Recorré vos mismo Ventas (las 3 modalidades) y Compras con la tabla nueva,
+  y el ciclo completo cerrar cuenta → cobrar, antes de la presentación.
