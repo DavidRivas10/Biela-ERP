@@ -447,7 +447,7 @@ export function CustomerDetailPage() {
     queryKey: queryKeys.customer(id),
     queryFn: () => customersApi.detail(id),
   });
-  const params = { page, limit: 20 };
+  const params = { page, limit: 10 };
   const account = useQuery({
     queryKey: queryKeys.customerAccount(id, params),
     queryFn: () => customersApi.account(id, params),

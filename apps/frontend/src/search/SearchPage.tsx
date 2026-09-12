@@ -19,7 +19,7 @@ import type { SearchProduct } from "../types/erp";
 import { apiErrorMessage } from "../utils/api-error";
 
 export function SearchPage() {
-  const filters = useUrlFilters(20);
+  const filters = useUrlFilters(10);
   const [draft, setDraft] = useState({
     q: filters.values.q ?? "",
     engine: filters.values.engine ?? "",

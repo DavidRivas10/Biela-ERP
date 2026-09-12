@@ -11,7 +11,7 @@ import { locationPhysicalHint } from "../utils/formatters";
 import { Field } from "./Field";
 import { Pagination } from "./Pagination";
 
-const SELECTOR_PAGE_SIZE = 20;
+const SELECTOR_PAGE_SIZE = 10;
 
 type SelectorProps<T> = {
   id: string;

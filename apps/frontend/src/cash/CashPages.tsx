@@ -201,7 +201,7 @@ export function CashSessionDetailPage() {
   const canReadMovements = hasPermission("cash-movements.read");
   const summary = useQuery({ queryKey: queryKeys.cashSessionSummary(id), queryFn: () => cashApi.summary(id), enabled: canReadMovements });
   const basic = useQuery({ queryKey: queryKeys.cashSession(id), queryFn: () => cashApi.session(id), enabled: !canReadMovements });
-  const movementParams = { cashSessionId: id, page: movementPage, limit: 20 };
+  const movementParams = { cashSessionId: id, page: movementPage, limit: 10 };
   const movements = useQuery({ queryKey: queryKeys.cashMovements(movementParams), queryFn: () => cashApi.movements(movementParams), enabled: canReadMovements });
   const close = useMutation({ mutationFn: () => cashApi.closeSession(id, { countedAmount: closeForm.countedAmount, notes: closeForm.notes || undefined }), onSuccess: async () => { setCloseConfirm(false); await Promise.all([client.invalidateQueries({ queryKey: queryKeys.cashSessionSummary(id) }), client.invalidateQueries({ queryKey: queryKeys.cashSession(id) }), client.invalidateQueries({ queryKey: queryKeys.cashSessionsRoot }), client.invalidateQueries({ queryKey: queryKeys.currentCashSession(summary.data?.cashRegisterId ?? basic.data?.cashRegisterId ?? "") }), invalidateCommercialSummary(client)]); } });
   const loading = canReadMovements ? summary.isLoading : basic.isLoading;

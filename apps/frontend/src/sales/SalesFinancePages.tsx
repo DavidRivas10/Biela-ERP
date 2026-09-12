@@ -41,7 +41,7 @@ function FinancialOperations({ kind, ownerId, saleId, ownerNumber, status, maxim
   const { hasPermission } = useAuth();
   const client = useQueryClient();
   const [page, setPage] = useState(1);
-  const params = { page, limit: 20 };
+  const params = { page, limit: 10 };
   const history = useQuery({ queryKey: kind === "payment" ? queryKeys.salePayments(ownerId, params) : queryKeys.saleRefunds(ownerId, params), queryFn: () => kind === "payment" ? salesFinanceApi.payments(ownerId, params) : salesFinanceApi.refunds(ownerId, params), enabled: hasPermission("payments.read") });
   const [methodId, setMethodId] = useState("");
   const [method, setMethod] = useState<PaymentMethod>();

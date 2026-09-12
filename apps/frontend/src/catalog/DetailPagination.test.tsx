@@ -13,8 +13,8 @@ vi.mock("../auth/AuthContext", () => ({
 
 const meta = (page: number) => ({
   page,
-  limit: 20,
-  total: 21,
+  limit: 10,
+  total: 11,
   pages: 2,
 });
 
@@ -149,7 +149,7 @@ describe("Frontend Phase 10.B detail pagination", () => {
       );
       return (
         url.searchParams.get("page") === "2" &&
-        url.searchParams.get("limit") === "20"
+        url.searchParams.get("limit") === "10"
       );
     });
     expect(pageTwoRequests).toHaveLength(2);
@@ -213,7 +213,7 @@ describe("Frontend Phase 10.B detail pagination", () => {
         return (
           url.pathname === "/api/vehicles/vehicle-1/products" &&
           url.searchParams.get("page") === "2" &&
-          url.searchParams.get("limit") === "20"
+          url.searchParams.get("limit") === "10"
         );
       }),
     ).toBe(true);

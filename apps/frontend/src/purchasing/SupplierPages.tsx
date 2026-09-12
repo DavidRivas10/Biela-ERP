@@ -425,7 +425,7 @@ export function SupplierDetailPage() {
     queryKey: queryKeys.supplier(id),
     queryFn: () => suppliersApi.detail(id),
   });
-  const accountParams = { page: accountPage, limit: 20 };
+  const accountParams = { page: accountPage, limit: 10 };
   const account = useQuery({
     queryKey: queryKeys.supplierAccount(id, accountParams),
     queryFn: () => suppliersApi.account(id, accountParams),

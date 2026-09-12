@@ -719,8 +719,8 @@ export function PurchaseDetailPage() {
     queryKey: queryKeys.purchase(id),
     queryFn: () => purchasingApi.purchase(id),
   });
-  const receiptParams = { page: receiptPage, limit: 20 };
-  const returnParams = { page: returnPage, limit: 20 };
+  const receiptParams = { page: receiptPage, limit: 10 };
+  const returnParams = { page: returnPage, limit: 10 };
   const receipts = useQuery({
     queryKey: queryKeys.receipts(id, receiptParams),
     queryFn: () => purchasingApi.receipts(id, receiptParams),

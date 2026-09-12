@@ -706,8 +706,8 @@ export function ProductDetailPage() {
   const [confirm, setConfirm] = useState(false);
   const [inventoryPage, setInventoryPage] = useState(1);
   const [vehiclesPage, setVehiclesPage] = useState(1);
-  const inventoryParams = { page: inventoryPage, limit: 20 };
-  const vehicleParams = { page: vehiclesPage, limit: 20 };
+  const inventoryParams = { page: inventoryPage, limit: 10 };
+  const vehicleParams = { page: vehiclesPage, limit: 10 };
   const product = useQuery({
     queryKey: queryKeys.product(id),
     queryFn: () => catalogApi.product(id),

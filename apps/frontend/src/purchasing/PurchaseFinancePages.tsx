@@ -73,7 +73,7 @@ export function PurchasePaymentsPage() {
     queryKey: queryKeys.purchase(id),
     queryFn: () => purchasingApi.purchase(id),
   });
-  const paymentParams = { page, limit: 20 };
+  const paymentParams = { page, limit: 10 };
   const payments = useQuery({
     queryKey: queryKeys.purchasePayments(id, paymentParams),
     queryFn: () => purchasingFinanceApi.purchasePayments(id, paymentParams),
@@ -264,7 +264,7 @@ export function PurchaseReturnDetailPage() {
     queryKey: queryKeys.purchaseReturn(id),
     queryFn: () => purchasingApi.purchaseReturn(id),
   });
-  const refundParams = { page: refundPage, limit: 20 };
+  const refundParams = { page: refundPage, limit: 10 };
   const refunds = useQuery({
     queryKey: queryKeys.supplierRefunds(id, refundParams),
     queryFn: () => purchasingFinanceApi.supplierRefunds(id, refundParams),

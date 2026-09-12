@@ -8,7 +8,7 @@ import type { CashRegister } from "../types/cash";
 import { Field } from "./Field";
 import { Pagination } from "./Pagination";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 export function CashRegisterSelector({
   id,

@@ -940,7 +940,7 @@ export function VehicleDetailPage() {
   const client = useQueryClient();
   const [confirm, setConfirm] = useState(false);
   const [productsPage, setProductsPage] = useState(1);
-  const productsParams = { page: productsPage, limit: 20 };
+  const productsParams = { page: productsPage, limit: 10 };
   const vehicle = useQuery({
     queryKey: queryKeys.vehicle(id),
     queryFn: () => vehiclesApi.vehicle(id),

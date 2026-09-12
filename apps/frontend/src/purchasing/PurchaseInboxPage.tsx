@@ -48,8 +48,8 @@ export function PurchaseInboxPage() {
     queryFn: () => purchasingApi.purchases({ page: 1, limit: 50 }),
   });
   const payables = useQuery({
-    queryKey: queryKeys.payables({ inbox: true, page: 1, limit: 20 }),
-    queryFn: () => purchasingFinanceApi.payables({ page: 1, limit: 20 }),
+    queryKey: queryKeys.payables({ inbox: true, page: 1, limit: 10 }),
+    queryFn: () => purchasingFinanceApi.payables({ page: 1, limit: 10 }),
     enabled: canReadPayables,
   });
 

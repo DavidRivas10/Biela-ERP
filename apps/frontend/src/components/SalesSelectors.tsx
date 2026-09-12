@@ -25,7 +25,7 @@ export function CustomerSelector({
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const debounced = useDebouncedValue(search.trim());
-  const params = { page, limit: 20, active: true, search: debounced || undefined };
+  const params = { page, limit: 10, active: true, search: debounced || undefined };
   const list = useQuery({
     queryKey: queryKeys.customers(params),
     queryFn: () => customersApi.list(params),

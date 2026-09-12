@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
-export function useUrlFilters(defaultLimit = 20) {
+export function useUrlFilters(defaultLimit = 10) {
   const [params, setParams] = useSearchParams();
   const page = Math.max(1, Number(params.get("page")) || 1);
   const limit = Math.min(
