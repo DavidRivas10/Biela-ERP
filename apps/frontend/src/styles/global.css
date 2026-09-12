@@ -1422,6 +1422,32 @@ b {
   color: var(--muted);
   font-style: italic;
 }
+/* Ventas workspace: three independent columns (mostrador / cliente
+   registrado / cuentas abiertas) side by side, each its own draft — loading
+   a product into one never touches the others. Stacks to one column on a
+   narrow screen instead of squeezing three panels sideways. */
+.sales-workspace {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 1.15rem;
+}
+.sales-workspace__column {
+  display: grid;
+  min-width: 0;
+}
+.sales-panel h2 {
+  margin: 0 0 0.2rem;
+}
+.quick-sale-payment {
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+@media (max-width: 1100px) {
+  .sales-workspace {
+    grid-template-columns: 1fr;
+  }
+}
 .return-line {
   display: grid;
   grid-template-columns: minmax(13rem, 1fr) minmax(15rem, 2fr) minmax(8rem, 1fr);
@@ -1647,36 +1673,7 @@ b {
   font-weight: 400;
 }
 
-/* Sales: mode selector and open accounts */
-.mode-select {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 0.6rem;
-  margin-top: 0.5rem;
-}
-.mode-select__option {
-  display: flex;
-  gap: 0.6rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 0.75rem 0.85rem;
-  cursor: pointer;
-}
-.mode-select__option--active {
-  border-color: var(--green-700);
-  background: var(--green-100);
-}
-.mode-select__option input {
-  margin-top: 0.2rem;
-  accent-color: var(--green-700);
-}
-.mode-select__option span {
-  display: grid;
-  gap: 0.15rem;
-}
-.mode-select__option small {
-  color: var(--muted);
-}
+/* Sales: open accounts */
 .account-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1694,6 +1691,9 @@ b {
   padding: 0.5rem 0.85rem;
   color: var(--ink-strong);
   text-decoration: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .account-tabs__tab:hover {
   border-color: var(--primary);

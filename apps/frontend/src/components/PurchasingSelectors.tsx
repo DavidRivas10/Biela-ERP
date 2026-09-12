@@ -10,7 +10,7 @@ import { formatPaymentMethodKind } from "../utils/formatters";
 import { Field } from "./Field";
 import { Pagination } from "./Pagination";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 function includeSelected<T extends { id: string }>(rows: T[], selected?: T) {
   return selected && !rows.some((row) => row.id === selected.id)
@@ -140,6 +140,19 @@ export function PaymentMethodSelector({
     enabled: enabled && Boolean(value) && !inPage,
   });
   const rows = includeSelected(list.data?.data ?? [], selected.data);
+
+  // A one-register shop often has just Efectivo and Tarjeta configured —
+  // still two options, so this rarely fires — but if there's truly only one
+  // active method, don't make anyone choose from a list of one.
+  useAutoSelectSoleOption({
+    value,
+    searchTerm: "",
+    loading: list.isFetching,
+    total: list.data?.meta.total,
+    rows: list.data?.data ?? [],
+    onSelect: (row) => onChange(row.id, row),
+  });
+
   return (
     <div className="entity-selector">
       <Field label={label} htmlFor={id} required={required}>
@@ -196,6 +209,18 @@ export function OpenCashSessionSelector({
     enabled: enabled && Boolean(value) && !inPage,
   });
   const rows = includeSelected(list.data?.data ?? [], selected.data);
+
+  // A single register almost never has more than one OPEN session at once —
+  // pick it automatically instead of asking the vendor to choose from one.
+  useAutoSelectSoleOption({
+    value,
+    searchTerm: "",
+    loading: list.isFetching,
+    total: list.data?.meta.total,
+    rows: list.data?.data ?? [],
+    onSelect: (row) => onChange(row.id, row),
+  });
+
   return (
     <div className="entity-selector">
       <Field label={label} htmlFor={id} required={required}>

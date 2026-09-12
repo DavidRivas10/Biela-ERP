@@ -40,11 +40,8 @@ import {
   SalePaymentsPage,
   SaleRefundsPage,
 } from "../sales/SalesFinancePages";
-import {
-  SaleDetailPage,
-  SaleFormPage,
-  SalesPage,
-} from "../sales/SalesPages";
+import { SaleDetailPage, SalesPage } from "../sales/SalesPages";
+import { SaleEditRedirect, SaleFormPage } from "../sales/SalesWorkspace";
 import { PayablesPage } from "../purchasing/PayablesPage";
 import {
   PurchaseDetailPage,
@@ -415,7 +412,7 @@ export function AppRoutes() {
           <Route path="sales" element={<RequirePermission permission="sales.read"><SalesPage /></RequirePermission>} />
           <Route path="sales/new" element={<RequirePermission permission="sales.create"><SaleFormPage /></RequirePermission>} />
           <Route path="sales/:id" element={<RequirePermission permission="sales.read"><SaleDetailPage /></RequirePermission>} />
-          <Route path="sales/:id/edit" element={<RequirePermission permission="sales.update"><SaleFormPage /></RequirePermission>} />
+          <Route path="sales/:id/edit" element={<RequirePermission permission="sales.update"><SaleEditRedirect /></RequirePermission>} />
           <Route path="sales/:id/returns" element={<RequirePermission permission="sales.return"><SaleReturnCreatePage /></RequirePermission>} />
           <Route path="sales/:id/payments" element={<RequirePermission permission="sales.read"><SalePaymentsPage /></RequirePermission>} />
           <Route path="sales/returns/:id" element={<RequirePermission permission="sales.read"><SaleReturnDetailPage /></RequirePermission>} />
