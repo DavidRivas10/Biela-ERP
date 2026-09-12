@@ -11,7 +11,7 @@ import {
 } from "class-validator";
 
 export class CreateCustomerDto {
-  @ApiProperty({ example: "CUS-0001" })
+  @ApiProperty({ example: "CLI-0001" })
   @Transform(({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim().toUpperCase() : value,
   )
@@ -36,10 +36,16 @@ export class CreateCustomerDto {
   @MaxLength(160)
   businessName?: string;
 
-  @ApiPropertyOptional({ description: "RTN or other tax identifier" })
+  @ApiPropertyOptional({
+    description: "RTN: exactly 14 numeric digits, no dashes",
+    example: "08011990123456",
+  })
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === "string" ? value.replace(/\D/g, "") : value,
+  )
   @IsString()
-  @MaxLength(40)
+  @Matches(/^\d{14}$/, { message: "taxId must be exactly 14 numeric digits" })
   taxId?: string;
 
   @ApiPropertyOptional()
@@ -51,7 +57,7 @@ export class CreateCustomerDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @MaxLength(40)
+  @MaxLength(60)
   phone?: string;
 
   @ApiPropertyOptional({ example: "customer@example.invalid" })

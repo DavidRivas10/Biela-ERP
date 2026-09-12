@@ -21,7 +21,7 @@ import { apiErrorMessage } from "../utils/api-error";
 import { formatCalendarDate, formatMoney } from "../utils/formatters";
 
 const empty: CustomerInput = {
-  code: "",
+  code: "CLI-",
   name: "",
   businessName: "",
   taxId: "",
@@ -327,7 +327,7 @@ function CustomerEditor({ id, initial }: { id?: string; initial?: Customer }) {
             label="Código"
             htmlFor="customer-code"
             required
-            hint="Identificador corto y único para encontrarlo rápido (ej.: TALLER-PROGRESO). Si no usás códigos, algo simple como sus iniciales o su teléfono sirve."
+            hint="Empieza con «CLI-» seguido de algo que lo identifique rápido (ej.: CLI-TALLER-PROGRESO o CLI-0001)."
           >
             <input
               id="customer-code"
@@ -350,12 +350,20 @@ function CustomerEditor({ id, initial }: { id?: string; initial?: Customer }) {
               onChange={(e) => change("businessName", e.target.value)}
             />
           </Field>
-          <Field label="RTN / identificación" htmlFor="customer-tax">
+          <Field
+            label="RTN / identificación"
+            htmlFor="customer-tax"
+            hint="14 dígitos numéricos, sin guiones (ej.: 08011990123456)."
+          >
             <input
               id="customer-tax"
-              maxLength={40}
+              inputMode="numeric"
+              pattern="\d{14}"
+              maxLength={14}
               value={form.taxId}
-              onChange={(e) => change("taxId", e.target.value)}
+              onChange={(e) =>
+                change("taxId", e.target.value.replace(/\D/g, "").slice(0, 14))
+              }
             />
           </Field>
           <Field label="Persona de contacto" htmlFor="customer-contact">
@@ -366,10 +374,14 @@ function CustomerEditor({ id, initial }: { id?: string; initial?: Customer }) {
               onChange={(e) => change("contactName", e.target.value)}
             />
           </Field>
-          <Field label="Teléfono" htmlFor="customer-phone">
+          <Field
+            label="Teléfono"
+            htmlFor="customer-phone"
+            hint="Cabe más de un número, ej.: 9999-9999 / 8888-8888."
+          >
             <input
               id="customer-phone"
-              maxLength={40}
+              maxLength={60}
               value={form.phone}
               onChange={(e) => change("phone", e.target.value)}
             />
