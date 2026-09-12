@@ -1428,18 +1428,41 @@ b {
   color: var(--muted);
   font-style: italic;
 }
-/* Ventas workspace: three independent columns (mostrador / cliente
-   registrado / cuentas abiertas) side by side, each its own draft — loading
-   a product into one never touches the others. Stacks to one column on a
-   narrow screen instead of squeezing three panels sideways. */
+/* Ventas workspace: three independent drafts (mostrador / cliente
+   registrado / cuentas abiertas), each its own state — loading a product
+   into one never touches the others. Only one is shown at a time (via a tab
+   bar, full width), but all three stay mounted so switching tabs never
+   resets what was loaded into the other two. */
+.workspace-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 2px solid var(--line);
+  margin-bottom: 1.15rem;
+}
+.workspace-tab {
+  appearance: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  margin-bottom: -2px;
+  padding: 0.75rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.workspace-tab:hover {
+  color: var(--ink-strong);
+}
+.workspace-tab[aria-selected="true"] {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
 .sales-workspace {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: start;
-  gap: 1.15rem;
-}
-.sales-workspace__column {
-  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
 }
 .sales-panel h2 {
@@ -1450,14 +1473,42 @@ b {
   color: var(--muted);
   font-size: 0.85rem;
 }
+/* Totals + call-to-action, pinned to the bottom of each panel and made
+   deliberately larger than a regular form field — this is the number the
+   vendor and the customer both look at last. */
+.sale-totals-bar {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  border-top: 2px solid var(--line);
+  padding-top: 1rem;
+}
+.sale-totals-bar__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.sale-totals-bar__label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sale-totals-bar__amount {
+  font-size: 2.75rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink-strong);
+}
 .quick-sale-payment {
   border-top: 1px solid var(--line);
   padding-top: 1rem;
 }
-@media (max-width: 1100px) {
-  .sales-workspace {
-    grid-template-columns: 1fr;
-  }
+.button--large {
+  padding: 0.9rem 1.5rem;
+  font-size: 1.05rem;
 }
 .return-line {
   display: grid;

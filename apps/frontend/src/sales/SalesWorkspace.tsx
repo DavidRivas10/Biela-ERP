@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { salesApi, type SaleInput } from "../api/sales-api";
 import { salesFinanceApi } from "../api/sales-finance-api";
@@ -52,6 +52,12 @@ function validateLines(lines: Line[]): string | null {
 
 type PanelKind = "mostrador" | "cliente" | "cuenta";
 
+const WORKSPACE_TABS: { key: PanelKind; label: string }[] = [
+  { key: "mostrador", label: "Venta rápida" },
+  { key: "cliente", label: "Cliente registrado" },
+  { key: "cuenta", label: "Cuentas abiertas" },
+];
+
 /**
  * Legacy route (`/app/sales/:id/edit`) kept working for any old link/bookmark:
  * it just resolves which workspace column owns that DRAFT sale and hands off
@@ -73,12 +79,16 @@ export function SaleEditRedirect() {
 }
 
 /**
- * Ventas: three independent columns instead of one form with a mode
- * selector. Each column is its own draft with its own state — loading a
- * product into one never touches the others, which is what used to cause a
- * product picked under one sale type to still be sitting in the table after
+ * Ventas: three independent panels instead of one form with a mode selector.
+ * Each panel is its own draft with its own state — loading a product into
+ * one never touches the others, which is what used to cause a product
+ * picked under one sale type to still be sitting in the table after
  * switching to another (the state simply doesn't exist anywhere shared
  * anymore, there's nothing left to leak).
+ *
+ * All three stay mounted at all times — a tab bar only controls which one is
+ * visible (via the `hidden` attribute), not which ones exist. Switching tabs
+ * is purely a view change: nothing unmounts, so nothing resets.
  */
 export function SaleFormPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -91,17 +101,6 @@ export function SaleFormPage() {
       ? "cliente"
       : "mostrador";
   const [activePanel, setActivePanel] = useState<PanelKind>(initialFocus);
-
-  const scrolledOnce = useRef(false);
-  useEffect(() => {
-    if (scrolledOnce.current) return;
-    scrolledOnce.current = true;
-    if (initialFocus === "mostrador") return;
-    document
-      .getElementById(`sales-column-${initialFocus}`)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   function setAccountId(id?: string) {
     setSearchParams(
@@ -118,20 +117,36 @@ export function SaleFormPage() {
   return (
     <div className="page-stack">
       <PageHeader eyebrow="Vender" title="Ventas" />
+      <div className="workspace-tabs" role="tablist" aria-label="Modalidad de venta">
+        {WORKSPACE_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            id={`workspace-tab-${tab.key}`}
+            aria-selected={activePanel === tab.key}
+            aria-controls={`sales-panel-${tab.key}`}
+            className="workspace-tab"
+            onClick={() => setActivePanel(tab.key)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
       <div className="sales-workspace">
         <section
-          id="sales-column-mostrador"
-          className="sales-workspace__column"
-          onFocusCapture={() => setActivePanel("mostrador")}
-          onMouseDownCapture={() => setActivePanel("mostrador")}
+          id="sales-panel-mostrador"
+          role="tabpanel"
+          aria-labelledby="workspace-tab-mostrador"
+          hidden={activePanel !== "mostrador"}
         >
           <QuickSalePanel active={activePanel === "mostrador"} />
         </section>
         <section
-          id="sales-column-cliente"
-          className="sales-workspace__column"
-          onFocusCapture={() => setActivePanel("cliente")}
-          onMouseDownCapture={() => setActivePanel("cliente")}
+          id="sales-panel-cliente"
+          role="tabpanel"
+          aria-labelledby="workspace-tab-cliente"
+          hidden={activePanel !== "cliente"}
         >
           <CustomerSalePanel
             key={customerSaleId ?? "new"}
@@ -141,10 +156,10 @@ export function SaleFormPage() {
           />
         </section>
         <section
-          id="sales-column-cuenta"
-          className="sales-workspace__column"
-          onFocusCapture={() => setActivePanel("cuenta")}
-          onMouseDownCapture={() => setActivePanel("cuenta")}
+          id="sales-panel-cuenta"
+          role="tabpanel"
+          aria-labelledby="workspace-tab-cuenta"
+          hidden={activePanel !== "cuenta"}
         >
           <OpenAccountColumn
             focusedId={accountId}
@@ -336,15 +351,23 @@ function QuickSalePanel({ active }: { active: boolean }) {
         scanFeedback={scanFeedback}
         scanTitle="Escanear producto para la venta"
       />
-      {canCheckoutInOneStep ? (
-        <div className="form-grid quick-sale-payment">
-          <SalePaymentFieldset idPrefix="mostrador" fields={payment} />
+      <div className="sale-totals-bar">
+        <div className="sale-totals-bar__total">
+          <span className="sale-totals-bar__label">Total</span>
+          <span className="sale-totals-bar__amount">
+            {formatMoney(total.toFixed(2))}
+          </span>
         </div>
-      ) : null}
-      <div className="form-actions">
-        <Button type="submit" loading={pending}>
-          {canCheckoutInOneStep ? "Cobrar y confirmar" : "Guardar venta"}
-        </Button>
+        {canCheckoutInOneStep ? (
+          <div className="form-grid quick-sale-payment">
+            <SalePaymentFieldset idPrefix="mostrador" fields={payment} />
+          </div>
+        ) : null}
+        <div className="form-actions">
+          <Button type="submit" loading={pending} className="button--large">
+            {canCheckoutInOneStep ? "Cobrar y confirmar" : "Guardar venta"}
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -430,6 +453,7 @@ function CustomerSaleForm({
   const documentDate = initial?.documentDate.slice(0, 10) ?? today();
   const { lines, updateLine, removeLine, addScannedProduct, handleScan, scanFeedback, duplicate, setLines } =
     useSaleLineItems("cliente", initial, active);
+  const total = linesTotal(lines);
   const [formError, setFormError] = useState<string | null>(null);
 
   const draftKey = `sale-draft:cliente:${id ?? "new"}`;
@@ -552,10 +576,18 @@ function CustomerSaleForm({
           </Field>
         </div>
       </details>
-      <div className="form-actions">
-        <Button type="submit" loading={mutation.isPending}>
-          Guardar venta
-        </Button>
+      <div className="sale-totals-bar">
+        <div className="sale-totals-bar__total">
+          <span className="sale-totals-bar__label">Total</span>
+          <span className="sale-totals-bar__amount">
+            {formatMoney(total.toFixed(2))}
+          </span>
+        </div>
+        <div className="form-actions">
+          <Button type="submit" loading={mutation.isPending} className="button--large">
+            Guardar venta
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -636,6 +668,7 @@ function OpenAccountForm({
   const documentDate = initial?.documentDate.slice(0, 10) ?? today();
   const { lines, updateLine, removeLine, addScannedProduct, handleScan, scanFeedback, duplicate, setLines } =
     useSaleLineItems("cuenta", initial, active);
+  const total = linesTotal(lines);
   const [formError, setFormError] = useState<string | null>(null);
 
   const draftKey = `sale-draft:cuenta:${id ?? "new"}`;
@@ -776,10 +809,18 @@ function OpenAccountForm({
           </Field>
         </div>
       </details>
-      <div className="form-actions">
-        <Button type="submit" loading={mutation.isPending}>
-          Guardar cuenta
-        </Button>
+      <div className="sale-totals-bar">
+        <div className="sale-totals-bar__total">
+          <span className="sale-totals-bar__label">Total</span>
+          <span className="sale-totals-bar__amount">
+            {formatMoney(total.toFixed(2))}
+          </span>
+        </div>
+        <div className="form-actions">
+          <Button type="submit" loading={mutation.isPending} className="button--large">
+            Guardar cuenta
+          </Button>
+        </div>
       </div>
     </form>
   );
