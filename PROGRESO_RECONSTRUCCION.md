@@ -1387,3 +1387,76 @@ estaban.
 - Dos hallazgos reportados arriba, ninguno corregido — a la espera de tu
   decisión sobre si aplicar pestañas a Inventario/Cajas y sobre si vale la
   pena resolver los IDs de actor sin nombre.
+
+## Fase 23 — Compras: tabla de productos real; Inventario: filtros emparejados (2026-09-12)
+
+Dos ajustes puntuales de layout, pedidos después de revisar la Fase 22.
+Antes de tocar nada verifiqué cada pantalla nombrada, porque una de las
+dos no tenía el problema descrito y la otra sí — pero en un lugar
+distinto del que se nombró.
+
+### 1 — Compras: la sección de productos que sí era "un formulario que se repite"
+
+Revisé primero **"Registrar una factura" → "Productos que trae la
+factura"**, que fue la pantalla nombrada en el pedido: ya usa exactamente
+el patrón de Ventas — buscador/escáner arriba, tabla `.line-items-table`
+creciendo debajo, nada por fila fuera de la tabla. No le cambié nada ahí,
+no hacía falta.
+
+El problema real lo encontré en **"Devolver mercadería al proveedor"**
+(la otra pantalla de productos dentro de Compras): cada producto elegible
+para devolver se renderizaba como su propia `<section className="form-
+section">` con su propio `<h2>` y su propia grilla de 2 campos (Ubicación
+origen, Cantidad a devolver) — si una compra tenía 5 productos elegibles,
+la pantalla mostraba 5 cajas apiladas, cada una pareciendo un mini-
+formulario aparte. Es exactamente el patrón que se describió como "un
+formulario que se repite por producto".
+
+**Corrección**: convertí esa lista en una sola tabla `.line-items-table`
+que crece con una fila por producto — columnas Producto / Recibido /
+Devuelto / Elegible / Cantidad a devolver — con la ubicación de origen
+colapsada dentro de la celda del producto (`<details className="line-
+location">`), el mismo micro-patrón exacto que ya usa Ventas para elegir
+la ubicación de cada línea. No cambié el estado (`lines`, `setLines`), ni
+la validación, ni el payload que arma la mutación — solo el marcado.
+
+### 2 — Almacén → Inventario (Existencias): filtros emparejados
+
+Los cinco controles (Buscar producto, Producto, Buscar ubicación,
+Ubicación, Existencia) vivían todos sueltos dentro de un único
+`.filter-bar` (fila flexible). Cada buscador y su selector correspondiente
+ya eran un solo componente (`ProductSelector`, `LocationSelector`), pero
+al no tener borde ni fondo propio, y compartir una fila flexible con
+`align-items: end` junto a un control mucho más bajo ("Existencia"), el
+conjunto se veía amontonado sin una separación visual clara entre "lo de
+Producto" y "lo de Ubicación".
+
+**Corrección**: separé el filtro en dos franjas. Producto y Ubicación
+ahora van en un `.form-grid` de dos columnas — el mismo patrón que ya usa,
+por ejemplo, "Transferencias de inventario" para emparejar Producto/Origen
+— así que cada buscador queda directamente arriba de su selector, en su
+propia columna. "Existencia" y "Limpiar filtros", al ser controles cortos
+y sueltos, se quedaron en su propio `.filter-bar` debajo. No toqué
+Movimientos ni Transferencias (sus propios filtros no se pidieron en esta
+ronda) ni ninguna lógica de filtrado.
+
+### Verificación
+
+- `tsc -b`, `eslint --max-warnings=0`, `vitest` (184/184), `vite build`:
+  los cuatro sin errores — ningún test dependía del marcado anterior de
+  "Devolver mercadería" ni del `.filter-bar` de Existencias.
+- **Recorrido y verificado en el navegador por mí mismo**: confirmé que
+  "Registrar una factura" ya cumplía antes de decidir no tocarla; en
+  "Devolver mercadería" verifiqué la tabla nueva con el producto real de
+  la compra #89 (fila única, ubicación colapsada, cantidad editable); en
+  Inventario → Existencias confirmé que "Buscar producto"/"Producto" y
+  "Buscar ubicación"/"Ubicación" quedaron alineados en columnas propias,
+  con "Existencia"/"Limpiar filtros" debajo.
+
+## Estado al cierre de la Fase 23
+
+- Todo commiteado en `redesign/producto-ux`, en un commit por bloque.
+  **Sin push** — a la espera de tu confirmación.
+- Los dos hallazgos de la Fase 22 (pestañas para Inventario/Cajas, IDs de
+  actor sin nombre) siguen pendientes de tu decisión — no se tocaron en
+  esta ronda.
