@@ -5,11 +5,13 @@ import {
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
+import { movementDelta, ZERO } from "../finance/finance-money";
 import {
   CommercialDocumentQueryDto,
   PayablesQueryDto,
   ReceivablesQueryDto,
 } from "./dto/commercial-query.dto";
+import { MoneySummaryQueryDto } from "./dto/money-summary-query.dto";
 
 type SummaryRow = {
   documentCount: bigint;
@@ -189,6 +191,141 @@ export class CommercialService {
         },
       }),
     };
+  }
+
+  /**
+   * Read-only "Resumen de Dinero" for a date range (defaults to today):
+   * money actually collected/paid, by method, plus the live expected Cash
+   * of every currently OPEN session. Everything here is a straight
+   * aggregate over Payment/CashSession rows that already exist — no new
+   * accounting concept.
+   *
+   * "Vendido hoy" (a Sale's full total, POSTED, by documentDate) already
+   * exists as `summary().sales`, but it doesn't decompose cleanly by
+   * payment method: one Sale can be split across several methods, or be
+   * partly/fully on credit with no payment at all yet. So this splits
+   * SALE_PAYMENT rows by method into two buckets instead, using the one
+   * distinction the data actually supports cleanly: whether the payment
+   * landed the same calendar day as the Sale it settles (a same-day
+   * mostrador-style collection) or a later day (an "abono" against a
+   * pre-existing balance — i.e., a receivables collection).
+   */
+  async moneySummary(query: MoneySummaryQueryDto) {
+    const businessDate = this.businessDate();
+    const dateFrom = query.dateFrom ?? businessDate;
+    const dateTo = query.dateTo ?? businessDate;
+    if (dateFrom > dateTo)
+      throw new BadRequestException("Money summary date range is invalid");
+    const tz = process.env.TZ ?? "America/Tegucigalpa";
+
+    const [salePaymentRows, purchasePaymentRows, openSessions] =
+      await Promise.all([
+        this.prisma.$queryRaw<
+          Array<{
+            paymentMethodId: string;
+            code: string;
+            name: string;
+            kind: string;
+            sameDaySalesAmount: Prisma.Decimal;
+            receivablesCollectedAmount: Prisma.Decimal;
+          }>
+        >(Prisma.sql`
+          WITH sale_payments AS (
+            SELECT p."paymentMethodId", p."amount",
+              (p."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz})::date AS "paidDate",
+              s."documentDate"
+            FROM "Payment" p
+            JOIN "Sale" s ON s."id" = p."saleId"
+            WHERE p."type" = 'SALE_PAYMENT' AND p."status" = 'POSTED'
+              AND (p."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz})::date
+                BETWEEN ${dateFrom}::date AND ${dateTo}::date
+          )
+          SELECT pm."id" AS "paymentMethodId", pm."code", pm."name", pm."kind",
+            COALESCE(SUM(sp."amount") FILTER (
+              WHERE sp."paidDate" = sp."documentDate"
+            ), 0)::numeric AS "sameDaySalesAmount",
+            COALESCE(SUM(sp."amount") FILTER (
+              WHERE sp."paidDate" <> sp."documentDate"
+            ), 0)::numeric AS "receivablesCollectedAmount"
+          FROM "PaymentMethod" pm
+          LEFT JOIN sale_payments sp ON sp."paymentMethodId" = pm."id"
+          WHERE pm."active" = TRUE
+          GROUP BY pm."id", pm."code", pm."name", pm."kind"
+          ORDER BY pm."code"
+        `),
+        this.prisma.$queryRaw<
+          Array<{
+            paymentMethodId: string;
+            code: string;
+            name: string;
+            kind: string;
+            amount: Prisma.Decimal;
+          }>
+        >(Prisma.sql`
+          SELECT pm."id" AS "paymentMethodId", pm."code", pm."name", pm."kind",
+            COALESCE(SUM(p."amount"), 0)::numeric AS "amount"
+          FROM "PaymentMethod" pm
+          LEFT JOIN "Payment" p ON p."paymentMethodId" = pm."id"
+            AND p."type" = 'PURCHASE_PAYMENT' AND p."status" = 'POSTED'
+            AND (p."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz})::date
+              BETWEEN ${dateFrom}::date AND ${dateTo}::date
+          WHERE pm."active" = TRUE
+          GROUP BY pm."id", pm."code", pm."name", pm."kind"
+          ORDER BY pm."code"
+        `),
+        this.prisma.cashSession.findMany({
+          where: { status: "OPEN" },
+          include: {
+            cashRegister: true,
+            movements: { select: { type: true, amount: true } },
+          },
+          orderBy: [{ openedAt: "asc" }],
+        }),
+      ]);
+
+    const byMethod = (
+      field: "sameDaySalesAmount" | "receivablesCollectedAmount",
+    ) =>
+      salePaymentRows.map((row) => ({
+        paymentMethodId: row.paymentMethodId,
+        code: row.code,
+        name: row.name,
+        kind: row.kind,
+        amount: row[field],
+      }));
+    const sumOf = (amounts: Prisma.Decimal[]) =>
+      amounts.reduce((total, amount) => total.plus(amount), ZERO);
+
+    return this.serialize({
+      dateFrom,
+      dateTo,
+      salesCollected: {
+        total: sumOf(salePaymentRows.map((row) => row.sameDaySalesAmount)),
+        byMethod: byMethod("sameDaySalesAmount"),
+      },
+      receivablesCollected: {
+        total: sumOf(
+          salePaymentRows.map((row) => row.receivablesCollectedAmount),
+        ),
+        byMethod: byMethod("receivablesCollectedAmount"),
+      },
+      purchasesPaid: {
+        total: sumOf(purchasePaymentRows.map((row) => row.amount)),
+        byMethod: purchasePaymentRows,
+      },
+      openCashSessions: openSessions.map((session) => ({
+        id: session.id,
+        cashRegisterCode: session.cashRegister.code,
+        cashRegisterName: session.cashRegister.name,
+        openedAt: session.openedAt,
+        openingAmount: session.openingAmount,
+        expectedCash: session.movements.reduce(
+          (value, movement) =>
+            value.plus(movementDelta(movement.type, movement.amount)),
+          session.openingAmount,
+        ),
+      })),
+    });
   }
 
   private receivableQuery(

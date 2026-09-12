@@ -26,6 +26,7 @@ describe("Phase 8 commercial settlement HTTP", () => {
   let purchaseReturnId: string;
   let saleId: string;
   let walkInSaleId: string;
+  let todaySaleId: string;
   let cashMethodId: string;
   let bankMethodId: string;
   let registerId: string;
@@ -205,7 +206,11 @@ describe("Phase 8 commercial settlement HTTP", () => {
       where: {
         OR: [
           { purchaseId },
-          { saleId: { in: [saleId, walkInSaleId].filter(Boolean) } },
+          {
+            saleId: {
+              in: [saleId, walkInSaleId, todaySaleId].filter(Boolean),
+            },
+          },
         ],
       },
     });
@@ -222,7 +227,9 @@ describe("Phase 8 commercial settlement HTTP", () => {
       await prisma.purchase.deleteMany({ where: { id: purchaseId } });
     }
     await prisma.sale.deleteMany({
-      where: { id: { in: [saleId, walkInSaleId].filter(Boolean) } },
+      where: {
+        id: { in: [saleId, walkInSaleId, todaySaleId].filter(Boolean) },
+      },
     });
     await prisma.customer.deleteMany({ where: { id: customerId } });
     await prisma.supplier.deleteMany({ where: { id: supplierId } });
@@ -579,6 +586,95 @@ describe("Phase 8 commercial settlement HTTP", () => {
         expect(typeof body.sales.today.total).toBe("string");
         expect(body.sales.today.count).toBeGreaterThanOrEqual(0);
       });
+  });
+
+  it("splits money-summary sale collections into same-day vs receivables, by method", async () => {
+    const before = (
+      await request(app.getHttpServer())
+        .get("/commercial/money-summary")
+        .expect(200)
+    ).body;
+
+    // A Sale documented and paid the same day: a same-day collection, not
+    // a receivables collection — even though it also settles through
+    // Payment the same way any credit collection would.
+    todaySaleId = (
+      await prisma.sale.create({
+        data: {
+          customerId,
+          documentDate: new Date(),
+          status: "POSTED",
+          createdByActorId: "fixture",
+          postedByActorId: "fixture",
+          postedAt: new Date(),
+          subtotal: "50.00",
+          total: "50.00",
+        },
+      })
+    ).id;
+    await request(app.getHttpServer())
+      .post(`/sales/${todaySaleId}/payments`)
+      .send({
+        paymentMethodId: cashMethodId,
+        amount: "50.00",
+        cashSessionId: sessionId,
+      })
+      .expect(201);
+
+    // A payment today against the Phase 8 Sale documented back on
+    // 2026-08-01: an "abono" against a pre-existing balance, i.e. a
+    // receivables collection.
+    await request(app.getHttpServer())
+      .post(`/sales/${saleId}/payments`)
+      .send({ paymentMethodId: bankMethodId, amount: "5.00" })
+      .expect(201);
+
+    const after = (
+      await request(app.getHttpServer())
+        .get("/commercial/money-summary")
+        .expect(200)
+    ).body;
+
+    const amountFor = (
+      body: typeof before,
+      bucket: "salesCollected" | "receivablesCollected",
+      methodId: string,
+    ) =>
+      Number(
+        body[bucket].byMethod.find(
+          (row: { paymentMethodId: string }) => row.paymentMethodId === methodId,
+        )?.amount ?? "0",
+      );
+
+    expect(
+      amountFor(after, "salesCollected", cashMethodId) -
+        amountFor(before, "salesCollected", cashMethodId),
+    ).toBeCloseTo(50, 2);
+    expect(
+      amountFor(after, "receivablesCollected", cashMethodId) -
+        amountFor(before, "receivablesCollected", cashMethodId),
+    ).toBeCloseTo(0, 2);
+    expect(
+      amountFor(after, "receivablesCollected", bankMethodId) -
+        amountFor(before, "receivablesCollected", bankMethodId),
+    ).toBeCloseTo(5, 2);
+    expect(
+      amountFor(after, "salesCollected", bankMethodId) -
+        amountFor(before, "salesCollected", bankMethodId),
+    ).toBeCloseTo(0, 2);
+
+    const session = after.openCashSessions.find(
+      (row: { id: string }) => row.id === sessionId,
+    );
+    expect(session).toBeDefined();
+    expect(typeof session.expectedCash).toBe("string");
+
+    const outOfRange = await request(app.getHttpServer())
+      .get("/commercial/money-summary?dateFrom=2000-01-01&dateTo=2000-01-02")
+      .expect(200);
+    expect(outOfRange.body.salesCollected.total).toBe("0.00");
+    expect(outOfRange.body.receivablesCollected.total).toBe("0.00");
+    expect(outOfRange.body.purchasesPaid.total).toBe("0.00");
   });
 
   it("enforces authentication and Phase 8 permissions", async () => {

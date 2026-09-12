@@ -17,6 +17,7 @@ import {
   PayablesQueryDto,
   ReceivablesQueryDto,
 } from "./dto/commercial-query.dto";
+import { MoneySummaryQueryDto } from "./dto/money-summary-query.dto";
 
 @ApiTags("commercial")
 @ApiBearerAuth()
@@ -70,5 +71,17 @@ export class CommercialController {
   })
   summary() {
     return this.commercial.summary();
+  }
+
+  @Get("commercial/money-summary")
+  @RequireBusinessPermissions(BUSINESS_PERMISSIONS.COMMERCIAL_SUMMARY_READ)
+  @ApiOperation({
+    summary:
+      "Read money collected/paid by method for a date range, plus live expected Cash per open session",
+    description:
+      "Read-only aggregate over existing Payment and CashSession rows. Not accounting, profit, COGS, forecasting, or a financial statement.",
+  })
+  moneySummary(@Query() query: MoneySummaryQueryDto) {
+    return this.commercial.moneySummary(query);
   }
 }
