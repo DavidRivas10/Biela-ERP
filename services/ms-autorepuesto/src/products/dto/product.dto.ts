@@ -70,6 +70,17 @@ export class CreateProductDto {
   @Matches(/^\d+(?:\.\d{1,4})?$/)
   referenceCost?: string;
 
+  @ApiPropertyOptional({
+    type: String,
+    example: "35.00",
+    description:
+      "Default profit margin percentage used to suggest a sale price from a Purchase line's cost (e.g. 35 = 35%). Purely a suggestion aid; never applied automatically.",
+  })
+  @IsOptional()
+  @IsDecimal({ decimal_digits: "0,4", force_decimal: false })
+  @Matches(/^\d+(?:\.\d{1,4})?$/)
+  marginPercent?: string;
+
   @ApiProperty({ format: "uuid" })
   @IsUUID()
   categoryId!: string;

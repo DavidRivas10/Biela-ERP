@@ -121,6 +121,7 @@ model Product {
   active             Boolean                 @default(true)
   defaultSalePrice   Decimal?                @db.Decimal(18, 4)
   referenceCost      Decimal?                @db.Decimal(18, 4)
+  marginPercent      Decimal?                @db.Decimal(7, 4)
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
   category           ProductCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict)

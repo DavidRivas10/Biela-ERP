@@ -259,6 +259,26 @@ describe("Products HTTP with PostgreSQL", () => {
       .expect(400);
   });
 
+  it("stores and returns an optional margin percentage and rejects a bad one", async () => {
+    await request(app.getHttpServer())
+      .patch(`/products/${productId}`)
+      .send({ marginPercent: "35.00" })
+      .expect(200)
+      .expect((response) =>
+        expect(Number(response.body.marginPercent)).toBe(35),
+      );
+    await request(app.getHttpServer())
+      .get(`/products/${productId}`)
+      .expect(200)
+      .expect((response) =>
+        expect(Number(response.body.marginPercent)).toBe(35),
+      );
+    await request(app.getHttpServer())
+      .patch(`/products/${productId}`)
+      .send({ marginPercent: "not-a-number" })
+      .expect(400);
+  });
+
   it("uploads, lists, serves and deletes product photos, and enforces limits", async () => {
     const png = Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
