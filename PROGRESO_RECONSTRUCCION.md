@@ -1595,3 +1595,64 @@ pediste.
   decisión sobre cuándo corregirlo.
 - Los hallazgos de la Fase 22 (pestañas Inventario/Cajas, IDs de actor)
   siguen igual de pendientes.
+
+## Fase 25 — Bug de fecha UTC vs. Honduras, corregido (2026-09-12)
+
+El hallazgo de la Fase 24 se corrige de inmediato, antes de seguir, porque
+es silencioso (no tira error, solo pone mal un dato) y justo esta noche
+estamos en la ventana horaria donde pasa.
+
+### La corrección
+
+Nueva función compartida `getBusinessDate()` en
+`apps/frontend/src/utils/formatters.ts` — calcula "hoy" con
+`Intl.DateTimeFormat("en-CA", { timeZone: "America/Tegucigalpa", ... })`,
+el mismo mecanismo que ya usa `businessDate()` en el backend
+(`CommercialService`), así que "hoy" significa el mismo día de los dos
+lados. Reemplaza el `today()` que estaba duplicado, idéntico, en
+`SalesWorkspace.tsx` y `PurchasePages.tsx` (cada uno con su propio
+`new Date().toISOString().slice(0, 10)`) — ahora los dos importan y usan
+la misma función, cero lógica de fecha duplicada.
+
+### Búsqueda de otros casos — no encontré ninguno más
+
+Recorrí todo el frontend buscando el mismo patrón (`new Date().toISOString()`
+y `.toISOString().slice(0, 10)`) antes de tocar nada, como pediste. Aparte
+de los dos ya corregidos, solo hay dos usos más de `new Date().toISOString()`
+en todo el sistema, y ninguno es el mismo bug:
+- `PartialCutPanel.tsx`: formatea la hora actual para MOSTRARLA
+  (`formatDateTime`, que ya convierte a hora de Honduras internamente)
+  — un instante no tiene "día equivocado", solo su presentación importa,
+  y esa ya es correcta.
+- `use-draft-autosave.ts`: guarda cuándo se autoguardó un borrador
+  (`savedAt`), un timestamp de auditoría, no una fecha de documento por
+  defecto.
+
+Tampoco encontré ningún campo de fecha en Cajas/Sesiones de caja
+precargado con "hoy" — la apertura de sesión no pide fecha (el servidor
+pone `openedAt` solo), y los filtros de fecha de Cajas/Movimientos
+arrancan vacíos, no con `new Date()`. No hay más casos que corregir.
+
+### Verificación
+
+- Frontend: `tsc -b`, `eslint --max-warnings=0` sin errores. Sumé un test
+  a `formatters.test.ts` que fija la hora del sistema en
+  `2026-08-20T02:00:00Z` (ya "20" en UTC, todavía "19" a las 8pm en
+  Tegucigalpa) y confirma que `getBusinessDate()` devuelve `2026-08-19`,
+  no `2026-08-20` — reproduce exactamente el bug que se está corrigiendo.
+  `vitest` 186/186. `vite build` OK.
+- Backend: el único test que fallaba en la Fase 24
+  (`commercial-finance.e2e-spec.ts`) sigue fallando ahora mismo, y es
+  esperable — ese test arma su propia fecha con `new Date()` directo en
+  Prisma dentro del archivo de test (no pasa por `getBusinessDate()` ni
+  por ningún código de producción), así que mi corrección de frontend no
+  lo toca. Es un caso de prueba, no una fecha por defecto real que vea un
+  usuario, así que no lo cuento en la búsqueda de arriba ni lo toqué —
+  te lo menciono para que no te sorprenda si lo volvés a ver fallar
+  exactamente en esta misma ventana horaria otra noche.
+
+## Estado al cierre de la Fase 25
+
+- Todo commiteado en `redesign/producto-ux`, en un commit por bloque.
+  **Sin push todavía** — reviso en el navegador y hago el push de la
+  ronda completa (Fases 22 a 25) a continuación, según lo acordado.
