@@ -7,6 +7,27 @@ const dateFormatter = new Intl.DateTimeFormat("es-HN", {
   dateStyle: "medium",
   timeZone: "America/Tegucigalpa",
 });
+const businessDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Tegucigalpa",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * Today as YYYY-MM-DD in Honduras's own calendar day — never the browser's
+ * UTC day. `new Date().toISOString().slice(0, 10)` reads the UTC date
+ * instead, which is 6 hours ahead of Honduras: from 6pm to midnight local
+ * time it silently returns tomorrow's date. Mirrors the backend's own
+ * businessDate() (CommercialService), so "today" means the same day on
+ * both sides.
+ */
+export function getBusinessDate(): string {
+  const parts = businessDateFormatter.formatToParts(new Date());
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((entry) => entry.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
 
 const paymentMethodKindLabels: Record<PaymentMethodKind, string> = {
   CASH: "Efectivo",

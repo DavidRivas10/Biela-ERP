@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   formatBusinessDate,
   formatCalendarDate,
@@ -6,10 +6,13 @@ import {
   formatMoney,
   formatPaymentMethodKind,
   formatPaymentType,
+  getBusinessDate,
   isPositiveMoneyAtMost,
   locationPhysicalHint,
   pluralize,
 } from "./formatters";
+
+afterEach(() => vi.useRealTimers());
 
 describe("display formatters", () => {
   it("formats exact decimal strings without calculating with floating point", () => {
@@ -30,6 +33,19 @@ describe("display formatters", () => {
     expect(formatBusinessDate("2026-08-19")).toMatch(/19/);
     expect(formatCalendarDate("2026-08-19T00:00:00.000Z")).toMatch(/19/);
     expect(formatDateTime("2026-08-19T18:30:00.000Z")).toMatch(/19/);
+  });
+
+  it("reads today as Honduras's calendar day, not the UTC day", () => {
+    // 2026-08-20T02:00:00Z is already the 20th in UTC, but only
+    // 2026-08-19 20:00 in Tegucigalpa (UTC-6) — still the 19th there.
+    // new Date().toISOString().slice(0, 10) would wrongly say "2026-08-20".
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-20T02:00:00.000Z"));
+    expect(getBusinessDate()).toBe("2026-08-19");
+
+    // Once UTC has caught up to the Honduras evening, both agree.
+    vi.setSystemTime(new Date("2026-08-20T08:00:00.000Z"));
+    expect(getBusinessDate()).toBe("2026-08-20");
   });
 
   it("presents Payment types and methods as business-facing Spanish labels", () => {

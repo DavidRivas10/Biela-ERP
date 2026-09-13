@@ -44,6 +44,7 @@ import {
   formatCalendarDate,
   formatDateTime,
   formatMoney,
+  getBusinessDate,
 } from "../utils/formatters";
 
 const purchaseStatuses: PurchaseStatus[] = [
@@ -237,8 +238,6 @@ export function PurchasesPage() {
   );
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
-
 type PurchaseLineForm = {
   key: number;
   productId: string;
@@ -357,7 +356,7 @@ function PurchaseFormEditor({
     initial?.supplierDocumentNumber ?? "",
   );
   const [documentDate, setDocumentDate] = useState(
-    initial?.documentDate.slice(0, 10) ?? today(),
+    initial?.documentDate.slice(0, 10) ?? getBusinessDate(),
   );
   const [paymentDueDate, setPaymentDueDate] = useState(
     initial?.paymentDueDate?.slice(0, 10) ?? "",

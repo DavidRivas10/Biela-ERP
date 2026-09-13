@@ -20,7 +20,11 @@ import {
 } from "../query/invalidation";
 import type { Sale } from "../types/sales";
 import { apiErrorMessage } from "../utils/api-error";
-import { formatMoney, isMoneyAtLeast } from "../utils/formatters";
+import {
+  formatMoney,
+  getBusinessDate,
+  isMoneyAtLeast,
+} from "../utils/formatters";
 import { useSalePaymentFields, SalePaymentFieldset } from "./SalePaymentFields";
 import {
   linesTotal,
@@ -28,8 +32,6 @@ import {
   ProductLinesEditor,
   type Line,
 } from "./SaleLineItems";
-
-const today = () => new Date().toISOString().slice(0, 10);
 
 function lineItems(lines: Line[]): SaleInput["items"] {
   return lines.map((line) => ({
@@ -191,7 +193,7 @@ function QuickSalePanel({ active }: { active: boolean }) {
     mutationFn: async () => {
       const sale = await salesApi.create({
         customerId: null,
-        documentDate: today(),
+        documentDate: getBusinessDate(),
         items: lineItems(lines),
       });
       try {
@@ -230,7 +232,7 @@ function QuickSalePanel({ active }: { active: boolean }) {
     mutationFn: () =>
       salesApi.create({
         customerId: null,
-        documentDate: today(),
+        documentDate: getBusinessDate(),
         items: lineItems(lines),
       }),
     onSuccess: async (sale) => {
@@ -427,7 +429,7 @@ function CustomerSaleForm({
     initial?.paymentDueDate?.slice(0, 10) ?? "",
   );
   const [notes, setNotes] = useState(initial?.notes ?? "");
-  const documentDate = initial?.documentDate.slice(0, 10) ?? today();
+  const documentDate = initial?.documentDate.slice(0, 10) ?? getBusinessDate();
   const { lines, updateLine, removeLine, addScannedProduct, handleScan, scanFeedback, duplicate, setLines } =
     useSaleLineItems("cliente", initial, active);
   const total = linesTotal(lines);
@@ -642,7 +644,7 @@ function OpenAccountForm({
     initial?.paymentDueDate?.slice(0, 10) ?? "",
   );
   const [notes, setNotes] = useState(initial?.notes ?? "");
-  const documentDate = initial?.documentDate.slice(0, 10) ?? today();
+  const documentDate = initial?.documentDate.slice(0, 10) ?? getBusinessDate();
   const { lines, updateLine, removeLine, addScannedProduct, handleScan, scanFeedback, duplicate, setLines } =
     useSaleLineItems("cuenta", initial, active);
   const total = linesTotal(lines);
