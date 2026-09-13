@@ -350,6 +350,7 @@ interface ProductFormState {
   description: string;
   defaultSalePrice: string;
   referenceCost: string;
+  marginPercent: string;
   categoryId: string;
   brandId: string;
   active: boolean;
@@ -361,6 +362,7 @@ const emptyProduct: ProductFormState = {
   description: "",
   defaultSalePrice: "",
   referenceCost: "",
+  marginPercent: "",
   categoryId: "",
   brandId: "",
   active: true,
@@ -423,6 +425,7 @@ export function ProductFormPage() {
       description: product.data.description ?? "",
       defaultSalePrice: product.data.defaultSalePrice ?? "",
       referenceCost: product.data.referenceCost ?? "",
+      marginPercent: product.data.marginPercent ?? "",
       categoryId: product.data.categoryId,
       brandId: product.data.brandId,
       active: product.data.active,
@@ -464,6 +467,7 @@ export function ProductFormPage() {
         ? { defaultSalePrice: form.defaultSalePrice }
         : {}),
       ...(form.referenceCost ? { referenceCost: form.referenceCost } : {}),
+      ...(form.marginPercent ? { marginPercent: form.marginPercent } : {}),
       attributes: visibleDefinitions
         .filter((definition) => form.attributes[definition.id]?.trim())
         .map((definition) => ({
@@ -589,6 +593,21 @@ export function ProductFormPage() {
               value={form.referenceCost}
               onChange={(e) =>
                 setForm({ ...form, referenceCost: e.target.value })
+              }
+            />
+          </Field>
+          <Field
+            label="Margen de ganancia (%)"
+            htmlFor="product-margin"
+            hint="Opcional. Se usa para sugerir un precio de venta al registrar una compra con el costo de este producto — nunca se aplica solo."
+          >
+            <input
+              id="product-margin"
+              inputMode="decimal"
+              pattern="\d+(\.\d{1,4})?"
+              value={form.marginPercent}
+              onChange={(e) =>
+                setForm({ ...form, marginPercent: e.target.value })
               }
             />
           </Field>
@@ -834,6 +853,14 @@ export function ProductDetailPage() {
               <dd>
                 {row.referenceCost
                   ? formatMoney(row.referenceCost)
+                  : "Sin definir"}
+              </dd>
+            </div>
+            <div>
+              <dt>Margen de ganancia</dt>
+              <dd>
+                {row.marginPercent
+                  ? `${Number(row.marginPercent).toFixed(1)}%`
                   : "Sin definir"}
               </dd>
             </div>

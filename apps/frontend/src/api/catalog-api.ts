@@ -33,6 +33,7 @@ export interface ProductInput {
   description?: string;
   defaultSalePrice?: string;
   referenceCost?: string;
+  marginPercent?: string;
   categoryId: string;
   brandId: string;
   active?: boolean;
