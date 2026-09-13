@@ -29,12 +29,18 @@ const supplier = {
   createdAt: "2026-08-20T12:00:00.000Z",
   updatedAt: "2026-08-20T12:00:00.000Z",
 };
-const product = (id: string, code: string, referenceCost?: string) => ({
+const product = (
+  id: string,
+  code: string,
+  referenceCost?: string,
+  marginPercent?: string,
+) => ({
   id,
   code,
   name: `Producto ${code}`,
   active: true,
   ...(referenceCost ? { referenceCost } : {}),
+  ...(marginPercent ? { marginPercent } : {}),
 });
 const purchase = {
   id: "purchase-1",
@@ -183,8 +189,8 @@ describe("Frontend Phase 10.C purchasing screens", () => {
     });
     await screen.findByRole("option", { name: /PROD-001/ });
     await user.selectOptions(screen.getByLabelText(/^Agregar producto/), "product-1");
-    await user.clear(screen.getByLabelText(/^Costo unitario/));
-    await user.type(screen.getByLabelText(/^Costo unitario/), "12.3456");
+    await user.clear(screen.getByLabelText(/^Precio unitario/));
+    await user.type(screen.getByLabelText(/^Precio unitario/), "12.3456");
 
     // Adding the same product a second time bumps its quantity instead of
     // creating a duplicate row — the table stays one row per product.
@@ -193,7 +199,7 @@ describe("Frontend Phase 10.C purchasing screens", () => {
 
     // A different product gets its own row.
     await user.selectOptions(screen.getByLabelText(/^Agregar producto/), "product-2");
-    const costInputs = screen.getAllByLabelText(/^Costo unitario/);
+    const costInputs = screen.getAllByLabelText(/^Precio unitario/);
     await user.clear(costInputs[1]);
     await user.type(costInputs[1], "2.5000");
 
@@ -216,7 +222,7 @@ describe("Frontend Phase 10.C purchasing screens", () => {
     );
   });
 
-  it("adds a table row prefilling cost from the product's reference cost, with discount/tax collapsed", async () => {
+  it("adds a table row prefilling cost, tax rate, and a margin-based suggested price — all flat, nothing collapsed", async () => {
     const fetchMock = vi.fn((input: string | URL | Request) => {
       const url = new URL(
         input instanceof Request ? input.url : input.toString(),
@@ -228,7 +234,7 @@ describe("Frontend Phase 10.C purchasing screens", () => {
       if (url.pathname === "/api/products")
         return Promise.resolve(
           jsonResponse({
-            data: [product("product-1", "PROD-001", "82.0000")],
+            data: [product("product-1", "PROD-001", "82.0000", "35")],
             meta: emptyMeta,
           }),
         );
@@ -249,12 +255,60 @@ describe("Frontend Phase 10.C purchasing screens", () => {
     await screen.findByRole("option", { name: /PROD-001/ });
     await user.selectOptions(screen.getByLabelText(/^Agregar producto/), "product-1");
 
+    // Cost prefilled from the product's reference cost.
     expect(document.getElementById("purchase-cost-1")).toHaveValue("82.0000");
-    const moreDetails = document.querySelector(
-      "details.line-more",
-    ) as HTMLDetailsElement;
-    expect(moreDetails.open).toBe(false);
+    // ISV defaults to 15% — a legal-rate safeguard, not per-product.
+    expect(document.getElementById("purchase-tax-rate-1")).toHaveValue("15");
+    // Margin snapshot comes from the product's own catalog setting.
+    expect(document.getElementById("purchase-margin-1")).toHaveValue("35");
+    // Suggested price: 82 × 1.15 × 1.35 = 127.305.
+    expect(document.getElementById("purchase-suggested-price-1")).toHaveValue(
+      "127.3050",
+    );
+    // Nothing here is collapsed — every field the row lists is flat and
+    // visible while the operator is copying the physical invoice.
+    expect(document.querySelector("details.line-more")).toBeNull();
     expect(document.getElementById("purchase-quantity-1")).toHaveFocus();
+  });
+
+  it("computes the tax amount from the rate, not as a raw amount typed by hand", async () => {
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = new URL(
+        input instanceof Request ? input.url : input.toString(),
+      );
+      if (url.pathname === "/api/suppliers")
+        return Promise.resolve(
+          jsonResponse({ data: [supplier], meta: emptyMeta }),
+        );
+      if (url.pathname === "/api/products")
+        return Promise.resolve(
+          jsonResponse({
+            data: [product("product-1", "PROD-001", "62.0000")],
+            meta: emptyMeta,
+          }),
+        );
+      return Promise.resolve(jsonResponse({}));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage(
+      "/app/purchasing/purchases/new",
+      "/app/purchasing/purchases/new",
+      <PurchaseFormPage />,
+    );
+
+    await screen.findByRole("option", { name: /PROD-001/ });
+    await user.selectOptions(screen.getByLabelText(/^Agregar producto/), "product-1");
+
+    // 62 × 1 × 15% = 9.30 tax, so the line and grand totals both read
+    // 62 + 9.30 = 71.30 — never 62 (ignored) nor 77 (15 added as lempiras).
+    expect(screen.getAllByText("L 71.30").length).toBeGreaterThan(0);
+
+    await user.clear(document.getElementById("purchase-tax-rate-1")!);
+    await user.type(document.getElementById("purchase-tax-rate-1")!, "18");
+
+    // 62 × 18% = 11.16 tax → 73.16.
+    expect(screen.getAllByText("L 73.16").length).toBeGreaterThan(0);
   });
 
   it("tells a new part apart from a recognized one when scanning to build a Purchase", async () => {

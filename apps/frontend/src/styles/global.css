@@ -1408,6 +1408,29 @@ b {
 .line-items-table .line-price-input {
   width: 6.5rem;
 }
+.line-items-table .line-percent-input {
+  width: 4.5rem;
+}
+/* Compras: every field stays flat in the row — while transcribing a paper
+   invoice line by line, nothing should be a click away behind a collapsed
+   summary. */
+.purchase-line-items-table td.line-suggested-price {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 11rem;
+}
+.line-update-price {
+  justify-self: start;
+  min-height: 2rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+}
+.line-update-price__ok {
+  color: var(--success);
+}
+.line-update-price__error {
+  color: var(--danger);
+}
 .line-items-table td.line-total {
   font-family: var(--font-mono);
   font-weight: 700;
@@ -1503,6 +1526,10 @@ b {
   font-weight: 800;
   line-height: 1;
   color: var(--ink-strong);
+}
+.sale-totals-bar__amount--small {
+  font-size: 1.4rem;
+  font-weight: 700;
 }
 .quick-sale-payment {
   border-top: 1px solid var(--line);

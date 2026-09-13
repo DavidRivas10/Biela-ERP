@@ -6,6 +6,7 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
+import { catalogApi } from "../api/catalog-api";
 import { purchasingApi, type PurchaseInput } from "../api/purchasing-api";
 import { useAuth } from "../auth/AuthContext";
 import { BarcodeScanButton } from "../components/BarcodeScanButton";
@@ -27,7 +28,10 @@ import { useUrlFilters } from "../hooks/use-url-filters";
 import { PurchaseAttachmentManager } from "./PurchaseAttachmentManager";
 import { PurchaseChain, purchaseStep } from "./PurchaseChain";
 import { queryKeys } from "../query/query-keys";
-import { invalidateCommercialSummary } from "../query/invalidation";
+import {
+  invalidateCommercialSummary,
+  invalidateProductReferenceIntegration,
+} from "../query/invalidation";
 import type { Product } from "../types/erp";
 import type {
   Purchase,
@@ -245,12 +249,20 @@ type PurchaseLineForm = {
   orderedQuantity: string;
   unitCost: string;
   discountAmount: string;
+  /** Always derived from taxRatePercent — never hand-typed as a raw amount.
+   * Kept as its own field only because that's what the API accepts. */
   taxAmount: string;
+  /** ISV rate, e.g. "15" or "18" — a legal-rate safeguard, not a per-product
+   * setting. Defaults to 15; editable in case the law changes it. */
+  taxRatePercent: string;
+  /** Snapshot of the product's own margin (Catálogo), editable per line so a
+   * one-off deal doesn't have to change the product's stored default. */
+  marginPercent: string;
+  /** costWithTax × (1 + margin%) — shown and editable before saving; never
+   * applied to the product's catalog price except via the explicit
+   * "Actualizar precio de venta" action. */
+  suggestedSalePrice: string;
 };
-function hasMoneyAdjustment(line: PurchaseLineForm): boolean {
-  const isZero = (value: string) => !value || Number(value) === 0;
-  return !isZero(line.discountAmount) || !isZero(line.taxAmount);
-}
 
 /** Line total: quantity × unit cost, minus the discount, plus the tax. */
 function purchaseLineTotal(
@@ -263,6 +275,29 @@ function purchaseLineTotal(
   return qty * cost - discount + tax;
 }
 
+/** The invoice-line tax amount the API stores: quantity × unit cost × rate. */
+function computeTaxAmount(
+  line: Pick<PurchaseLineForm, "orderedQuantity" | "unitCost" | "taxRatePercent">,
+): string {
+  const qty = Number(line.orderedQuantity) || 0;
+  const cost = Number(line.unitCost) || 0;
+  const rate = Number(line.taxRatePercent) || 0;
+  return ((qty * cost * rate) / 100).toFixed(2);
+}
+
+/** Suggested retail price: per-unit cost with tax folded in, marked up by
+ * the margin — e.g. L62 cost, 15% ISV, 35% margin → L62×1.15×1.35 = L96.28. */
+function computeSuggestedSalePrice(
+  line: Pick<PurchaseLineForm, "unitCost" | "taxRatePercent" | "marginPercent">,
+): string {
+  const cost = Number(line.unitCost) || 0;
+  if (cost <= 0) return "";
+  const rate = Number(line.taxRatePercent) || 0;
+  const margin = Number(line.marginPercent) || 0;
+  const costWithTax = cost * (1 + rate / 100);
+  return (costWithTax * (1 + margin / 100)).toFixed(4);
+}
+
 const newLine = (key: number): PurchaseLineForm => ({
   key,
   productId: "",
@@ -272,6 +307,9 @@ const newLine = (key: number): PurchaseLineForm => ({
   unitCost: "",
   discountAmount: "0.00",
   taxAmount: "0.00",
+  taxRatePercent: "15",
+  marginPercent: "",
+  suggestedSalePrice: "",
 });
 
 export function PurchaseFormPage() {
@@ -310,6 +348,8 @@ function PurchaseFormEditor({
 }) {
   const navigate = useNavigate();
   const client = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canUpdateCatalogPrice = hasPermission("products.update");
   const [supplierId, setSupplierId] = useState(
     initial?.supplierId ?? requestedSupplierId ?? "",
   );
@@ -333,7 +373,18 @@ function PurchaseFormEditor({
           orderedQuantity: String(item.orderedQuantity),
           unitCost: item.unitCost,
           discountAmount: item.discountAmount,
+          // The stored taxAmount is kept exactly as-is on load — the rate
+          // selector defaults to 15 for display only, and nothing here gets
+          // silently recalculated until the operator actually changes a
+          // field that feeds the calculation.
           taxAmount: item.taxAmount,
+          taxRatePercent: "15",
+          marginPercent: item.product.marginPercent ?? "",
+          suggestedSalePrice: computeSuggestedSalePrice({
+            unitCost: item.unitCost,
+            taxRatePercent: "15",
+            marginPercent: item.product.marginPercent ?? "",
+          }),
         }))
       : [],
   );
@@ -353,6 +404,22 @@ function PurchaseFormEditor({
     const ids = lines.map((line) => line.productId).filter(Boolean);
     return new Set(ids).size !== ids.length;
   }, [lines]);
+  // Recalculates live as lines are added/edited, so the operator can cuadrar
+  // against the supplier's physical invoice before saving.
+  const linesSubtotal = lines.reduce(
+    (sum, line) =>
+      sum + (Number(line.orderedQuantity) || 0) * (Number(line.unitCost) || 0),
+    0,
+  );
+  const linesDiscountTotal = lines.reduce(
+    (sum, line) => sum + (Number(line.discountAmount) || 0),
+    0,
+  );
+  const linesTaxTotal = lines.reduce(
+    (sum, line) => sum + (Number(line.taxAmount) || 0),
+    0,
+  );
+  const linesGrandTotal = linesSubtotal - linesDiscountTotal + linesTaxTotal;
   function updateLine(key: number, changes: Partial<PurchaseLineForm>) {
     setLines((current) =>
       current.map((line) =>
@@ -360,6 +427,40 @@ function PurchaseFormEditor({
       ),
     );
   }
+
+  // Explicit, per-line action — saving the purchase never touches the
+  // catalog by itself. Tracked by line key so each row shows its own
+  // pending/result state independently of the others.
+  const [priceUpdateKey, setPriceUpdateKey] = useState<number | null>(null);
+  const [priceUpdateResult, setPriceUpdateResult] = useState<
+    Record<number, "success" | "error">
+  >({});
+  const updateCatalogPrice = useMutation({
+    mutationFn: ({
+      productId,
+      price,
+    }: {
+      key: number;
+      productId: string;
+      price: string;
+    }) => catalogApi.updateProduct(productId, { defaultSalePrice: price }),
+    onMutate: ({ key }) => {
+      setPriceUpdateKey(key);
+      setPriceUpdateResult((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+    },
+    onSuccess: async (_result, { key }) => {
+      await invalidateProductReferenceIntegration(client);
+      setPriceUpdateResult((current) => ({ ...current, [key]: "success" }));
+    },
+    onError: (_error, { key }) => {
+      setPriceUpdateResult((current) => ({ ...current, [key]: "error" }));
+    },
+    onSettled: () => setPriceUpdateKey(null),
+  });
 
   // After a product lands on a line (scanned or picked), the cursor jumps
   // straight to Cantidad — ready to type, or to keep scanning the next one.
@@ -376,33 +477,41 @@ function PurchaseFormEditor({
       );
       if (existingIndex >= 0) {
         targetKey = current[existingIndex].key;
-        return current.map((line, index) =>
-          index === existingIndex
-            ? {
-                ...line,
-                orderedQuantity: String(
-                  (Number(line.orderedQuantity) || 0) + 1,
-                ),
-              }
-            : line,
-        );
+        return current.map((line, index) => {
+          if (index !== existingIndex) return line;
+          const orderedQuantity = String(
+            (Number(line.orderedQuantity) || 0) + 1,
+          );
+          return {
+            ...line,
+            orderedQuantity,
+            taxAmount: computeTaxAmount({ ...line, orderedQuantity }),
+          };
+        });
       }
       // Purchase cost is real money paid this time, not authoritative — but
-      // the reference cost is a fair starting point so the field can stay
-      // collapsed instead of demanding a value with nothing to go on.
+      // the reference cost is a fair starting point so the field isn't left
+      // demanding a value with nothing to go on.
       const cost = product.referenceCost ?? "";
+      const marginPercent = product.marginPercent ?? "";
       const nextKey = current.length
         ? Math.max(...current.map((line) => line.key)) + 1
         : 1;
       targetKey = nextKey;
+      const draft = {
+        ...newLine(nextKey),
+        productId: product.id,
+        productCode: product.code,
+        productName: product.name,
+        unitCost: cost,
+        marginPercent,
+      };
       return [
         ...current,
         {
-          ...newLine(nextKey),
-          productId: product.id,
-          productCode: product.code,
-          productName: product.name,
-          unitCost: cost,
+          ...draft,
+          taxAmount: computeTaxAmount(draft),
+          suggestedSalePrice: computeSuggestedSalePrice(draft),
         },
       ];
     });
@@ -545,12 +654,16 @@ function PurchaseFormEditor({
           </div>
           {lines.length ? (
             <div className="table-wrap line-items-table-wrap">
-              <table className="line-items-table">
+              <table className="line-items-table purchase-line-items-table">
                 <thead>
                   <tr>
                     <th>Producto</th>
                     <th>Cantidad</th>
-                    <th>Costo unitario</th>
+                    <th>Precio unitario</th>
+                    <th>Impuesto %</th>
+                    <th>Descuento</th>
+                    <th>Margen %</th>
+                    <th>Precio de venta sugerido</th>
                     <th>Total</th>
                     <th aria-label="Quitar" />
                   </tr>
@@ -576,17 +689,22 @@ function PurchaseFormEditor({
                             min={1}
                             step={1}
                             value={line.orderedQuantity}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const orderedQuantity = e.target.value;
                               updateLine(line.key, {
-                                orderedQuantity: e.target.value,
-                              })
-                            }
+                                orderedQuantity,
+                                taxAmount: computeTaxAmount({
+                                  ...line,
+                                  orderedQuantity,
+                                }),
+                              });
+                            }}
                           />
                         </Field>
                       </td>
                       <td>
                         <Field
-                          label="Costo unitario"
+                          label="Precio unitario"
                           htmlFor={`purchase-cost-${line.key}`}
                           required
                         >
@@ -597,51 +715,144 @@ function PurchaseFormEditor({
                             inputMode="decimal"
                             pattern="\d+(\.\d{1,4})?"
                             value={line.unitCost}
+                            onChange={(e) => {
+                              const unitCost = e.target.value;
+                              updateLine(line.key, {
+                                unitCost,
+                                taxAmount: computeTaxAmount({
+                                  ...line,
+                                  unitCost,
+                                }),
+                                suggestedSalePrice: computeSuggestedSalePrice({
+                                  ...line,
+                                  unitCost,
+                                }),
+                              });
+                            }}
+                          />
+                        </Field>
+                      </td>
+                      <td>
+                        <Field
+                          label="Impuesto %"
+                          htmlFor={`purchase-tax-rate-${line.key}`}
+                          hint="15% por defecto; cambialo solo si la ley cambia la tasa."
+                        >
+                          <input
+                            id={`purchase-tax-rate-${line.key}`}
+                            className="line-percent-input"
+                            inputMode="decimal"
+                            pattern="\d+(\.\d{1,2})?"
+                            value={line.taxRatePercent}
+                            onChange={(e) => {
+                              const taxRatePercent = e.target.value;
+                              updateLine(line.key, {
+                                taxRatePercent,
+                                taxAmount: computeTaxAmount({
+                                  ...line,
+                                  taxRatePercent,
+                                }),
+                                suggestedSalePrice: computeSuggestedSalePrice({
+                                  ...line,
+                                  taxRatePercent,
+                                }),
+                              });
+                            }}
+                          />
+                        </Field>
+                      </td>
+                      <td>
+                        <Field
+                          label="Descuento"
+                          htmlFor={`purchase-discount-${line.key}`}
+                        >
+                          <input
+                            id={`purchase-discount-${line.key}`}
+                            className="line-price-input"
+                            inputMode="decimal"
+                            pattern="\d+(\.\d{1,2})?"
+                            value={line.discountAmount}
                             onChange={(e) =>
-                              updateLine(line.key, { unitCost: e.target.value })
+                              updateLine(line.key, {
+                                discountAmount: e.target.value,
+                              })
                             }
                           />
                         </Field>
-                        <details
-                          className="line-more"
-                          open={hasMoneyAdjustment(line)}
+                      </td>
+                      <td>
+                        <Field
+                          label="Margen %"
+                          htmlFor={`purchase-margin-${line.key}`}
                         >
-                          <summary>Descuento / impuesto</summary>
-                          <div className="line-more__fields">
-                            <Field
-                              label="Descuento"
-                              htmlFor={`purchase-discount-${line.key}`}
+                          <input
+                            id={`purchase-margin-${line.key}`}
+                            className="line-percent-input"
+                            inputMode="decimal"
+                            pattern="\d+(\.\d{1,2})?"
+                            value={line.marginPercent}
+                            onChange={(e) => {
+                              const marginPercent = e.target.value;
+                              updateLine(line.key, {
+                                marginPercent,
+                                suggestedSalePrice: computeSuggestedSalePrice({
+                                  ...line,
+                                  marginPercent,
+                                }),
+                              });
+                            }}
+                          />
+                        </Field>
+                      </td>
+                      <td className="line-suggested-price">
+                        <Field
+                          label="Precio de venta sugerido"
+                          htmlFor={`purchase-suggested-price-${line.key}`}
+                        >
+                          <input
+                            id={`purchase-suggested-price-${line.key}`}
+                            className="line-price-input"
+                            inputMode="decimal"
+                            pattern="\d+(\.\d{1,4})?"
+                            disabled={!canUpdateCatalogPrice}
+                            value={line.suggestedSalePrice}
+                            onChange={(e) =>
+                              updateLine(line.key, {
+                                suggestedSalePrice: e.target.value,
+                              })
+                            }
+                          />
+                        </Field>
+                        {canUpdateCatalogPrice && line.productId ? (
+                          <>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              className="line-update-price"
+                              loading={priceUpdateKey === line.key}
+                              disabled={!line.suggestedSalePrice}
+                              onClick={() =>
+                                updateCatalogPrice.mutate({
+                                  key: line.key,
+                                  productId: line.productId,
+                                  price: line.suggestedSalePrice,
+                                })
+                              }
                             >
-                              <input
-                                id={`purchase-discount-${line.key}`}
-                                inputMode="decimal"
-                                pattern="\d+(\.\d{1,2})?"
-                                value={line.discountAmount}
-                                onChange={(e) =>
-                                  updateLine(line.key, {
-                                    discountAmount: e.target.value,
-                                  })
-                                }
-                              />
-                            </Field>
-                            <Field
-                              label="Impuesto"
-                              htmlFor={`purchase-tax-${line.key}`}
-                            >
-                              <input
-                                id={`purchase-tax-${line.key}`}
-                                inputMode="decimal"
-                                pattern="\d+(\.\d{1,2})?"
-                                value={line.taxAmount}
-                                onChange={(e) =>
-                                  updateLine(line.key, {
-                                    taxAmount: e.target.value,
-                                  })
-                                }
-                              />
-                            </Field>
-                          </div>
-                        </details>
+                              Actualizar precio de venta
+                            </Button>
+                            {priceUpdateResult[line.key] === "success" ? (
+                              <small className="line-update-price__ok">
+                                Precio del catálogo actualizado.
+                              </small>
+                            ) : null}
+                            {priceUpdateResult[line.key] === "error" ? (
+                              <small className="line-update-price__error">
+                                No se pudo actualizar el precio.
+                              </small>
+                            ) : null}
+                          </>
+                        ) : null}
                       </td>
                       <td className="line-total">
                         {formatMoney(purchaseLineTotal(line).toFixed(4))}
@@ -663,19 +874,6 @@ function PurchaseFormEditor({
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={3}>Total</td>
-                    <td className="line-total">
-                      {formatMoney(
-                        lines
-                          .reduce((sum, line) => sum + purchaseLineTotal(line), 0)
-                          .toFixed(4),
-                      )}
-                    </td>
-                    <td />
-                  </tr>
-                </tfoot>
               </table>
             </div>
           ) : (
@@ -692,6 +890,28 @@ function PurchaseFormEditor({
             />
           </div>
         </fieldset>
+        {lines.length ? (
+          <div className="sale-totals-bar">
+            <div className="sale-totals-bar__total">
+              <span className="sale-totals-bar__label">Subtotal</span>
+              <span className="sale-totals-bar__amount sale-totals-bar__amount--small">
+                {formatMoney(linesSubtotal.toFixed(2))}
+              </span>
+            </div>
+            <div className="sale-totals-bar__total">
+              <span className="sale-totals-bar__label">Impuesto</span>
+              <span className="sale-totals-bar__amount sale-totals-bar__amount--small">
+                {formatMoney(linesTaxTotal.toFixed(2))}
+              </span>
+            </div>
+            <div className="sale-totals-bar__total">
+              <span className="sale-totals-bar__label">Total a pagar</span>
+              <span className="sale-totals-bar__amount">
+                {formatMoney(linesGrandTotal.toFixed(2))}
+              </span>
+            </div>
+          </div>
+        ) : null}
         <div className="form-actions">
           <Button
             type="button"
