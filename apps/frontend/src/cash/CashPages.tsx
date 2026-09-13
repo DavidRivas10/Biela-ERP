@@ -15,6 +15,7 @@ import { FormFeedback } from "../components/FormFeedback";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
+import { useActorNames } from "../hooks/use-actor-names";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { queryKeys } from "../query/query-keys";
 import {
@@ -79,15 +80,19 @@ function MovementReference({ row }: { row: CashMovement }) {
   return link ? <Link className="table-link" to={link}>{content}</Link> : <span>{content}</span>;
 }
 
-const movementColumns: ErpColumn<CashMovement>[] = [
-  { key: "time", header: "Fecha y hora", cell: (row) => formatDateTime(row.createdAt) },
-  { key: "type", header: "Movimiento", cell: (row) => <strong>{movementLabels[row.type]}</strong> },
-  { key: "direction", header: "Dirección", cell: (row) => <Badge tone={inflows.has(row.type) ? "success" : "warning"}>{inflows.has(row.type) ? "Entrada" : "Salida"}</Badge> },
-  { key: "amount", header: "Monto", cell: (row) => <strong>{formatMoney(row.amount)}</strong> },
-  { key: "reference", header: "Referencia", cell: (row) => <MovementReference row={row} /> },
-  { key: "session", header: "Sesión / caja", cell: (row) => <Link className="table-link" to={`/app/cash/sessions/${row.cashSessionId}`}><strong>{row.cashSession.cashRegister.code}</strong><small>{row.cashSessionId}</small></Link> },
-  { key: "reason", header: "Razón / actor", cell: (row) => <><span>{row.reason || "—"}</span><small>{row.actorId}</small></> },
-];
+function buildMovementColumns(
+  resolveActorName: (actorId: string) => string,
+): ErpColumn<CashMovement>[] {
+  return [
+    { key: "time", header: "Fecha y hora", cell: (row) => formatDateTime(row.createdAt) },
+    { key: "type", header: "Movimiento", cell: (row) => <strong>{movementLabels[row.type]}</strong> },
+    { key: "direction", header: "Dirección", cell: (row) => <Badge tone={inflows.has(row.type) ? "success" : "warning"}>{inflows.has(row.type) ? "Entrada" : "Salida"}</Badge> },
+    { key: "amount", header: "Monto", cell: (row) => <strong>{formatMoney(row.amount)}</strong> },
+    { key: "reference", header: "Referencia", cell: (row) => <MovementReference row={row} /> },
+    { key: "session", header: "Sesión / caja", cell: (row) => <Link className="table-link" to={`/app/cash/sessions/${row.cashSessionId}`}><strong>{row.cashSession.cashRegister.code}</strong><small>{row.cashSessionId}</small></Link> },
+    { key: "reason", header: "Razón / actor", cell: (row) => <><span>{row.reason || "—"}</span><small>{resolveActorName(row.actorId)}</small></> },
+  ];
+}
 
 export function CashRegistersPage() {
   const { hasPermission } = useAuth();
@@ -167,14 +172,15 @@ export function CashRegisterDetailPage() {
 
 export function CashSessionsPage() {
   const filters = useUrlFilters();
+  const resolveActorName = useActorNames();
   const params = { page: filters.page, limit: filters.limit, cashRegisterId: filters.values.cashRegisterId, status: filters.values.status, openedByActorId: filters.values.openedByActorId, openedFrom: filters.values.openedFrom ? `${filters.values.openedFrom}T00:00:00.000-06:00` : undefined, openedTo: filters.values.openedTo ? `${filters.values.openedTo}T23:59:59.999-06:00` : undefined };
   const list = useQuery({ queryKey: queryKeys.cashSessions(params), queryFn: () => cashApi.sessions(params) });
   const columns: ErpColumn<CashSession>[] = [
     { key: "register", header: "Caja", cell: (row) => <Link className="table-link" to={`/app/cash/sessions/${row.id}`}><strong>{row.cashRegister.code}</strong><small>{row.cashRegister.name}</small></Link> },
     { key: "status", header: "Estado", cell: (row) => <SessionBadge status={row.status} /> },
-    { key: "opened", header: "Apertura", cell: (row) => <>{formatDateTime(row.openedAt)}<small>{row.openedByActorId}</small></> },
+    { key: "opened", header: "Apertura", cell: (row) => <>{formatDateTime(row.openedAt)}<small>{resolveActorName(row.openedByActorId)}</small></> },
     { key: "opening", header: "Inicial", cell: (row) => formatMoney(row.openingAmount) },
-    { key: "closed", header: "Cierre", cell: (row) => row.closedAt ? <>{formatDateTime(row.closedAt)}<small>{row.closedByActorId}</small></> : "—" },
+    { key: "closed", header: "Cierre", cell: (row) => row.closedAt ? <>{formatDateTime(row.closedAt)}<small>{resolveActorName(row.closedByActorId)}</small></> : "—" },
     { key: "difference", header: "Diferencia", cell: (row) => row.differenceAmount != null ? formatMoney(row.differenceAmount) : "—" },
   ];
   return <div className="page-stack"><PageHeader eyebrow="Dinero" title="Sesiones de caja (turnos)" description="Cada sesión es un turno: se abre contando el efectivo inicial y se cierra contándolo al final. Acá ves todos los turnos, abiertos y cerrados." />
@@ -194,6 +200,7 @@ function ManualMovementForm({ sessionId, onCreated }: { sessionId: string; onCre
 export function CashSessionDetailPage() {
   const { id = "" } = useParams();
   const { hasPermission } = useAuth();
+  const resolveActorName = useActorNames();
   const client = useQueryClient();
   const [movementPage, setMovementPage] = useState(1);
   const [closeForm, setCloseForm] = useState({ countedAmount: "", notes: "" });
@@ -215,21 +222,22 @@ export function CashSessionDetailPage() {
   const refresh = async () => { await invalidateCashIntegration(client); };
   return <div className="page-stack"><PageHeader eyebrow="Caja" title={`Sesión · ${row.cashRegister.code}`} description={`Abierta ${formatDateTime(row.openedAt)}`} actions={<SessionBadge status={row.status} />} />
     <section className="commercial-summary-grid panel"><span>Efectivo inicial<strong>{formatMoney(row.openingAmount)}</strong></span><span>Efectivo esperado<strong>{expectedCash != null ? formatMoney(expectedCash) : "Requiere permiso de movimientos"}</strong></span>{row.status === "CLOSED" ? <><span>Efectivo contado<strong>{formatMoney(row.countedAmount ?? "0")}</strong></span><span>Diferencia<strong>{formatMoney(row.differenceAmount ?? "0")}</strong></span></> : null}</section>
-    <section className="panel detail-grid"><div className="detail-card"><h2>Apertura</h2><dl><div><dt>Caja</dt><dd><Link className="table-link" to={`/app/cash/registers/${row.cashRegisterId}`}>{row.cashRegister.code} · {row.cashRegister.name}</Link></dd></div><div><dt>Actor</dt><dd>{row.openedByActorId}</dd></div><div><dt>Notas</dt><dd>{row.openingNotes || "—"}</dd></div></dl></div>{row.status === "CLOSED" ? <div className="detail-card"><h2>Cierre</h2><dl><div><dt>Fecha</dt><dd>{formatDateTime(row.closedAt!)}</dd></div><div><dt>Actor</dt><dd>{row.closedByActorId}</dd></div><div><dt>Notas</dt><dd>{row.closingNotes || "—"}</dd></div></dl></div> : null}</section>
+    <section className="panel detail-grid"><div className="detail-card"><h2>Apertura</h2><dl><div><dt>Caja</dt><dd><Link className="table-link" to={`/app/cash/registers/${row.cashRegisterId}`}>{row.cashRegister.code} · {row.cashRegister.name}</Link></dd></div><div><dt>Actor</dt><dd>{resolveActorName(row.openedByActorId)}</dd></div><div><dt>Notas</dt><dd>{row.openingNotes || "—"}</dd></div></dl></div>{row.status === "CLOSED" ? <div className="detail-card"><h2>Cierre</h2><dl><div><dt>Fecha</dt><dd>{formatDateTime(row.closedAt!)}</dd></div><div><dt>Actor</dt><dd>{resolveActorName(row.closedByActorId)}</dd></div><div><dt>Notas</dt><dd>{row.closingNotes || "—"}</dd></div></dl></div> : null}</section>
     {row.status === "OPEN" && canReadMovements && summary.data ? <PartialCutPanel summary={summary.data} /> : null}
     {row.status === "OPEN" && hasPermission("cash-movements.create") ? <ManualMovementForm sessionId={id} onCreated={refresh} /> : null}
     {row.status === "OPEN" && hasPermission("cash-sessions.close") ? <form className="panel erp-form" onSubmit={(event) => { event.preventDefault(); setCloseConfirm(true); }}><div className="section-heading"><div><h2>Cerrar sesión</h2><p>Contá el efectivo real de la caja. El sistema calcula la diferencia y ya no se pueden registrar más movimientos en este turno.</p></div></div><FormFeedback error={close.error ? apiErrorMessage(close.error) : null} /><div className="form-grid"><Field label="Efectivo contado" htmlFor="counted-amount" required><input id="counted-amount" required inputMode="decimal" value={closeForm.countedAmount} onChange={(event) => setCloseForm({ ...closeForm, countedAmount: event.target.value })} /></Field><Field label="Notas de cierre" htmlFor="closing-notes" hint="Obligatorias cuando existe diferencia."><textarea id="closing-notes" maxLength={500} value={closeForm.notes} onChange={(event) => setCloseForm({ ...closeForm, notes: event.target.value })} /></Field></div><div className="form-actions"><Button type="submit" disabled={!isMoneyAtLeast(closeForm.countedAmount, "0")}>Revisar cierre</Button></div><ConfirmDialog open={closeConfirm} title="Cerrar sesión de caja" description="Cerrar finaliza esta sesión e impide nuevos movimientos. El efectivo esperado y la diferencia final provienen del sistema." confirmLabel="Cerrar sesión" dangerous loading={close.isPending} onCancel={() => setCloseConfirm(false)} onConfirm={() => close.mutate()} /></form> : null}
-    {canReadMovements ? <section className="panel"><div className="section-heading"><div><h2>Movimientos</h2><p>Todo lo que entró y salió de efectivo en este turno.</p></div><Link className="button button--secondary" to={`/app/cash/movements?cashSessionId=${id}`}>Ver registro completo</Link></div><ErpTable columns={movementColumns} rows={movements.data?.data} rowKey={(item) => item.id} loading={movements.isLoading} error={movements.error ? apiErrorMessage(movements.error) : undefined} onRetry={() => void movements.refetch()} emptyTitle="Esta sesión no tiene movimientos" /><Pagination meta={movements.data?.meta} onPageChange={setMovementPage} /></section> : null}
+    {canReadMovements ? <section className="panel"><div className="section-heading"><div><h2>Movimientos</h2><p>Todo lo que entró y salió de efectivo en este turno.</p></div><Link className="button button--secondary" to={`/app/cash/movements?cashSessionId=${id}`}>Ver registro completo</Link></div><ErpTable columns={buildMovementColumns(resolveActorName)} rows={movements.data?.data} rowKey={(item) => item.id} loading={movements.isLoading} error={movements.error ? apiErrorMessage(movements.error) : undefined} onRetry={() => void movements.refetch()} emptyTitle="Esta sesión no tiene movimientos" /><Pagination meta={movements.data?.meta} onPageChange={setMovementPage} /></section> : null}
   </div>;
 }
 
 export function CashMovementsPage() {
   const filters = useUrlFilters();
+  const resolveActorName = useActorNames();
   const params = { page: filters.page, limit: filters.limit, cashSessionId: filters.values.cashSessionId, cashRegisterId: filters.values.cashRegisterId, type: filters.values.type, paymentId: filters.values.paymentId, reference: filters.values.reference, createdFrom: filters.values.createdFrom ? `${filters.values.createdFrom}T00:00:00.000-06:00` : undefined, createdTo: filters.values.createdTo ? `${filters.values.createdTo}T23:59:59.999-06:00` : undefined };
   const list = useQuery({ queryKey: queryKeys.cashMovements(params), queryFn: () => cashApi.movements(params) });
   return <div className="page-stack"><PageHeader eyebrow="Caja" title="Movimientos de efectivo" description="Cada entrada y salida de efectivo de una caja: cobros, pagos, reembolsos y ajustes manuales. No se puede borrar." />
     <CashTabs />
     <section className="panel filter-bar"><CashRegisterSelector id="movement-register" value={filters.values.cashRegisterId ?? ""} onChange={(cashRegisterId) => filters.update({ cashRegisterId })} /><Field label="Tipo" htmlFor="movement-type"><select id="movement-type" value={filters.values.type ?? ""} onChange={(event) => filters.update({ type: event.target.value })}><option value="">Todos</option>{MOVEMENT_TYPES.map((type) => <option key={type} value={type}>{movementLabels[type]}</option>)}</select></Field><Field label="Sesión" htmlFor="movement-session"><input id="movement-session" placeholder="Identificador de sesión" value={filters.values.cashSessionId ?? ""} onChange={(event) => filters.update({ cashSessionId: event.target.value })} /></Field><Field label="Pago o referencia" htmlFor="movement-reference"><input id="movement-reference" placeholder="Identificador, número o referencia externa" value={filters.values.reference ?? ""} onChange={(event) => filters.update({ reference: event.target.value })} /></Field><Field label="Desde" htmlFor="movement-from"><input id="movement-from" type="date" value={filters.values.createdFrom ?? ""} onChange={(event) => filters.update({ createdFrom: event.target.value })} /></Field><Field label="Hasta" htmlFor="movement-to"><input id="movement-to" type="date" value={filters.values.createdTo ?? ""} onChange={(event) => filters.update({ createdTo: event.target.value })} /></Field><div className="filter-actions"><Button variant="ghost" onClick={filters.clear}>Limpiar</Button></div></section>
-    <section className="panel"><ErpTable columns={movementColumns} rows={list.data?.data} rowKey={(row) => row.id} loading={list.isLoading} error={list.error ? apiErrorMessage(list.error) : undefined} onRetry={() => void list.refetch()} emptyTitle="No se encontraron movimientos" /><Pagination meta={list.data?.meta} onPageChange={(page) => filters.update({ page }, false)} ariaLabel="Paginación de movimientos de efectivo" /></section>
+    <section className="panel"><ErpTable columns={buildMovementColumns(resolveActorName)} rows={list.data?.data} rowKey={(row) => row.id} loading={list.isLoading} error={list.error ? apiErrorMessage(list.error) : undefined} onRetry={() => void list.refetch()} emptyTitle="No se encontraron movimientos" /><Pagination meta={list.data?.meta} onPageChange={(page) => filters.update({ page }, false)} ariaLabel="Paginación de movimientos de efectivo" /></section>
   </div>;
 }

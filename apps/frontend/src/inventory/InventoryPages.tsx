@@ -15,6 +15,7 @@ import { Field } from "../components/Field";
 import { FormFeedback } from "../components/FormFeedback";
 import { PageHeader } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
+import { useActorNames } from "../hooks/use-actor-names";
 import { useFocusFieldById } from "../hooks/use-focus-field";
 import { useUrlFilters } from "../hooks/use-url-filters";
 import { InventorySummary } from "./InventorySummary";
@@ -216,6 +217,7 @@ export function InventoryMovementsPage() {
   const { hasPermission } = useAuth();
   const client = useQueryClient();
   const filters = useUrlFilters();
+  const resolveActorName = useActorNames();
   const [from, setFrom] = useState(filters.values.from ?? "");
   const [to, setTo] = useState(filters.values.to ?? "");
   const [showForm, setShowForm] = useState(false);
@@ -327,7 +329,7 @@ export function InventoryMovementsPage() {
     {
       key: "actor",
       header: "Actor",
-      cell: (row) => <small>{row.actorId}</small>,
+      cell: (row) => <small>{resolveActorName(row.actorId)}</small>,
     },
   ];
   return (

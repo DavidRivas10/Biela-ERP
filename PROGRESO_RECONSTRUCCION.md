@@ -1656,3 +1656,76 @@ arrancan vacíos, no con `new Date()`. No hay más casos que corregir.
 - Todo commiteado en `redesign/producto-ux`, en un commit por bloque.
   **Sin push todavía** — reviso en el navegador y hago el push de la
   ronda completa (Fases 22 a 25) a continuación, según lo acordado.
+- Push hecho: 40 commits (`2de3435..0c8256f`) a `origin/redesign/producto-ux`,
+  con autorización explícita tuya para la ronda completa.
+
+## Fase 26 — IDs de actor en crudo: nombre en vez de UUID (2026-09-12)
+
+Cierre del último pendiente técnico de la noche, uno de los hallazgos
+sin tocar de la Fase 22: Movimientos de inventario y Cajas/Sesiones de
+caja mostraban el `actorId` en crudo (un ObjectId de Mongo de 24
+caracteres hex) en vez del nombre de la persona que hizo el movimiento.
+
+### Por qué es un fix de frontend únicamente
+
+`ms-autorepuesto` (Postgres) guarda el `actorId` como texto opaco — no
+hay FK ni join posible dentro de Postgres, porque el usuario vive en
+`ms-users` (Mongo), un microservicio aparte. La única forma de resolver
+el nombre es consultando `GET /api/users` (ya expuesto por el
+api-gateway) y armando el mapa id → nombre en el cliente. No hizo falta
+tocar el backend: "con el lookup que haga falta en el backend" se
+resolvió usando el endpoint que ya existe (`USERS_READ`), no creando uno
+nuevo — encaja con el pedido de "acotado a resolver ese nombre, sin
+tocar nada más".
+
+### La corrección
+
+Hook nuevo y único, `useActorNames()` en
+`apps/frontend/src/hooks/use-actor-names.ts`: trae la lista de usuarios
+(paginada, límite 100, incluye inactivos — un movimiento viejo tiene que
+seguir mostrando quién lo hizo) y devuelve una función
+`actorId → "Nombre Apellido"`. Se degrada sola y sin error en tres casos,
+todos con el mismo resultado (mostrar el id crudo, nunca romper la
+pantalla): el usuario que mira no tiene permiso `users.read`, el
+directorio todavía no cargó, o el id no aparece en la lista.
+
+Usado en:
+- `InventoryPages.tsx` → `InventoryMovementsPage`: columna "Actor".
+- `CashPages.tsx` → `CashSessionsPage` (apertura/cierre en la lista),
+  `CashSessionDetailPage` (Apertura, Cierre, y la tabla de Movimientos
+  de la sesión) y `CashMovementsPage` (columna "Razón / Actor").
+
+En `CashPages.tsx`, `movementColumns` era una constante a nivel de
+módulo compartida por dos pantallas — no se puede llamar un hook de
+React (`useActorNames`) desde ahí. Se convirtió en una función
+`buildMovementColumns(resolveActorName)` que cada pantalla llama con su
+propia instancia del hook, sin duplicar las columnas.
+
+### Verificación
+
+- `tsc -b`, `eslint --max-warnings=0`, `vitest run` (186/186) y
+  `vite build`, todo limpio. Los tests existentes de Cajas usan
+  `actorId: "actor-1"` como dato de prueba y no aseveran el texto
+  crudo, así que siguen pasando sin cambios: el fallback a id crudo
+  cuando no hay match en el directorio los deja intactos.
+- Verificado en el navegador, con la sesión de administrador (tiene
+  `users.read`):
+  - Almacén → Inventario → Movimientos: columna "Actor" muestra
+    "BIELA Administrator" en vez del UUID.
+  - Dinero → Sesiones de caja (lista): apertura y cierre muestran
+    "BIELA Administrator" (una sesión vieja de dato de prueba, con
+    actor "fixture", cae al fallback esperado — no es un UUID, es un
+    id de prueba que no está en el directorio).
+  - Sesión de caja (detalle): tarjetas "Apertura"/"Cierre" y la tabla
+    de "Movimientos" de la sesión, todo con nombre.
+  - Dinero → Sesiones de caja → Movimientos (vista completa): columna
+    "Razón / Actor" con nombre.
+
+## Estado al cierre de la Fase 26
+
+- Todo commiteado en `redesign/producto-ux`, commit chico.
+- Con esto se cierra el plan de la noche: quedan pendientes, para
+  cuando arme el sistema con la plantilla final, el diseño visual de
+  Compras y de Mantenimientos/Administración, el recorrido de punta a
+  punta y la carga de datos reales — todo explícitamente para otro día,
+  no técnico ni urgente.
