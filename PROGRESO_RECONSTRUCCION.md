@@ -1460,3 +1460,138 @@ ronda) ni ninguna lógica de filtrado.
 - Los dos hallazgos de la Fase 22 (pestañas para Inventario/Cajas, IDs de
   actor sin nombre) siguen pendientes de tu decisión — no se tocaron en
   esta ronda.
+
+## Fase 24 — Bug real de impuesto en Compras + margen de ganancia (2026-09-12)
+
+Ronda con dos partes explícitamente separadas: un **bug de cálculo real**
+(el campo "Impuesto" se sumaba como lempiras, nunca fue un porcentaje) y
+una **función nueva** (margen de ganancia por producto + precio de venta
+sugerido al comprar). Antes de escribir código de la función nueva, resolví
+un bloqueo de infraestructura que ya había reportado la ronda anterior, con
+tu permiso explícito.
+
+### 0 — Desbloqueo de migraciones (con tu autorización)
+
+- Borré la fila muerta de `_prisma_migrations` (el intento fallido del
+  20260819210000_phase_8_commercial_integration, del 20 de agosto,
+  correctamente `rolled_back_at` pero nunca limpiado) — exactamente como
+  autorizaste.
+- Al correr la migración nueva, Prisma generó también dos `DROP INDEX` no
+  pedidos: los índices GIN/trigram de búsqueda (`Product_code_trgm_idx`,
+  `Product_name_trgm_idx`) que la Fase 3 creó por SQL crudo porque el DSL
+  de Prisma de esta versión no modela `gin_trgm_ops`. Como no están
+  declarados en `schema.prisma`, Prisma los ve como "drift" y los va a
+  querer borrar en **cualquier** migración futura, no solo esta. Los
+  recreé de inmediato (no se perdió nada — son estructuras derivadas, no
+  datos) y edité el archivo de migración para que no los borre si alguien
+  reconstruye la base desde cero, dejando un comentario explicando el
+  problema de fondo para la próxima vez que aparezca.
+- Verifiqué integridad después: la migración quedó aplicada limpia
+  (`prisma migrate status` → "up to date"), los 2 productos existentes
+  siguen ahí, los índices están recreados.
+
+### 1 — El bug de impuesto, confirmado y corregido
+
+Repliqué tu caso exacto: costo L62, "Impuesto" = 15 esperando 15%. Antes de
+esta ronda, el campo `taxAmount` de cada línea de compra era un monto en
+lempiras escrito a mano — nunca hubo una tasa en ningún lado del sistema
+(ni en el schema, ni en el cálculo del backend). Por eso escribir "15" daba
+75 (sumado directo) o 62 (si no se tocaba). Ninguno de los dos es 15% real.
+
+**Corrección**: "Impuesto %" pasa a ser el único campo — un porcentaje (15
+por defecto, editable) — y el monto que viaja al backend (`taxAmount`) se
+calcula siempre como `cantidad × precio unitario × tasa/100`. No hizo falta
+tocar el backend: ya sumaba `taxAmount` correctamente al total
+(`subtotal - descuento + impuesto`); el problema era 100% de qué mandaba el
+frontend. Con esto, costo L62 + 15% da exactamente **L71.30** — verificado
+en el navegador, y con un test que reproduce el caso exacto (62→71.30 con
+15%, 62→73.16 con 18%, para probar que también recalcula en vivo al
+cambiar la tasa).
+
+### 2 — Margen de ganancia por producto (función nueva)
+
+- **Catálogo → Productos**: nuevo campo `marginPercent` (Decimal(7,4),
+  opcional) — migración, DTO, servicio y formulario de alta/edición.
+  Convive con el "Margen estimado" que ya existía (ese sigue siendo un
+  cálculo de solo lectura a partir de precio y costo; el nuevo campo es un
+  valor que vos definís y queda guardado).
+- **Compras → Registrar una factura**: cada línea ahora trae, además de
+  Cantidad/Precio unitario/Impuesto %/Descuento, dos campos nuevos:
+  **Margen %** (llega precargado del margen del producto, editable por
+  línea sin tocar el catálogo) y **Precio de venta sugerido**, calculado
+  como costo con impuesto incluido × (1 + margen%) — ej. L62 × 1.15 × 1.35
+  = L96.28 aprox. Editable antes de guardar.
+- **Actualización del catálogo — con tus tres respuestas aplicadas
+  literalmente**:
+  1. El campo "Precio de venta sugerido" es de solo lectura
+     (`disabled`) para quien no tenga permiso `products.update`.
+  2. La actualización al catálogo se hace con un botón explícito
+     **"Actualizar precio de venta"** por línea — nunca al guardar la
+     compra. Guardar la compra no toca el catálogo para nada.
+  3. El botón solo aparece para quien sí tiene `products.update`, y usa
+     el mismo endpoint que ya existe para editar productos — no se creó
+     ningún endpoint nuevo.
+
+### 3 — Fila horizontal única + barra de totales
+
+La fila de cada producto en "Registrar una factura" ya no tiene nada
+colapsado: Producto | Cantidad | Precio unitario | Impuesto % | Descuento |
+Margen % | Precio de venta sugerido (+ botón) | Total | Quitar, todo visible
+a la vez mientras se transcribe la factura física. Debajo de la tabla,
+nueva barra de totales (mismo patrón `.sale-totals-bar` de Ventas):
+Subtotal / Impuesto / Total a pagar, recalculándose en vivo con cada
+cambio. El paso "Confirmar" (paso 2 del wizard) no se tocó, tal como
+pediste.
+
+### Verificación
+
+- Backend: `tsc`, `eslint`, `nest build` sin errores. Unit 23/23. E2E
+  **127/128** — el único que falla
+  (`commercial-finance.e2e-spec.ts › splits money-summary...`) es un
+  hallazgo nuevo y **no relacionado** con esta ronda: ese test (de la Fase
+  20, Dinero) crea una venta con `documentDate: new Date()` esperando que
+  sea "hoy", pero falló exactamente ahora porque son las 12:23 a.m. UTC del
+  13 de septiembre y a la vez las 6:23 p.m. del 12 de septiembre en
+  Honduras — `new Date()` guarda la fecha en UTC, mientras el resto del
+  sistema define "hoy" según la fecha de negocio de Honduras. Confirmé que
+  es un problema de reloj, no de mi código: lo corrí aislado y falla solo
+  en esta ventana (se resuelve solo a la medianoche de Honduras). **Esto
+  probablemente sea un bug real en producción también** — encontré que
+  tanto `SalesWorkspace.tsx` como `PurchasePages.tsx` calculan la fecha por
+  defecto de "hoy" con `new Date().toISOString().slice(0,10)`, que tiene
+  exactamente el mismo problema: cualquier venta o compra registrada entre
+  las 6 p.m. y la medianoche (hora Honduras) puede precargarse con la
+  fecha de **mañana**, no de hoy. No lo toqué — es un hallazgo nuevo,
+  ajeno a lo pedido esta ronda, y te lo marco para que decidas cuándo
+  atacarlo.
+- Frontend: `tsc -b`, `eslint --max-warnings=0` sin errores. `vitest`
+  185/185 (sumé 2 casos a `PurchasingPages.test.tsx`: el prefill de
+  costo/tasa/margen/precio sugerido, y el cálculo exacto 62→71.30/73.16
+  reproduciendo tu caso). `vite build` OK.
+- **Verificado en el navegador por mí mismo**: puse margen 35% en
+  FILT-001 (costo L62) en Catálogo, fui a Compras → Registrar una factura,
+  agregué FILT-001 — Impuesto % mostró 15 por defecto, Margen % mostró 35
+  (heredado del catálogo), Precio de venta sugerido mostró L96.2550, y el
+  Total de la línea y la barra de totales mostraron **L71.30** (no L77, no
+  L62). Cambié la tasa a 18% y todo recalculó en vivo (L73.16, sugerido
+  L98.7660). Cliqueé "Actualizar precio de venta" y confirmé en la ficha
+  del producto que el precio de venta del catálogo pasó a L96.25. Revertí
+  el precio de prueba a L85.00 al terminar (dejé el margen de 35% real,
+  no es dato de prueba). No guardé la compra de prueba — quedó descartada
+  al no enviarse el formulario.
+
+## Estado al cierre de la Fase 24
+
+- Todo commiteado en `redesign/producto-ux`, en commits pequeños por
+  bloque. **Sin push** — a la espera de tu confirmación.
+- El dato borrado de `_prisma_migrations` y la recreación de los índices
+  trigram ya están aplicados en la base de datos local — no son cambios
+  de código, así que no aparecen en ningún commit; si se reconstruye la
+  base desde cero, la migración corregida ya no los va a volver a borrar.
+- **Nuevo hallazgo, sin tocar**: `today()` en Ventas y Compras usa
+  `new Date().toISOString()`, que puede adelantarse un día a la fecha de
+  negocio de Honduras entre las 6 p.m. y la medianoche. Afecta la fecha
+  por defecto en "Fecha del documento" de ambos módulos. Pendiente de tu
+  decisión sobre cuándo corregirlo.
+- Los hallazgos de la Fase 22 (pestañas Inventario/Cajas, IDs de actor)
+  siguen igual de pendientes.
